@@ -453,6 +453,7 @@ export type AuthBypassProviders = {
 
 export type AuthProviders = {
   __typename?: 'AuthProviders';
+  casdoor: Scalars['Boolean'];
   google: Scalars['Boolean'];
   magicLink: Scalars['Boolean'];
   microsoft: Scalars['Boolean'];

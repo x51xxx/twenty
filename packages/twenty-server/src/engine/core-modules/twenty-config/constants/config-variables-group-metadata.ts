@@ -136,8 +136,15 @@ export const CONFIG_VARIABLES_GROUP_METADATA: Record<
   [ConfigVariablesGroup.AWS_SES_SETTINGS]: {
     position: 2100,
     description:
-      'Configure AWS SES settings for emailing domains (mass outbound / feature not released yet)',
+      ‘Configure AWS SES settings for emailing domains (mass outbound / feature not released yet)’,
     isHiddenOnLoad: true,
     isHiddenInAdminPanel: true,
+  },
+  [ConfigVariablesGroup.CASDOOR_AUTH]: {
+    position: 2200,
+    description:
+      ‘Configure Casdoor as an external OIDC identity provider for authentication’,
+    isHiddenOnLoad: false,
+    isHiddenInAdminPanel: false,
   },
 };

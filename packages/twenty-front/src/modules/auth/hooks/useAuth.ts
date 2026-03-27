@@ -628,6 +628,18 @@ export const useAuth = () => {
     [buildRedirectUrl, redirect],
   );
 
+  const handleCasdoorLogin = useCallback(
+    (params: {
+      workspacePersonalInviteToken?: string;
+      workspaceInviteHash?: string;
+      billingCheckoutSession?: BillingCheckoutSession;
+      action: string;
+    }) => {
+      redirect(buildRedirectUrl('/auth/casdoor', params));
+    },
+    [buildRedirectUrl, redirect],
+  );
+
   const handleGetAuthTokensFromOTP = useCallback(
     async (otp: string, loginToken: string, captchaToken?: string) => {
       const getAuthTokensFromOtpResult = await getAuthTokensFromOtp({
@@ -669,6 +681,7 @@ export const useAuth = () => {
     signInWithCredentials: handleCredentialsSignIn,
     signInWithGoogle: handleGoogleLogin,
     signInWithMicrosoft: handleMicrosoftLogin,
+    signInWithCasdoor: handleCasdoorLogin,
     setAuthTokens: handleSetAuthTokens,
     getAuthTokensFromOTP: handleGetAuthTokensFromOTP,
   };

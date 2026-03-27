@@ -42,6 +42,7 @@ import { type WorkspaceInviteHashValidDTO } from 'src/engine/core-modules/auth/d
 import { AuthSsoService } from 'src/engine/core-modules/auth/services/auth-sso.service';
 import { CreateSSOConnectedAccountService } from 'src/engine/core-modules/auth/services/create-sso-connected-account.service';
 import { SignInUpService } from 'src/engine/core-modules/auth/services/sign-in-up.service';
+import { type CasdoorRequest } from 'src/engine/core-modules/auth/strategies/casdoor.auth.strategy';
 import { type GoogleRequest } from 'src/engine/core-modules/auth/strategies/google.auth.strategy';
 import { type MicrosoftRequest } from 'src/engine/core-modules/auth/strategies/microsoft.auth.strategy';
 import { AccessTokenService } from 'src/engine/core-modules/auth/token/services/access-token.service';
@@ -935,8 +936,14 @@ export class AuthService {
       billingCheckoutSessionState,
       action,
       locale,
-    }: MicrosoftRequest['user'] | GoogleRequest['user'],
-    authProvider: AuthProviderEnum.Google | AuthProviderEnum.Microsoft,
+    }:
+      | MicrosoftRequest['user']
+      | GoogleRequest['user']
+      | CasdoorRequest['user'],
+    authProvider:
+      | AuthProviderEnum.Google
+      | AuthProviderEnum.Microsoft
+      | AuthProviderEnum.Casdoor,
   ): Promise<string> {
     const email = rawEmail.toLowerCase();
 

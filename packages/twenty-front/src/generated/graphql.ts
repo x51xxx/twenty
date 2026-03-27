@@ -16,6 +16,7 @@ export type Scalars = {
   UUID: any;
 };
 
+
 export enum CalendarChannelVisibility {
   METADATA = 'METADATA',
   SHARE_EVERYTHING = 'SHARE_EVERYTHING'

@@ -242,6 +242,82 @@ export class ConfigVariables {
   CALENDAR_PROVIDER_MICROSOFT_ENABLED = false;
 
   @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.CASDOOR_AUTH,
+    description: 'Enable or disable Casdoor authentication',
+    type: ConfigVariableType.BOOLEAN,
+  })
+  @IsOptional()
+  AUTH_CASDOOR_ENABLED = false;
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.CASDOOR_AUTH,
+    isSensitive: false,
+    description:
+      'Internal Casdoor endpoint URL (used for server-to-server communication)',
+    type: ConfigVariableType.STRING,
+  })
+  @IsUrl({ require_tld: false, require_protocol: true })
+  @ValidateIf((env) => env.AUTH_CASDOOR_ENABLED)
+  CASDOOR_ENDPOINT: string;
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.CASDOOR_AUTH,
+    isSensitive: false,
+    description:
+      'Public Casdoor URL (used for browser redirects)',
+    type: ConfigVariableType.STRING,
+  })
+  @IsUrl({ require_tld: false, require_protocol: true })
+  @ValidateIf((env) => env.AUTH_CASDOOR_ENABLED)
+  CASDOOR_URL: string;
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.CASDOOR_AUTH,
+    isSensitive: false,
+    description: 'Client ID for the Casdoor application',
+    type: ConfigVariableType.STRING,
+  })
+  @ValidateIf((env) => env.AUTH_CASDOOR_ENABLED)
+  CASDOOR_CLIENT_ID: string;
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.CASDOOR_AUTH,
+    isSensitive: true,
+    description: 'Client secret for the Casdoor application',
+    type: ConfigVariableType.STRING,
+  })
+  @ValidateIf((env) => env.AUTH_CASDOOR_ENABLED)
+  CASDOOR_CLIENT_SECRET: string;
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.CASDOOR_AUTH,
+    isSensitive: false,
+    description: 'Casdoor organization name',
+    type: ConfigVariableType.STRING,
+  })
+  @IsOptional()
+  CASDOOR_ORG_NAME = 'built-in';
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.CASDOOR_AUTH,
+    isSensitive: false,
+    description: 'Casdoor application name',
+    type: ConfigVariableType.STRING,
+  })
+  @IsOptional()
+  CASDOOR_APP_NAME = 'twenty';
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.CASDOOR_AUTH,
+    isSensitive: false,
+    description: 'Callback URL for Casdoor authentication',
+    type: ConfigVariableType.STRING,
+  })
+  @IsUrl({ require_tld: false, require_protocol: true })
+  @ValidateIf((env) => env.AUTH_CASDOOR_ENABLED)
+  AUTH_CASDOOR_CALLBACK_URL: string;
+
+  @ConfigVariablesMetadata({
     group: ConfigVariablesGroup.TOKENS_DURATION,
     description: 'Duration for which the access token is valid',
     type: ConfigVariableType.STRING,

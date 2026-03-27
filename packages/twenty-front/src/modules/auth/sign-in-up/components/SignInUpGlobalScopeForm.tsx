@@ -7,6 +7,7 @@ import { FormProvider } from 'react-hook-form';
 import { ClickToActionLink, UndecoratedLink } from 'twenty-ui/navigation';
 
 import { useAuth } from '@/auth/hooks/useAuth';
+import { SignInUpWithCasdoor } from '@/auth/sign-in-up/components/internal/SignInUpWithCasdoor';
 import { SignInUpWithCredentials } from '@/auth/sign-in-up/components/internal/SignInUpWithCredentials';
 import { SignInUpWithGoogle } from '@/auth/sign-in-up/components/internal/SignInUpWithGoogle';
 import { SignInUpWithMicrosoft } from '@/auth/sign-in-up/components/internal/SignInUpWithMicrosoft';
@@ -241,9 +242,12 @@ export const SignInUpGlobalScopeForm = () => {
               isGlobalScope
             />
           )}
-          {(authProviders.google || authProviders.microsoft) && (
-            <HorizontalSeparator />
+          {authProviders.casdoor && (
+            <SignInUpWithCasdoor action="list-available-workspaces" />
           )}
+          {(authProviders.google ||
+            authProviders.microsoft ||
+            authProviders.casdoor) && <HorizontalSeparator />}
           {/* oxlint-disable-next-line react/jsx-props-no-spreading */}
           <FormProvider {...form}>
             <SignInUpWithCredentials isGlobalScope />

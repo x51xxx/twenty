@@ -1,3 +1,4 @@
+import { SignInUpWithCasdoor } from '@/auth/sign-in-up/components/internal/SignInUpWithCasdoor';
 import { SignInUpWithCredentials } from '@/auth/sign-in-up/components/internal/SignInUpWithCredentials';
 import { SignInUpWithGoogle } from '@/auth/sign-in-up/components/internal/SignInUpWithGoogle';
 import { SignInUpWithMicrosoft } from '@/auth/sign-in-up/components/internal/SignInUpWithMicrosoft';
@@ -57,10 +58,15 @@ export const SignInUpWorkspaceScopeForm = () => {
           <SignInUpWithMicrosoft action="join-workspace" />
         )}
 
+        {providers.casdoor && (
+          <SignInUpWithCasdoor action="join-workspace" />
+        )}
+
         {providers.sso.length > 0 && <SignInUpWithSSO />}
 
         {(providers.google ||
           providers.microsoft ||
+          providers.casdoor ||
           providers.sso.length > 0) &&
         providers.password ? (
           <HorizontalSeparator />
