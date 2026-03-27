@@ -26,6 +26,7 @@ export type CasdoorRequest = Omit<
     action: SocialSSOSignInUpActionType;
     workspaceId?: string;
     billingCheckoutSessionState?: string;
+    casdoorRoles: string[];
   };
 };
 
@@ -41,7 +42,7 @@ export class CasdoorStrategy extends PassportStrategy(Strategy, 'casdoor') {
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   async authenticate(req: Request, options: any) {
     return super.authenticate(req, {
       ...options,
@@ -76,10 +77,26 @@ export class CasdoorStrategy extends PassportStrategy(Strategy, 'casdoor') {
     }
   }
 
+  private extractRoles(
+    // oxlint-disable-next-line @typescripttypescript/no-explicit-any
+    userinfo: Record<string, any>,
+  ): string[] {
+    // Casdoor may return roles as array of strings or objects
+    const rawRoles = userinfo.roles ?? userinfo.groups ?? [];
+
+    if (!Array.isArray(rawRoles)) {
+      return [];
+    }
+
+    return rawRoles.map((role: string | { name: string }) =>
+      typeof role === 'string' ? role : role.name,
+    );
+  }
+
   async validate(
     req: Request,
     tokenset: TokenSet,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line @typescripttypescript/no-explicit-any
     done: (err: any, user?: CasdoorRequest['user']) => void,
   ) {
     try {
@@ -109,6 +126,9 @@ export class CasdoorStrategy extends PassportStrategy(Strategy, 'casdoor') {
         billingCheckoutSessionState: state.billingCheckoutSessionState,
         action: state.action ?? 'list-available-workspaces',
         locale: state.locale,
+        casdoorRoles: this.extractRoles(
+          userinfo as Record<string, unknown>,
+        ),
       });
     } catch (err) {
       done(err);

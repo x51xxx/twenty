@@ -318,6 +318,26 @@ export class ConfigVariables {
   AUTH_CASDOOR_CALLBACK_URL: string;
 
   @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.CASDOOR_AUTH,
+    isSensitive: false,
+    description:
+      'JSON mapping of Casdoor roles to Twenty role labels (e.g. {"casdoor-admin":"Admin","casdoor-member":"Member"})',
+    type: ConfigVariableType.STRING,
+  })
+  @IsOptional()
+  CASDOOR_ROLE_MAPPING = '';
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.CASDOOR_AUTH,
+    isSensitive: true,
+    description:
+      'Secret for verifying Casdoor webhook signatures',
+    type: ConfigVariableType.STRING,
+  })
+  @IsOptional()
+  CASDOOR_WEBHOOK_SECRET = '';
+
+  @ConfigVariablesMetadata({
     group: ConfigVariablesGroup.TOKENS_DURATION,
     description: 'Duration for which the access token is valid',
     type: ConfigVariableType.STRING,

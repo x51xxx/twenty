@@ -9,7 +9,9 @@ import { AppTokenService } from 'src/engine/core-modules/app-token/services/app-
 import { ApplicationEntity } from 'src/engine/core-modules/application/application.entity';
 import { ApplicationModule } from 'src/engine/core-modules/application/application.module';
 import { AuditModule } from 'src/engine/core-modules/audit/audit.module';
+import { CasdoorProviderModule } from 'src/engine/core-modules/auth/casdoor/casdoor-provider.module';
 import { CasdoorAuthController } from 'src/engine/core-modules/auth/controllers/casdoor-auth.controller';
+import { CasdoorRoleMappingService } from 'src/engine/core-modules/auth/services/casdoor-role-mapping.service';
 import { GoogleAPIsAuthController } from 'src/engine/core-modules/auth/controllers/google-apis-auth.controller';
 import { GoogleAuthController } from 'src/engine/core-modules/auth/controllers/google-auth.controller';
 import { MicrosoftAPIsAuthController } from 'src/engine/core-modules/auth/controllers/microsoft-apis-auth.controller';
@@ -64,6 +66,8 @@ import { ConnectedAccountDataAccessModule } from 'src/engine/metadata-modules/co
 import { MessageChannelDataAccessModule } from 'src/engine/metadata-modules/message-channel/data-access/message-channel-data-access.module';
 import { ObjectMetadataEntity } from 'src/engine/metadata-modules/object-metadata/object-metadata.entity';
 import { PermissionsModule } from 'src/engine/metadata-modules/permissions/permissions.module';
+import { RoleEntity } from 'src/engine/metadata-modules/role/role.entity';
+import { UserRoleModule } from 'src/engine/metadata-modules/user-role/user-role.module';
 import { WorkspaceCacheModule } from 'src/engine/workspace-cache/workspace-cache.module';
 import { CalendarChannelSyncStatusService } from 'src/modules/calendar/common/services/calendar-channel-sync-status.service';
 import { ConnectedAccountModule } from 'src/modules/connected-account/connected-account.module';
@@ -94,6 +98,7 @@ import { JwtAuthStrategy } from './strategies/jwt.auth.strategy';
       TwoFactorAuthenticationMethodEntity,
       ObjectMetadataEntity,
       ConnectedAccountEntity,
+      RoleEntity,
     ]),
     UserWorkspaceModule,
     OnboardingModule,
@@ -110,6 +115,7 @@ import { JwtAuthStrategy } from './strategies/jwt.auth.strategy';
     GuardRedirectModule,
     MetricsModule,
     PermissionsModule,
+    UserRoleModule,
     TwoFactorAuthenticationModule,
     ApiKeyModule,
     AuditModule,
@@ -121,6 +127,7 @@ import { JwtAuthStrategy } from './strategies/jwt.auth.strategy';
     SecureHttpClientModule,
     EnterpriseModule,
     FileModule,
+    CasdoorProviderModule,
   ],
   controllers: [
     CasdoorAuthController,
@@ -157,6 +164,7 @@ import { JwtAuthStrategy } from './strategies/jwt.auth.strategy';
     UpdateConnectedAccountOnReconnectService,
     TransientTokenService,
     AuthSsoService,
+    CasdoorRoleMappingService,
   ],
   exports: [
     AccessTokenService,
