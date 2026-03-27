@@ -16,6 +16,7 @@ import { CasdoorProviderEnabledGuard } from 'src/engine/core-modules/auth/guards
 import { AuthService } from 'src/engine/core-modules/auth/services/auth.service';
 import { CasdoorRequest } from 'src/engine/core-modules/auth/strategies/casdoor.auth.strategy';
 import { AuthProviderEnum } from 'src/engine/core-modules/workspace/types/workspace.type';
+import { NoPermissionGuard } from 'src/engine/guards/no-permission.guard';
 import { PublicEndpointGuard } from 'src/engine/guards/public-endpoint.guard';
 
 @Controller('auth/casdoor')
@@ -28,6 +29,7 @@ export class CasdoorAuthController {
     CasdoorProviderEnabledGuard,
     CasdoorAuthGuard,
     PublicEndpointGuard,
+    NoPermissionGuard,
   )
   async casdoorAuth() {
     // As this method is protected by Casdoor Auth guard, it will trigger Casdoor OIDC flow
@@ -39,6 +41,7 @@ export class CasdoorAuthController {
     CasdoorProviderEnabledGuard,
     CasdoorAuthGuard,
     PublicEndpointGuard,
+    NoPermissionGuard,
   )
   @UseFilters(AuthOAuthExceptionFilter)
   async casdoorAuthRedirect(
