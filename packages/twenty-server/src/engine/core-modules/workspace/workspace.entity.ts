@@ -1,6 +1,7 @@
 import { Field, ObjectType, registerEnumType } from '@nestjs/graphql';
 
 import { IDField } from '@ptc-org/nestjs-query-graphql';
+import { type Application } from 'cloudflare/resources/zero-trust/access/applications/applications';
 import { WorkspaceActivationStatus } from 'twenty-shared/workspace';
 import {
   Check,
@@ -9,38 +10,49 @@ import {
   DeleteDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
+  OneToOne,
   PrimaryGeneratedColumn,
-  Relation,
+  type Relation,
   UpdateDateColumn,
 } from 'typeorm';
 
 import { UUIDScalarType } from 'src/engine/api/graphql/workspace-schema-builder/graphql-types/scalars';
-import { ApiKey } from 'src/engine/core-modules/api-key/api-key.entity';
-import { AppToken } from 'src/engine/core-modules/app-token/app-token.entity';
-import { ApprovedAccessDomain } from 'src/engine/core-modules/approved-access-domain/approved-access-domain.entity';
-import { FeatureFlag } from 'src/engine/core-modules/feature-flag/feature-flag.entity';
-import { KeyValuePair } from 'src/engine/core-modules/key-value-pair/key-value-pair.entity';
-import { PostgresCredentials } from 'src/engine/core-modules/postgres-credentials/postgres-credentials.entity';
-import { WorkspaceSSOIdentityProvider } from 'src/engine/core-modules/sso/workspace-sso-identity-provider.entity';
-import { UserWorkspace } from 'src/engine/core-modules/user-workspace/user-workspace.entity';
-import { ViewFieldDTO } from 'src/engine/core-modules/view/dtos/view-field.dto';
-import { ViewFilterGroupDTO } from 'src/engine/core-modules/view/dtos/view-filter-group.dto';
-import { ViewFilterDTO } from 'src/engine/core-modules/view/dtos/view-filter.dto';
-import { ViewGroupDTO } from 'src/engine/core-modules/view/dtos/view-group.dto';
-import { ViewSortDTO } from 'src/engine/core-modules/view/dtos/view-sort.dto';
-import { ViewDTO } from 'src/engine/core-modules/view/dtos/view.dto';
-import { ViewFieldEntity } from 'src/engine/core-modules/view/entities/view-field.entity';
-import { ViewFilterGroupEntity } from 'src/engine/core-modules/view/entities/view-filter-group.entity';
-import { ViewFilterEntity } from 'src/engine/core-modules/view/entities/view-filter.entity';
-import { ViewGroupEntity } from 'src/engine/core-modules/view/entities/view-group.entity';
-import { ViewSortEntity } from 'src/engine/core-modules/view/entities/view-sort.entity';
-import { ViewEntity } from 'src/engine/core-modules/view/entities/view.entity';
-import { Webhook } from 'src/engine/core-modules/webhook/webhook.entity';
-import { AgentHandoffEntity } from 'src/engine/metadata-modules/agent/agent-handoff.entity';
-import { AgentEntity } from 'src/engine/metadata-modules/agent/agent.entity';
-import { AgentDTO } from 'src/engine/metadata-modules/agent/dtos/agent.dto';
+import { ApiKeyEntity } from 'src/engine/core-modules/api-key/api-key.entity';
+import { AppTokenEntity } from 'src/engine/core-modules/app-token/app-token.entity';
+import { ApplicationEntity } from 'src/engine/core-modules/application/application.entity';
+import { ApplicationDTO } from 'src/engine/core-modules/application/dtos/application.dto';
+import { ApprovedAccessDomainEntity } from 'src/engine/core-modules/approved-access-domain/approved-access-domain.entity';
+import { EmailingDomainEntity } from 'src/engine/core-modules/emailing-domain/emailing-domain.entity';
+import { FeatureFlagEntity } from 'src/engine/core-modules/feature-flag/feature-flag.entity';
+import { FileEntity } from 'src/engine/core-modules/file/entities/file.entity';
+import { KeyValuePairEntity } from 'src/engine/core-modules/key-value-pair/key-value-pair.entity';
+import { PostgresCredentialsEntity } from 'src/engine/core-modules/postgres-credentials/postgres-credentials.entity';
+import { PublicDomainEntity } from 'src/engine/core-modules/public-domain/public-domain.entity';
+import { WorkspaceSSOIdentityProviderEntity } from 'src/engine/core-modules/sso/workspace-sso-identity-provider.entity';
+import { UserWorkspaceEntity } from 'src/engine/core-modules/user-workspace/user-workspace.entity';
+import { AgentEntity } from 'src/engine/metadata-modules/ai/ai-agent/entities/agent.entity';
+import {
+  AUTO_SELECT_FAST_MODEL_ID,
+  AUTO_SELECT_SMART_MODEL_ID,
+} from 'twenty-shared/constants';
+import { type ModelId } from 'src/engine/metadata-modules/ai/ai-models/types/model-id.type';
 import { RoleDTO } from 'src/engine/metadata-modules/role/dtos/role.dto';
+import { ViewFieldDTO } from 'src/engine/metadata-modules/view-field/dtos/view-field.dto';
+import { ViewFieldEntity } from 'src/engine/metadata-modules/view-field/entities/view-field.entity';
+import { ViewFilterGroupDTO } from 'src/engine/metadata-modules/view-filter-group/dtos/view-filter-group.dto';
+import { ViewFilterGroupEntity } from 'src/engine/metadata-modules/view-filter-group/entities/view-filter-group.entity';
+import { ViewFilterDTO } from 'src/engine/metadata-modules/view-filter/dtos/view-filter.dto';
+import { ViewFilterEntity } from 'src/engine/metadata-modules/view-filter/entities/view-filter.entity';
+import { ViewGroupDTO } from 'src/engine/metadata-modules/view-group/dtos/view-group.dto';
+import { ViewGroupEntity } from 'src/engine/metadata-modules/view-group/entities/view-group.entity';
+import { ViewSortDTO } from 'src/engine/metadata-modules/view-sort/dtos/view-sort.dto';
+import { ViewSortEntity } from 'src/engine/metadata-modules/view-sort/entities/view-sort.entity';
+import { ViewDTO } from 'src/engine/metadata-modules/view/dtos/view.dto';
+import { ViewEntity } from 'src/engine/metadata-modules/view/entities/view.entity';
+import { WebhookEntity } from 'src/engine/metadata-modules/webhook/entities/webhook.entity';
 
 registerEnumType(WorkspaceActivationStatus, {
   name: 'WorkspaceActivationStatus',
@@ -51,8 +63,8 @@ registerEnumType(WorkspaceActivationStatus, {
   `"activationStatus" IN ('PENDING_CREATION', 'ONGOING_CREATION') OR "defaultRoleId" IS NOT NULL`,
 )
 @Entity({ name: 'workspace', schema: 'core' })
-@ObjectType()
-export class Workspace {
+@ObjectType('Workspace')
+export class WorkspaceEntity {
   // Fields
   @IDField(() => UUIDScalarType)
   @PrimaryGeneratedColumn('uuid')
@@ -62,9 +74,21 @@ export class Workspace {
   @Column({ nullable: true })
   displayName?: string;
 
+  //deprecated
   @Field({ nullable: true })
   @Column({ nullable: true })
   logo?: string;
+
+  @Field(() => UUIDScalarType, { nullable: true })
+  @Column({ nullable: true, type: 'uuid' })
+  logoFileId: string | null;
+
+  @OneToOne(() => FileEntity, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'logoFileId' })
+  logoFile: Relation<FileEntity>;
 
   @Field({ nullable: true })
   @Column({ nullable: true })
@@ -90,30 +114,55 @@ export class Workspace {
   @Column({ default: true })
   isPublicInviteLinkEnabled: boolean;
 
+  @Field()
+  @Column({ type: 'integer', default: 14 })
+  trashRetentionDays: number;
+
+  @Field()
+  @Column({ type: 'integer', default: 90 })
+  eventLogRetentionDays: number;
+
   // Relations
-  @OneToMany(() => AppToken, (appToken) => appToken.workspace, {
+  @OneToMany(() => AppTokenEntity, (appToken) => appToken.workspace, {
     cascade: true,
   })
-  appTokens: Relation<AppToken[]>;
-
-  @OneToMany(() => KeyValuePair, (keyValuePair) => keyValuePair.workspace, {
-    cascade: true,
-  })
-  keyValuePairs: Relation<KeyValuePair[]>;
-
-  @OneToMany(() => UserWorkspace, (userWorkspace) => userWorkspace.workspace, {
-    onDelete: 'CASCADE',
-  })
-  workspaceUsers: Relation<UserWorkspace[]>;
-
-  @OneToMany(() => FeatureFlag, (featureFlag) => featureFlag.workspace)
-  featureFlags: Relation<FeatureFlag[]>;
+  appTokens: Relation<AppTokenEntity[]>;
 
   @OneToMany(
-    () => ApprovedAccessDomain,
+    () => KeyValuePairEntity,
+    (keyValuePair) => keyValuePair.workspace,
+    {
+      cascade: true,
+    },
+  )
+  keyValuePairs: Relation<KeyValuePairEntity[]>;
+
+  @OneToMany(
+    () => UserWorkspaceEntity,
+    (userWorkspace) => userWorkspace.workspace,
+    {
+      onDelete: 'CASCADE',
+    },
+  )
+  workspaceUsers: Relation<UserWorkspaceEntity[]>;
+
+  @OneToMany(() => FeatureFlagEntity, (featureFlag) => featureFlag.workspace)
+  featureFlags: Relation<FeatureFlagEntity[]>;
+
+  @OneToMany(
+    () => ApprovedAccessDomainEntity,
     (approvedAccessDomain) => approvedAccessDomain.workspace,
   )
-  approvedAccessDomains: Relation<ApprovedAccessDomain[]>;
+  approvedAccessDomains: Relation<ApprovedAccessDomainEntity[]>;
+
+  @OneToMany(
+    () => EmailingDomainEntity,
+    (emailingDomain) => emailingDomain.workspace,
+  )
+  emailingDomains: Relation<EmailingDomainEntity[]>;
+
+  @OneToMany(() => PublicDomainEntity, (publicDomain) => publicDomain.workspace)
+  publicDomains: Relation<PublicDomainEntity[]>;
 
   @Field({ nullable: true })
   workspaceMembersCount: number;
@@ -128,33 +177,31 @@ export class Workspace {
   @Index('IDX_WORKSPACE_ACTIVATION_STATUS')
   activationStatus: WorkspaceActivationStatus;
 
-  @OneToMany(
-    () => PostgresCredentials,
-    (postgresCredentials) => postgresCredentials.workspace,
-  )
-  allPostgresCredentials: Relation<PostgresCredentials[]>;
+  @Column({ type: 'timestamptz', nullable: true })
+  suspendedAt: Date | null;
 
   @OneToMany(
-    () => WorkspaceSSOIdentityProvider,
+    () => PostgresCredentialsEntity,
+    (postgresCredentials) => postgresCredentials.workspace,
+  )
+  allPostgresCredentials: Relation<PostgresCredentialsEntity[]>;
+
+  @OneToMany(
+    () => WorkspaceSSOIdentityProviderEntity,
     (workspaceSSOIdentityProviders) => workspaceSSOIdentityProviders.workspace,
   )
-  workspaceSSOIdentityProviders: Relation<WorkspaceSSOIdentityProvider[]>;
+  workspaceSSOIdentityProviders: Relation<WorkspaceSSOIdentityProviderEntity[]>;
 
   @OneToMany(() => AgentEntity, (agent) => agent.workspace, {
     onDelete: 'CASCADE',
   })
   agents: Relation<AgentEntity[]>;
 
-  @OneToMany(() => AgentHandoffEntity, (handoff) => handoff.workspace, {
-    onDelete: 'CASCADE',
-  })
-  agentHandoffs: Relation<AgentHandoffEntity[]>;
+  @OneToMany(() => WebhookEntity, (webhook) => webhook.workspace)
+  webhooks: Relation<WebhookEntity[]>;
 
-  @OneToMany(() => Webhook, (webhook) => webhook.workspace)
-  webhooks: Relation<Webhook[]>;
-
-  @OneToMany(() => ApiKey, (apiKey) => apiKey.workspace)
-  apiKeys: Relation<ApiKey[]>;
+  @OneToMany(() => ApiKeyEntity, (apiKey) => apiKey.workspace)
+  apiKeys: Relation<ApiKeyEntity[]>;
 
   @Field(() => [ViewDTO], { nullable: true })
   @OneToMany(() => ViewEntity, (view) => view.workspace)
@@ -209,6 +256,10 @@ export class Workspace {
 
   @Field()
   @Column({ default: false })
+  isGoogleAuthBypassEnabled: boolean;
+
+  @Field()
+  @Column({ default: false })
   isTwoFactorAuthenticationEnforced: boolean;
 
   @Field()
@@ -216,12 +267,29 @@ export class Workspace {
   isPasswordAuthEnabled: boolean;
 
   @Field()
+  @Column({ default: false })
+  isPasswordAuthBypassEnabled: boolean;
+
+  @Field()
   @Column({ default: true })
   isMicrosoftAuthEnabled: boolean;
 
   @Field()
   @Column({ default: false })
+  isMicrosoftAuthBypassEnabled: boolean;
+
+  @Field()
+  @Column({ default: false })
   isCustomDomainEnabled: boolean;
+
+  @Field(() => [String], { nullable: true })
+  @Column({
+    type: 'varchar',
+    array: true,
+    nullable: true,
+    default: '{email,profilePicture,firstName,lastName}',
+  })
+  editableProfileFields: string[] | null;
 
   // TODO: set as non nullable
   @Column({ nullable: true, type: 'uuid' })
@@ -230,14 +298,63 @@ export class Workspace {
   @Field(() => RoleDTO, { nullable: true })
   defaultRole: RoleDTO | null;
 
-  // TODO: set as non nullable
-  @Column({ nullable: true, type: 'uuid' })
-  defaultAgentId: string | null;
-
-  @Field(() => AgentDTO, { nullable: true })
-  defaultAgent: AgentDTO | null;
-
   @Field(() => String, { nullable: true })
   @Column({ type: 'varchar', nullable: true })
   version: string | null;
+
+  @Field(() => String, { nullable: false })
+  @Column({
+    type: 'varchar',
+    nullable: false,
+    default: AUTO_SELECT_FAST_MODEL_ID,
+  })
+  fastModel: ModelId;
+
+  @Field(() => String, { nullable: false })
+  @Column({
+    type: 'varchar',
+    nullable: false,
+    default: AUTO_SELECT_SMART_MODEL_ID,
+  })
+  smartModel: ModelId;
+
+  @Field(() => String, { nullable: true })
+  @Column({ type: 'text', nullable: true })
+  aiAdditionalInstructions: string | null;
+
+  @Field(() => [String], { nullable: true })
+  @Column({
+    type: 'varchar',
+    array: true,
+    nullable: false,
+    default: '{}',
+  })
+  enabledAiModelIds: string[];
+
+  @Field(() => Boolean, { nullable: false })
+  @Column({ type: 'boolean', nullable: false, default: true })
+  useRecommendedModels: boolean;
+
+  @Column({ nullable: false, type: 'uuid' })
+  workspaceCustomApplicationId: string;
+
+  // TODO: delete
+  // This is deprecated
+  // If we are in December 2025 you can remove this column from DB
+  @Field(() => String, { nullable: false })
+  @Column({ type: 'varchar', nullable: false, default: 'auto' })
+  routerModel: ModelId;
+
+  @Field(() => ApplicationDTO, { nullable: true })
+  @ManyToOne(() => ApplicationEntity, {
+    onDelete: 'RESTRICT',
+    nullable: false,
+  })
+  @JoinColumn({ name: 'workspaceCustomApplicationId' })
+  workspaceCustomApplication: Relation<ApplicationEntity>;
+
+  @OneToMany(() => ApplicationEntity, (application) => application.workspace, {
+    onDelete: 'CASCADE',
+  })
+  applications: Relation<Application[]>;
 }

@@ -1,23 +1,22 @@
+import { getRelativeDateFilterTimeZoneAbbreviation } from '@/object-record/object-filter-dropdown/utils/getRelativeDateFilterTimeZoneAbbreviation';
 import { plural } from 'pluralize';
+
 import {
-  type VariableDateViewFilterValueDirection,
-  type VariableDateViewFilterValueUnit,
-} from 'twenty-shared/types';
-import { capitalize } from 'twenty-shared/utils';
+  capitalize,
+  isDefined,
+  type RelativeDateFilter,
+} from 'twenty-shared/utils';
 
 export const getRelativeDateDisplayValue = (
-  relativeDate: {
-    direction: VariableDateViewFilterValueDirection;
-    amount?: number;
-    unit: VariableDateViewFilterValueUnit;
-  } | null,
+  relativeDate: RelativeDateFilter,
+  shouldDisplayTimeZoneAbbreviation?: boolean,
 ) => {
-  if (!relativeDate) return '';
+  if (!isDefined(relativeDate)) return '';
   const { direction, amount, unit } = relativeDate;
 
-  const directionStr = capitalize(direction.toLowerCase());
-  const amountStr = direction === 'THIS' ? '' : amount;
-  const unitStr =
+  const directionFormatted = capitalize(direction.toLowerCase());
+  const amountFormatted = direction === 'THIS' ? '' : amount;
+  let unitFormatted =
     direction === 'THIS'
       ? unit.toLowerCase()
       : amount
@@ -26,7 +25,14 @@ export const getRelativeDateDisplayValue = (
           : unit.toLowerCase()
         : undefined;
 
-  return [directionStr, amountStr, unitStr]
+  if (isDefined(relativeDate.timezone)) {
+    const timeZoneAbbreviation =
+      getRelativeDateFilterTimeZoneAbbreviation(relativeDate);
+
+    unitFormatted = `${unitFormatted ?? ''}${shouldDisplayTimeZoneAbbreviation ? ` (${timeZoneAbbreviation})` : ''}`;
+  }
+
+  return [directionFormatted, amountFormatted, unitFormatted]
     .filter((item) => item !== undefined)
     .join(' ');
 };

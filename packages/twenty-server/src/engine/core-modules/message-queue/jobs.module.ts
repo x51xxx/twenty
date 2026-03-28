@@ -6,19 +6,25 @@ import { TypeORMModule } from 'src/database/typeorm/typeorm.module';
 import { AuditJobModule } from 'src/engine/core-modules/audit/jobs/audit-job.module';
 import { AuthModule } from 'src/engine/core-modules/auth/auth.module';
 import { BillingModule } from 'src/engine/core-modules/billing/billing.module';
-import { BillingSubscription } from 'src/engine/core-modules/billing/entities/billing-subscription.entity';
+import { BillingSubscriptionEntity } from 'src/engine/core-modules/billing/entities/billing-subscription.entity';
 import { UpdateSubscriptionQuantityJob } from 'src/engine/core-modules/billing/jobs/update-subscription-quantity.job';
 import { StripeModule } from 'src/engine/core-modules/billing/stripe/stripe.module';
 import { EmailSenderJob } from 'src/engine/core-modules/email/email-sender.job';
 import { EmailModule } from 'src/engine/core-modules/email/email.module';
+import { EnterpriseModule } from 'src/engine/core-modules/enterprise/enterprise.module';
 import { UserWorkspaceModule } from 'src/engine/core-modules/user-workspace/user-workspace.module';
+import { UpdateWorkspaceMemberEmailJob } from 'src/engine/core-modules/user/jobs/update-workspace-member-email.job';
 import { UserVarsModule } from 'src/engine/core-modules/user/user-vars/user-vars.module';
 import { UserModule } from 'src/engine/core-modules/user/user.module';
 import { HandleWorkspaceMemberDeletedJob } from 'src/engine/core-modules/workspace/handle-workspace-member-deleted.job';
-import { Workspace } from 'src/engine/core-modules/workspace/workspace.entity';
+import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { WorkspaceModule } from 'src/engine/core-modules/workspace/workspace.module';
+import { AiAgentMonitorModule } from 'src/engine/metadata-modules/ai/ai-agent-monitor/ai-agent-monitor.module';
 import { DataSourceModule } from 'src/engine/metadata-modules/data-source/data-source.module';
+import { LogicFunctionModule } from 'src/engine/metadata-modules/logic-function/logic-function.module';
+import { NavigationMenuItemModule } from 'src/engine/metadata-modules/navigation-menu-item/navigation-menu-item.module';
 import { ObjectMetadataModule } from 'src/engine/metadata-modules/object-metadata/object-metadata.module';
+import { WebhookJobModule } from 'src/engine/metadata-modules/webhook/jobs/webhook-job.module';
 import { SubscriptionsModule } from 'src/engine/subscriptions/subscriptions.module';
 import { CleanOnboardingWorkspacesJob } from 'src/engine/workspace-manager/workspace-cleaner/crons/clean-onboarding-workspaces.job';
 import { CleanSuspendedWorkspacesJob } from 'src/engine/workspace-manager/workspace-cleaner/crons/clean-suspended-workspaces.job';
@@ -31,14 +37,11 @@ import { FavoriteModule } from 'src/modules/favorite/favorite.module';
 import { MessagingModule } from 'src/modules/messaging/messaging.module';
 import { TimelineJobModule } from 'src/modules/timeline/jobs/timeline-job.module';
 import { TimelineActivityModule } from 'src/modules/timeline/timeline-activity.module';
-import { WebhookJobModule } from 'src/engine/core-modules/webhook/jobs/webhook-job.module';
 import { WorkflowModule } from 'src/modules/workflow/workflow.module';
-import { TriggerModule } from 'src/engine/metadata-modules/trigger/trigger.module';
-import { ServerlessFunctionModule } from 'src/engine/metadata-modules/serverless-function/serverless-function.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Workspace, BillingSubscription]),
+    TypeOrmModule.forFeature([WorkspaceEntity, BillingSubscriptionEntity]),
     DataSourceModule,
     ObjectMetadataModule,
     TypeORMModule,
@@ -59,11 +62,13 @@ import { ServerlessFunctionModule } from 'src/engine/metadata-modules/serverless
     WebhookJobModule,
     WorkflowModule,
     FavoriteModule,
+    NavigationMenuItemModule,
     WorkspaceCleanerModule,
     SubscriptionsModule,
     AuditJobModule,
-    TriggerModule,
-    ServerlessFunctionModule,
+    AiAgentMonitorModule,
+    LogicFunctionModule,
+    EnterpriseModule,
   ],
   providers: [
     CleanSuspendedWorkspacesJob,
@@ -72,6 +77,7 @@ import { ServerlessFunctionModule } from 'src/engine/metadata-modules/serverless
     UpdateSubscriptionQuantityJob,
     HandleWorkspaceMemberDeletedJob,
     CleanWorkspaceDeletionWarningUserVarsJob,
+    UpdateWorkspaceMemberEmailJob,
   ],
 })
 export class JobsModule {

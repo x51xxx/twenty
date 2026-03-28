@@ -5,7 +5,9 @@ import { type SpreadsheetImportFields } from '@/spreadsheet-import/types';
 import { type SpreadsheetColumn } from '@/spreadsheet-import/types/SpreadsheetColumn';
 import { type SpreadsheetColumns } from '@/spreadsheet-import/types/SpreadsheetColumns';
 import { SpreadsheetColumnType } from '@/spreadsheet-import/types/SpreadsheetColumnType';
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
+import { t } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react/macro';
 import { useState } from 'react';
 import { isDefined } from 'twenty-shared/utils';
@@ -14,15 +16,16 @@ import { AnimatedExpandableContainer } from 'twenty-ui/layout';
 const getExpandableContainerTitle = (
   fields: SpreadsheetImportFields,
   column: SpreadsheetColumn,
-) => {
+): string => {
   const fieldLabel = fields.find(
     (field) => 'value' in column && field.key === column.value,
   )?.label;
 
-  return `Match ${fieldLabel} (${
+  const unmatchedCount =
     'matchedOptions' in column &&
-    column.matchedOptions?.filter((option) => !isDefined(option.value)).length
-  } Unmatched)`;
+    column.matchedOptions?.filter((option) => !isDefined(option.value)).length;
+
+  return t`Match ${fieldLabel} (${unmatchedCount} Unmatched)`;
 };
 
 type UnmatchColumnProps = {
@@ -39,9 +42,9 @@ const StyledContainer = styled.div`
 const StyledContentWrapper = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.spacing(3)};
-  margin-top: ${({ theme }) => theme.spacing(4)};
-  padding-bottom: ${({ theme }) => theme.spacing(4)};
+  gap: ${themeCssVariables.spacing[3]};
+  margin-top: ${themeCssVariables.spacing[4]};
+  padding-bottom: ${themeCssVariables.spacing[4]};
 `;
 
 export const UnmatchColumn = ({

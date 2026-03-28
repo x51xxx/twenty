@@ -1,10 +1,19 @@
 import { type FieldDateMetadataSettings } from '@/object-record/record-field/ui/types/FieldMetadata';
+import { TimeZoneAbbreviation } from '@/ui/input/components/internal/date/components/TimeZoneAbbreviation';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { UserContext } from '@/users/contexts/UserContext';
+import { styled } from '@linaria/react';
+import { isNonEmptyString } from '@sniptt/guards';
 import { useContext } from 'react';
-import { useRecoilValue } from 'recoil';
+import { Temporal } from 'temporal-polyfill';
 import { dateLocaleState } from '~/localization/states/dateLocaleState';
 import { formatDateTimeString } from '~/utils/string/formatDateTimeString';
 import { EllipsisDisplay } from './EllipsisDisplay';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
+
+const StyledTimeZoneSpacer = styled.span`
+  min-width: ${themeCssVariables.spacing[1]};
+`;
 
 type DateTimeDisplayProps = {
   value: string | null | undefined;
@@ -16,7 +25,7 @@ export const DateTimeDisplay = ({
   dateFieldSettings,
 }: DateTimeDisplayProps) => {
   const { dateFormat, timeFormat, timeZone } = useContext(UserContext);
-  const dateLocale = useRecoilValue(dateLocaleState);
+  const dateLocale = useAtomStateValue(dateLocaleState);
 
   const formattedDate = formatDateTimeString({
     value,
@@ -27,5 +36,16 @@ export const DateTimeDisplay = ({
     localeCatalog: dateLocale.localeCatalog,
   });
 
-  return <EllipsisDisplay>{formattedDate}</EllipsisDisplay>;
+  return (
+    <EllipsisDisplay>
+      {formattedDate}
+      <span></span>
+      {isNonEmptyString(value) && (
+        <>
+          <StyledTimeZoneSpacer />
+          <TimeZoneAbbreviation instant={Temporal.Instant.from(value)} />
+        </>
+      )}
+    </EllipsisDisplay>
+  );
 };

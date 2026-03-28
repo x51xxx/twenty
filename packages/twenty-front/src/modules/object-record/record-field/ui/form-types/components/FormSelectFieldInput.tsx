@@ -1,23 +1,26 @@
+import { t } from '@lingui/core/macro';
 import { FormFieldInputContainer } from '@/object-record/record-field/ui/form-types/components/FormFieldInputContainer';
 import { FormFieldInputInnerContainer } from '@/object-record/record-field/ui/form-types/components/FormFieldInputInnerContainer';
 import { FormFieldInputRowContainer } from '@/object-record/record-field/ui/form-types/components/FormFieldInputRowContainer';
 import { VariableChipStandalone } from '@/object-record/record-field/ui/form-types/components/VariableChipStandalone';
 import { type VariablePickerComponent } from '@/object-record/record-field/ui/form-types/types/VariablePickerComponent';
+import { InputHint } from '@/ui/input/components/InputHint';
 import { InputLabel } from '@/ui/input/components/InputLabel';
 import { Select } from '@/ui/input/components/Select';
 import { GenericDropdownContentWidth } from '@/ui/layout/dropdown/constants/GenericDropdownContentWidth';
 import { useRemoveFocusItemFromFocusStackById } from '@/ui/utilities/focus/hooks/useRemoveFocusItemFromFocusStackById';
 import { useHotkeysOnFocusedElement } from '@/ui/utilities/hotkey/hooks/useHotkeysOnFocusedElement';
 import { isStandaloneVariableString } from '@/workflow/utils/isStandaloneVariableString';
-import { useTheme } from '@emotion/react';
-import { useId, useState } from 'react';
+import { useContext, useId, useState } from 'react';
 import { Key } from 'ts-key-enum';
 import { isDefined } from 'twenty-shared/utils';
 import { IconCircleOff } from 'twenty-ui/display';
 import { type SelectOption } from 'twenty-ui/input';
+import { ThemeContext } from 'twenty-ui/theme-constants';
 
 type FormSelectFieldInputProps = {
   label?: string;
+  hint?: string;
   defaultValue: string | undefined;
   onChange: (value: string | null) => void;
   VariablePicker?: VariablePickerComponent;
@@ -27,14 +30,14 @@ type FormSelectFieldInputProps = {
 
 export const FormSelectFieldInput = ({
   label,
+  hint,
   defaultValue,
   onChange,
   VariablePicker,
   options,
   readonly,
 }: FormSelectFieldInputProps) => {
-  const theme = useTheme();
-
+  const { theme } = useContext(ThemeContext);
   const instanceId = useId();
 
   const { removeFocusItemFromFocusStackById } =
@@ -92,10 +95,10 @@ export const FormSelectFieldInput = ({
     (option) => option.value === draftValue.value,
   );
 
-  const emptyOption = {
-    label: `No ${label}`,
+  const defaultEmptyOption = {
+    label: label ? t`No ${label}` : t`No value`,
     value: '',
-    Icon: IconCircleOff,
+    icon: IconCircleOff,
   };
 
   const handleUnlinkVariable = () => {
@@ -135,13 +138,15 @@ export const FormSelectFieldInput = ({
             options={options}
             value={selectedOption?.value}
             onChange={onSelect}
-            emptyOption={emptyOption}
+            emptyOption={defaultEmptyOption}
             fullWidth
             hasRightElement={isDefined(VariablePicker) && !readonly}
             withSearchInput
             disabled={readonly}
             dropdownWidth={GenericDropdownContentWidth.ExtraLarge}
-            dropdownOffset={{ y: parseInt(theme.spacing(1), 10) }}
+            dropdownOffset={{
+              y: parseInt(theme.spacing[1], 10),
+            }}
           />
         ) : (
           <FormFieldInputInnerContainer
@@ -162,6 +167,7 @@ export const FormSelectFieldInput = ({
           />
         )}
       </FormFieldInputRowContainer>
+      {hint && <InputHint>{hint}</InputHint>}
     </FormFieldInputContainer>
   );
 };

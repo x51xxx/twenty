@@ -1,5 +1,8 @@
 import isEmpty from 'lodash.isempty';
-import { type ObjectsPermissionsDeprecated } from 'twenty-shared/types';
+import {
+  type ObjectsPermissions,
+  type ObjectsPermissionsByRoleId,
+} from 'twenty-shared/types';
 import { isDefined } from 'twenty-shared/utils';
 import {
   type DeleteResult,
@@ -34,91 +37,152 @@ import { type FeatureFlagMap } from 'src/engine/core-modules/feature-flag/interf
 import { type WorkspaceInternalContext } from 'src/engine/twenty-orm/interfaces/workspace-internal-context.interface';
 
 import { DatabaseEventAction } from 'src/engine/api/graphql/graphql-query-runner/enums/database-event-action';
-import { type AuthContext } from 'src/engine/core-modules/auth/types/auth-context.type';
+import { type WorkspaceAuthContext } from 'src/engine/core-modules/auth/types/workspace-auth-context.type';
 import { InternalServerError } from 'src/engine/core-modules/graphql/utils/graphql-errors.util';
+import { findFlatEntityByIdInFlatEntityMaps } from 'src/engine/metadata-modules/flat-entity/utils/find-flat-entity-by-id-in-flat-entity-maps.util';
+import { type FlatObjectMetadata } from 'src/engine/metadata-modules/flat-object-metadata/types/flat-object-metadata.type';
 import {
   PermissionsException,
   PermissionsExceptionCode,
 } from 'src/engine/metadata-modules/permissions/permissions.exception';
-import { type ObjectMetadataItemWithFieldMaps } from 'src/engine/metadata-modules/types/object-metadata-item-with-field-maps';
-import { type WorkspaceDataSource } from 'src/engine/twenty-orm/datasource/workspace.datasource';
+import { type BaseWorkspaceEntity } from 'src/engine/twenty-orm/base.workspace-entity';
 import { type DeepPartialWithNestedRelationFields } from 'src/engine/twenty-orm/entity-manager/types/deep-partial-entity-with-nested-relation-fields.type';
 import { type QueryDeepPartialEntityWithNestedRelationFields } from 'src/engine/twenty-orm/entity-manager/types/query-deep-partial-entity-with-nested-relation-fields.type';
 import { getEntityTarget } from 'src/engine/twenty-orm/entity-manager/utils/get-entity-target';
 import { computeTwentyORMException } from 'src/engine/twenty-orm/error-handling/compute-twenty-orm-exception';
-import { RelationNestedQueries } from 'src/engine/twenty-orm/relation-nested-queries/relation-nested-queries';
+import { FilesFieldSync } from 'src/engine/twenty-orm/field-operations/files-field-sync/files-field-sync';
+import { RelationNestedQueries } from 'src/engine/twenty-orm/field-operations/relation-nested-queries/relation-nested-queries';
+import { type GlobalWorkspaceDataSource } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-datasource';
 import {
   type OperationType,
   validateOperationIsPermittedOrThrow,
 } from 'src/engine/twenty-orm/repository/permissions.utils';
 import { WorkspaceSelectQueryBuilder } from 'src/engine/twenty-orm/repository/workspace-select-query-builder';
 import { WorkspaceRepository } from 'src/engine/twenty-orm/repository/workspace.repository';
+import { getWorkspaceContext } from 'src/engine/twenty-orm/storage/orm-workspace-context.storage';
+import { type RolePermissionConfig } from 'src/engine/twenty-orm/types/role-permission-config';
+import { computePermissionIntersection } from 'src/engine/twenty-orm/utils/compute-permission-intersection.util';
 import { formatData } from 'src/engine/twenty-orm/utils/format-data.util';
 import { formatResult } from 'src/engine/twenty-orm/utils/format-result.util';
+import { formatTwentyOrmEventToDatabaseBatchEvent } from 'src/engine/twenty-orm/utils/format-twenty-orm-event-to-database-batch-event.util';
 import { getObjectMetadataFromEntityTarget } from 'src/engine/twenty-orm/utils/get-object-metadata-from-entity-target.util';
+import { type WorkspaceEventEmitter } from 'src/engine/workspace-event-emitter/workspace-event-emitter';
 
 type PermissionOptions = {
   shouldBypassPermissionChecks?: boolean;
-  objectRecordsPermissions?: ObjectsPermissionsDeprecated;
+  objectRecordsPermissions?: ObjectsPermissions;
 };
 
 export class WorkspaceEntityManager extends EntityManager {
-  private readonly internalContext: WorkspaceInternalContext;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   readonly repositories: Map<string, Repository<any>>;
-  declare connection: WorkspaceDataSource;
+  declare connection: GlobalWorkspaceDataSource;
 
   constructor(
-    internalContext: WorkspaceInternalContext,
-    connection: WorkspaceDataSource,
+    connection: GlobalWorkspaceDataSource,
     queryRunner?: QueryRunner,
   ) {
     super(connection, queryRunner);
-    this.internalContext = internalContext;
     this.repositories = new Map();
+  }
+
+  private get eventEmitterService(): WorkspaceEventEmitter {
+    return this.connection.eventEmitterService;
+  }
+
+  get authContext(): WorkspaceAuthContext {
+    const context = getWorkspaceContext();
+
+    return context.authContext;
+  }
+
+  get internalContext(): WorkspaceInternalContext {
+    const context = getWorkspaceContext();
+
+    return {
+      workspaceId: context.authContext.workspace.id,
+      flatObjectMetadataMaps: context.flatObjectMetadataMaps,
+      flatFieldMetadataMaps: context.flatFieldMetadataMaps,
+      flatIndexMaps: context.flatIndexMaps,
+      flatRowLevelPermissionPredicateMaps:
+        context.flatRowLevelPermissionPredicateMaps,
+      flatRowLevelPermissionPredicateGroupMaps:
+        context.flatRowLevelPermissionPredicateGroupMaps,
+      objectIdByNameSingular: context.objectIdByNameSingular,
+      featureFlagsMap: context.featureFlagsMap,
+      userWorkspaceRoleMap: context.userWorkspaceRoleMap,
+      eventEmitterService: this.eventEmitterService,
+      coreDataSource: this.connection.coreDataSource,
+    };
   }
 
   getFeatureFlagMap(): FeatureFlagMap {
     return this.connection.featureFlagMap;
   }
 
+  private getPermissionsForRole(
+    roleId: string,
+    permissionsPerRoleId: ObjectsPermissionsByRoleId,
+  ): ObjectsPermissions {
+    if (!isDefined(permissionsPerRoleId?.[roleId])) {
+      throw new PermissionsException(
+        `No permissions found for role in datasource (roleId: ${roleId})`,
+        PermissionsExceptionCode.NO_PERMISSIONS_FOUND_IN_DATASOURCE,
+      );
+    }
+
+    return permissionsPerRoleId[roleId];
+  }
+
   override getRepository<Entity extends ObjectLiteral>(
     target: EntityTarget<Entity>,
-    permissionOptions?: {
-      shouldBypassPermissionChecks?: boolean;
-      roleId?: string;
-    },
-    authContext?: AuthContext,
+    rolePermissionConfig?: RolePermissionConfig,
+    authContext?: WorkspaceAuthContext,
   ): WorkspaceRepository<Entity> {
     const dataSource = this.connection;
 
     let objectPermissions = {};
+    let shouldBypassPermissionChecks = false;
+    const objectPermissionsByRoleId = dataSource.permissionsPerRoleId;
 
-    if (permissionOptions?.roleId) {
-      const objectPermissionsByRoleId = dataSource.permissionsPerRoleId;
+    if (
+      rolePermissionConfig &&
+      'shouldBypassPermissionChecks' in rolePermissionConfig
+    ) {
+      shouldBypassPermissionChecks =
+        rolePermissionConfig.shouldBypassPermissionChecks;
+    }
 
-      if (!isDefined(objectPermissionsByRoleId?.[permissionOptions.roleId])) {
-        throw new PermissionsException(
-          `No permissions found for role in datasource (missing ${
-            !isDefined(objectPermissionsByRoleId)
-              ? 'objectPermissionsByRoleId object'
-              : `roleId in objectPermissionsByRoleId object (${permissionOptions.roleId})`
-          })`,
-          PermissionsExceptionCode.NO_PERMISSIONS_FOUND_IN_DATASOURCE,
+    if (rolePermissionConfig && 'unionOf' in rolePermissionConfig) {
+      if (rolePermissionConfig.unionOf.length === 1) {
+        objectPermissions = this.getPermissionsForRole(
+          rolePermissionConfig.unionOf[0],
+          objectPermissionsByRoleId,
         );
       } else {
-        objectPermissions = objectPermissionsByRoleId[permissionOptions.roleId];
+        // TODO: Implement union logic for combining permissions across multiple roles
+        throw new Error(
+          'Union permission logic for multiple roles not yet implemented',
+        );
       }
     }
 
+    if (rolePermissionConfig && 'intersectionOf' in rolePermissionConfig) {
+      const allRolePermissions = rolePermissionConfig.intersectionOf.map(
+        (roleId: string) =>
+          this.getPermissionsForRole(roleId, objectPermissionsByRoleId),
+      );
+
+      objectPermissions = computePermissionIntersection(allRolePermissions);
+    }
+
     const newRepository = new WorkspaceRepository<Entity>(
-      this.internalContext,
       target,
       this,
       dataSource.featureFlagMap,
       this.queryRunner,
       objectPermissions,
-      permissionOptions?.shouldBypassPermissionChecks,
+      shouldBypassPermissionChecks,
       authContext,
     );
 
@@ -131,7 +195,7 @@ export class WorkspaceEntityManager extends EntityManager {
     queryRunner?: QueryRunner,
     options: {
       shouldBypassPermissionChecks?: boolean;
-      objectRecordsPermissions?: ObjectsPermissionsDeprecated;
+      objectRecordsPermissions?: ObjectsPermissions;
     } = {
       shouldBypassPermissionChecks: false,
       objectRecordsPermissions: {},
@@ -162,7 +226,7 @@ export class WorkspaceEntityManager extends EntityManager {
       options?.objectRecordsPermissions ?? {},
       this.internalContext,
       options?.shouldBypassPermissionChecks ?? false,
-      undefined,
+      this.authContext,
       this.getFeatureFlagMap(),
     );
   }
@@ -174,7 +238,7 @@ export class WorkspaceEntityManager extends EntityManager {
       | QueryDeepPartialEntityWithNestedRelationFields<Entity>[],
     selectedColumns: string[] | '*' = '*',
     permissionOptions?: PermissionOptions,
-    authContext?: AuthContext,
+    authContext?: WorkspaceAuthContext,
   ): Promise<InsertResult> {
     const metadata = this.connection.getMetadata(target);
 
@@ -185,7 +249,7 @@ export class WorkspaceEntityManager extends EntityManager {
       permissionOptions,
     )
       .insert()
-      .setAuthContext(authContext ?? {})
+      .setWorkspaceAuthContext(authContext ?? ({} as WorkspaceAuthContext))
       .values(entity)
       .returning(selectedColumns)
       .execute();
@@ -199,7 +263,7 @@ export class WorkspaceEntityManager extends EntityManager {
     conflictPathsOrOptions: string[] | UpsertOptions<Entity>,
     permissionOptions?: {
       shouldBypassPermissionChecks?: boolean;
-      objectRecordsPermissions?: ObjectsPermissionsDeprecated;
+      objectRecordsPermissions?: ObjectsPermissions;
     },
     selectedColumns: string[] | '*' = '*',
   ): Promise<InsertResult> {
@@ -233,7 +297,20 @@ export class WorkspaceEntityManager extends EntityManager {
         ),
     );
 
-    return this.createQueryBuilder(
+    const overwrites = [...conflictColumns, ...overwriteColumns].map(
+      (col) => col.databaseName,
+    );
+
+    const conflictTargets = conflictColumns.map((col) => col.databaseName);
+
+    const upsertOptions = {
+      skipUpdateIfNoValuesChanged: options.skipUpdateIfNoValuesChanged,
+      indexPredicate: options.indexPredicate,
+      upsertType:
+        options.upsertType || this.connection.driver.supportedUpsertTypes[0],
+    };
+
+    const queryBuilder = this.createQueryBuilder(
       undefined,
       undefined,
       undefined,
@@ -242,21 +319,10 @@ export class WorkspaceEntityManager extends EntityManager {
       .insert()
       .into(target)
       .values(entities)
-      .orUpdate(
-        [...conflictColumns, ...overwriteColumns].map(
-          (col) => col.databaseName,
-        ),
-        conflictColumns.map((col) => col.databaseName),
-        {
-          skipUpdateIfNoValuesChanged: options.skipUpdateIfNoValuesChanged,
-          indexPredicate: options.indexPredicate,
-          upsertType:
-            options.upsertType ||
-            this.connection.driver.supportedUpsertTypes[0],
-        },
-      )
-      .returning(selectedColumns)
-      .execute();
+      .orUpdate(overwrites, conflictTargets, upsertOptions)
+      .returning(selectedColumns);
+
+    return queryBuilder.execute();
   }
 
   override update<Entity extends ObjectLiteral>(
@@ -362,7 +428,7 @@ export class WorkspaceEntityManager extends EntityManager {
     if (isNaN(Number(value)))
       throw new TypeORMError(`Value "${value}" is not a number.`);
     // convert possible embeded path "social.likes" into object { social: { like: () => value } }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line @typescripttypescript/no-explicit-any
     const values = propertyPath.split('.').reduceRight<any>(
       (value, key) => ({ [key]: value }),
       () => this.connection.driver.escape(column.databaseName) + ' + ' + value,
@@ -388,7 +454,7 @@ export class WorkspaceEntityManager extends EntityManager {
     operationType: OperationType;
     permissionOptions?: {
       shouldBypassPermissionChecks?: boolean;
-      objectRecordsPermissions?: ObjectsPermissionsDeprecated;
+      objectRecordsPermissions?: ObjectsPermissions;
     };
     selectedColumns: string[];
     updatedColumns?: string[];
@@ -406,7 +472,9 @@ export class WorkspaceEntityManager extends EntityManager {
       entityName,
       operationType,
       objectsPermissions: permissionOptions?.objectRecordsPermissions ?? {},
-      objectMetadataMaps: this.internalContext.objectMetadataMaps,
+      flatObjectMetadataMaps: this.internalContext.flatObjectMetadataMaps,
+      flatFieldMetadataMaps: this.internalContext.flatFieldMetadataMaps,
+      objectIdByNameSingular: this.internalContext.objectIdByNameSingular,
       selectedColumns,
       allFieldsSelected: false,
       updatedColumns,
@@ -414,12 +482,12 @@ export class WorkspaceEntityManager extends EntityManager {
   }
 
   private extractTargetNameSingularFromEntityTarget(
-    target: EntityTarget<unknown>,
+    target: EntityTarget<ObjectLiteral>,
   ): string {
     return this.connection.getMetadata(target).name;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   private extractTargetNameSingularFromEntity(entity: any): string {
     return this.connection.getMetadata(entity.constructor).name;
   }
@@ -920,7 +988,11 @@ export class WorkspaceEntityManager extends EntityManager {
       this.internalContext,
     );
 
-    const formattedEntityLike = formatData(entityLike, objectMetadataItem);
+    const formattedEntityLike = formatData(
+      entityLike,
+      objectMetadataItem,
+      this.internalContext.flatFieldMetadataMaps,
+    );
 
     const managerWithPermissionOptions = Object.assign(
       Object.create(Object.getPrototypeOf(this)),
@@ -968,7 +1040,7 @@ export class WorkspaceEntityManager extends EntityManager {
       );
     if (isNaN(Number(value)))
       throw new TypeORMError(`Value "${value}" is not a number.`);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line @typescripttypescript/no-explicit-any
     const values = propertyPath.split('.').reduceRight<any>(
       (value, key) => ({ [key]: value }),
       () => this.connection.driver.escape(column.databaseName) + ' - ' + value,
@@ -1146,6 +1218,35 @@ export class WorkspaceEntityManager extends EntityManager {
         {} as Record<string, ObjectLiteral>,
       );
 
+      const filesFieldSync = new FilesFieldSync(this.internalContext);
+
+      let filesFieldDiffByEntityIndex = null;
+      let filesFieldFileIds = null;
+
+      filesFieldDiffByEntityIndex =
+        filesFieldSync.computeFilesFieldDiffBeforeUpsert(
+          entityWithConnectedRelations,
+          entityTarget,
+          beforeUpdateMapById,
+        );
+
+      if (isDefined(filesFieldDiffByEntityIndex)) {
+        const result = await filesFieldSync.enrichFilesFields({
+          entities: entityWithConnectedRelations,
+          filesFieldDiffByEntityIndex,
+          workspaceId: this.internalContext.workspaceId,
+          target: entityTarget,
+        });
+
+        filesFieldFileIds = result.fileIds;
+
+        entityWithConnectedRelations.splice(
+          0,
+          entityWithConnectedRelations.length,
+          ...result.entities,
+        );
+      }
+
       const objectMetadataItem = getObjectMetadataFromEntityTarget(
         entityTarget,
         this.internalContext,
@@ -1154,6 +1255,7 @@ export class WorkspaceEntityManager extends EntityManager {
       const formattedEntityOrEntities = formatData(
         entityWithConnectedRelations,
         objectMetadataItem,
+        this.internalContext.flatFieldMetadataMaps,
       );
 
       const updatedColumns = formattedEntityOrEntities
@@ -1180,12 +1282,17 @@ export class WorkspaceEntityManager extends EntityManager {
         .then(() => formattedEntityOrEntities as Entity[])
         .finally(() => queryRunnerForEntityPersistExecutor.release());
 
+      if (isDefined(filesFieldFileIds)) {
+        await filesFieldSync.updateFileEntityRecords(filesFieldFileIds);
+      }
+
       const resultArray = Array.isArray(result) ? result : [result];
 
       let formattedResult = formatResult<Entity[]>(
         resultArray,
         objectMetadataItem,
-        this.internalContext.objectMetadataMaps,
+        this.internalContext.flatObjectMetadataMaps,
+        this.internalContext.flatFieldMetadataMaps,
       );
 
       const updatedEntities = formattedResult.filter(
@@ -1195,22 +1302,28 @@ export class WorkspaceEntityManager extends EntityManager {
         (entity) => !beforeUpdateMapById[entity.id],
       );
 
-      await this.internalContext.eventEmitterService.emitMutationEvent({
-        action: DatabaseEventAction.UPDATED,
-        objectMetadataItem,
-        workspaceId: this.internalContext.workspaceId,
-        entities: updatedEntities,
-        beforeEntities: updatedEntities.map(
-          (entity) => beforeUpdateMapById[entity.id],
-        ),
-      });
+      this.internalContext.eventEmitterService.emitDatabaseBatchEvent(
+        formatTwentyOrmEventToDatabaseBatchEvent({
+          action: DatabaseEventAction.UPDATED,
+          objectMetadataItem,
+          flatFieldMetadataMaps: this.internalContext.flatFieldMetadataMaps,
+          workspaceId: this.internalContext.workspaceId,
+          recordsAfter: updatedEntities,
+          recordsBefore: updatedEntities.map(
+            (entity) => beforeUpdateMapById[entity.id],
+          ),
+        }),
+      );
 
-      await this.internalContext.eventEmitterService.emitMutationEvent({
-        action: DatabaseEventAction.CREATED,
-        objectMetadataItem,
-        workspaceId: this.internalContext.workspaceId,
-        entities: createdEntities,
-      });
+      this.internalContext.eventEmitterService.emitDatabaseBatchEvent(
+        formatTwentyOrmEventToDatabaseBatchEvent({
+          action: DatabaseEventAction.CREATED,
+          objectMetadataItem,
+          flatFieldMetadataMaps: this.internalContext.flatFieldMetadataMaps,
+          workspaceId: this.internalContext.workspaceId,
+          recordsAfter: createdEntities,
+        }),
+      );
 
       const permissionCheckApplies =
         permissionOptionsFromArgs?.shouldBypassPermissionChecks !== true &&
@@ -1231,7 +1344,12 @@ export class WorkspaceEntityManager extends EntityManager {
         this.internalContext,
       );
 
-      throw computeTwentyORMException(error, objectMetadataItem);
+      throw await computeTwentyORMException(
+        error,
+        objectMetadataItem,
+        this,
+        this.internalContext,
+      );
     }
   }
 
@@ -1243,7 +1361,7 @@ export class WorkspaceEntityManager extends EntityManager {
     permissionOptionsFromArgs,
   }: {
     formattedResult: Entity[];
-    objectMetadataItem: ObjectMetadataItemWithFieldMaps;
+    objectMetadataItem: FlatObjectMetadata;
     permissionOptionsFromArgs: PermissionOptions | undefined;
   }): Entity[] {
     if (permissionOptionsFromArgs?.shouldBypassPermissionChecks === true) {
@@ -1263,15 +1381,14 @@ export class WorkspaceEntityManager extends EntityManager {
       return formattedResult;
     }
 
-    const objectMetadataItemWithFieldMaps =
-      this.internalContext.objectMetadataMaps.byId[objectMetadataItem.id];
-
     const restrictedFieldNames = new Set(
       Object.entries(restrictedFields)
         .filter(([_, fieldPermissions]) => fieldPermissions.canRead === false)
         .map(([fieldMetadataId]) => {
-          const fieldMetadata =
-            objectMetadataItemWithFieldMaps?.fieldsById[fieldMetadataId];
+          const fieldMetadata = findFlatEntityByIdInFlatEntityMaps({
+            flatEntityId: fieldMetadataId,
+            flatEntityMaps: this.internalContext.flatFieldMetadataMaps,
+          });
 
           if (!isDefined(fieldMetadata)) {
             throw new InternalServerError(
@@ -1367,7 +1484,11 @@ export class WorkspaceEntityManager extends EntityManager {
       this.internalContext,
     );
 
-    const formattedEntity = formatData(entity, objectMetadataItem);
+    const formattedEntity = formatData(
+      entity,
+      objectMetadataItem,
+      this.internalContext.flatFieldMetadataMaps,
+    );
 
     const result = new EntityPersistExecutor(
       this.connection,
@@ -1384,15 +1505,23 @@ export class WorkspaceEntityManager extends EntityManager {
     const formattedResult = formatResult<Entity[]>(
       result,
       objectMetadataItem,
-      this.internalContext.objectMetadataMaps,
+      this.internalContext.flatObjectMetadataMaps,
+      this.internalContext.flatFieldMetadataMaps,
     );
 
-    await this.internalContext.eventEmitterService.emitMutationEvent({
-      action: DatabaseEventAction.DESTROYED,
-      objectMetadataItem,
-      workspaceId: this.internalContext.workspaceId,
-      entities: formattedResult,
-    });
+    const recordsBefore = Array.isArray(formattedResult)
+      ? formattedResult
+      : [formattedResult];
+
+    this.internalContext.eventEmitterService.emitDatabaseBatchEvent(
+      formatTwentyOrmEventToDatabaseBatchEvent({
+        action: DatabaseEventAction.DESTROYED,
+        objectMetadataItem,
+        flatFieldMetadataMaps: this.internalContext.flatFieldMetadataMaps,
+        workspaceId: this.internalContext.workspaceId,
+        recordsBefore,
+      }),
+    );
 
     return isEntityArray ? formattedResult : formattedResult[0];
   }
@@ -1475,12 +1604,39 @@ export class WorkspaceEntityManager extends EntityManager {
     const entityTarget =
       target ?? (isEntityArray ? entity[0]?.constructor : entity.constructor);
 
+    const entityArray = isEntityArray ? entity : [entity];
+
+    const entityIds = entityArray
+      .map((entity) => (entity as { id: string }).id)
+      .filter(isDefined);
+
+    const recordsBeforeFindResult = await this.find<BaseWorkspaceEntity>(
+      entityTarget,
+      {
+        where: { id: In(entityIds) },
+      },
+      { shouldBypassPermissionChecks: true }, // Bypass as this is for event emission
+    );
+
+    const beforeUpdateMapById = recordsBeforeFindResult.reduce(
+      (acc, e: BaseWorkspaceEntity) => {
+        acc[e.id] = e;
+
+        return acc;
+      },
+      {} as Record<string, BaseWorkspaceEntity>,
+    );
+
     const objectMetadataItem = getObjectMetadataFromEntityTarget(
       entityTarget,
       this.internalContext,
     );
 
-    const formattedEntity = formatData(entity, objectMetadataItem);
+    const formattedEntity = formatData(
+      entity,
+      objectMetadataItem,
+      this.internalContext.flatFieldMetadataMaps,
+    );
 
     const result = new EntityPersistExecutor(
       this.connection,
@@ -1497,15 +1653,28 @@ export class WorkspaceEntityManager extends EntityManager {
     const formattedResult = formatResult<Entity[]>(
       result,
       objectMetadataItem,
-      this.internalContext.objectMetadataMaps,
+      this.internalContext.flatObjectMetadataMaps,
+      this.internalContext.flatFieldMetadataMaps,
     );
 
-    await this.internalContext.eventEmitterService.emitMutationEvent({
-      action: DatabaseEventAction.DELETED,
-      objectMetadataItem,
-      workspaceId: this.internalContext.workspaceId,
-      entities: formattedResult,
-    });
+    const recordsAfter = Array.isArray(formattedResult)
+      ? formattedResult
+      : [formattedResult];
+
+    const recordsBefore = recordsAfter.map<Entity>(
+      (record) => beforeUpdateMapById[record.id] as unknown as Entity,
+    );
+
+    this.internalContext.eventEmitterService.emitDatabaseBatchEvent(
+      formatTwentyOrmEventToDatabaseBatchEvent({
+        action: DatabaseEventAction.DELETED,
+        objectMetadataItem,
+        flatFieldMetadataMaps: this.internalContext.flatFieldMetadataMaps,
+        workspaceId: this.internalContext.workspaceId,
+        recordsAfter,
+        recordsBefore,
+      }),
+    );
 
     return isEntityArray ? formattedResult : formattedResult[0];
   }
@@ -1584,12 +1753,39 @@ export class WorkspaceEntityManager extends EntityManager {
     const entityTarget =
       target ?? (isEntityArray ? entity[0]?.constructor : entity.constructor);
 
+    const entityArray = isEntityArray ? entity : [entity];
+
+    const entityIds = entityArray
+      .map((entity) => (entity as { id: string }).id)
+      .filter(isDefined);
+
+    const recordsBeforeFindResult = await this.find<BaseWorkspaceEntity>(
+      entityTarget,
+      {
+        where: { id: In(entityIds) },
+      },
+      { shouldBypassPermissionChecks: true }, // Bypass as this is for event emission
+    );
+
+    const beforeUpdateMapById = recordsBeforeFindResult.reduce(
+      (acc, e: BaseWorkspaceEntity) => {
+        acc[e.id] = e;
+
+        return acc;
+      },
+      {} as Record<string, BaseWorkspaceEntity>,
+    );
+
     const objectMetadataItem = getObjectMetadataFromEntityTarget(
       entityTarget,
       this.internalContext,
     );
 
-    const formattedEntity = formatData(entity, objectMetadataItem);
+    const formattedEntity = formatData(
+      entity,
+      objectMetadataItem,
+      this.internalContext.flatFieldMetadataMaps,
+    );
 
     const result = new EntityPersistExecutor(
       this.connection,
@@ -1606,22 +1802,35 @@ export class WorkspaceEntityManager extends EntityManager {
     const formattedResult = formatResult<Entity[]>(
       result,
       objectMetadataItem,
-      this.internalContext.objectMetadataMaps,
+      this.internalContext.flatObjectMetadataMaps,
+      this.internalContext.flatFieldMetadataMaps,
     );
 
-    await this.internalContext.eventEmitterService.emitMutationEvent({
-      action: DatabaseEventAction.RESTORED,
-      objectMetadataItem,
-      workspaceId: this.internalContext.workspaceId,
-      entities: formattedResult,
-    });
+    const recordsAfter = Array.isArray(formattedResult)
+      ? formattedResult
+      : [formattedResult];
+
+    const recordsBefore = recordsAfter.map<Entity>(
+      (record) => beforeUpdateMapById[record.id] as unknown as Entity,
+    );
+
+    this.internalContext.eventEmitterService.emitDatabaseBatchEvent(
+      formatTwentyOrmEventToDatabaseBatchEvent({
+        action: DatabaseEventAction.RESTORED,
+        objectMetadataItem,
+        flatFieldMetadataMaps: this.internalContext.flatFieldMetadataMaps,
+        workspaceId: this.internalContext.workspaceId,
+        recordsAfter,
+        recordsBefore,
+      }),
+    );
 
     return isEntityArray ? formattedResult : formattedResult[0];
   }
 
   // Forbidden methods
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   override query<T = any>(_query: string, _parameters?: any[]): Promise<T> {
     throw new PermissionsException(
       'Method not allowed.',

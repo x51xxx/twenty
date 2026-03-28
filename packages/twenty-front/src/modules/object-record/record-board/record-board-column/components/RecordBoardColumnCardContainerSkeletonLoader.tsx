@@ -1,68 +1,88 @@
-import { useTheme } from '@emotion/react';
-import styled from '@emotion/styled';
-import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
+import { styled } from '@linaria/react';
+import { useContext } from 'react';
+import { SkeletonTheme } from 'react-loading-skeleton';
+import { ThemeContext, themeCssVariables } from 'twenty-ui/theme-constants';
 
 import { SKELETON_LOADER_HEIGHT_SIZES } from '@/activities/components/SkeletonLoader';
-import { RecordBoardCardBodyContainer } from '@/object-record/record-board/record-board-card/components/RecordBoardCardBodyContainer';
-import { RecordBoardCardHeaderContainer } from '@/object-record/record-board/record-board-card/components/RecordBoardCardHeaderContainer';
+import { RecordCardBodyContainer } from '@/object-record/record-card/components/RecordCardBodyContainer';
+import { RecordCardHeaderContainer } from '@/object-record/record-card/components/RecordCardHeaderContainer';
+import { visibleRecordFieldsComponentSelector } from '@/object-record/record-field/states/visibleRecordFieldsComponentSelector';
+import { useAtomComponentSelectorValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentSelectorValue';
+import { useGetCurrentViewOnly } from '@/views/hooks/useGetCurrentViewOnly';
+
 const StyledSkeletonIconAndText = styled.div`
   display: flex;
-  gap: ${({ theme }) => theme.spacing(1)};
+  gap: ${themeCssVariables.spacing[1]};
 `;
 
 const StyledSkeletonTitle = styled.div`
-  padding-left: ${({ theme }) => theme.spacing(2)};
+  padding-left: ${themeCssVariables.spacing[1]};
 `;
 
-const StyledSeparator = styled.div`
-  height: ${({ theme }) => theme.spacing(2)};
+const StyledBodyContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${themeCssVariables.spacing['0.5']};
+  padding-bottom: 4px;
+  padding-top: 4px;
 `;
 
-export const RecordBoardColumnCardContainerSkeletonLoader = ({
-  numberOfFields,
-  titleSkeletonWidth,
-  isCompactModeActive,
-}: {
-  numberOfFields: number;
-  titleSkeletonWidth: number;
-  isCompactModeActive: boolean;
-}) => {
-  const theme = useTheme();
+const StyledStaticCellSkeleton = styled.div<{ width: number; height: number }>`
+  background-color: ${themeCssVariables.background.tertiary};
+  border-radius: ${themeCssVariables.border.radius.sm};
+
+  height: ${({ height }) => height}px;
+  width: ${({ width }) => width}px;
+`;
+
+export const RecordBoardColumnCardContainerSkeletonLoader = () => {
+  const { theme } = useContext(ThemeContext);
+  const { currentView } = useGetCurrentViewOnly();
+
+  const isCompactModeActive = currentView?.isCompact ?? false;
+
+  const visibleRecordFields = useAtomComponentSelectorValue(
+    visibleRecordFieldsComponentSelector,
+  );
+
+  const numberOfFields = visibleRecordFields.length - 1;
+
   const skeletonItems = Array.from({ length: numberOfFields }).map(
     (_, index) => ({
       id: `skeleton-item-${index}`,
     }),
   );
+
+  const titleSkeletonWidth = isCompactModeActive ? 72 : 54;
+
   return (
     <SkeletonTheme
       baseColor={theme.background.tertiary}
       highlightColor={theme.background.transparent.lighter}
-      borderRadius={4}
+      borderRadius={2}
     >
-      <RecordBoardCardHeaderContainer showCompactView={isCompactModeActive}>
+      <RecordCardHeaderContainer isCompact={isCompactModeActive}>
         <StyledSkeletonTitle>
-          <Skeleton
-            width={titleSkeletonWidth}
-            height={SKELETON_LOADER_HEIGHT_SIZES.standard.s}
-          />
+          <StyledStaticCellSkeleton width={titleSkeletonWidth} height={12} />
         </StyledSkeletonTitle>
-      </RecordBoardCardHeaderContainer>
-      <StyledSeparator />
-      {!isCompactModeActive &&
-        skeletonItems.map(({ id }) => (
-          <RecordBoardCardBodyContainer key={id}>
-            <StyledSkeletonIconAndText>
-              <Skeleton
-                width={16}
-                height={SKELETON_LOADER_HEIGHT_SIZES.standard.s}
-              />
-              <Skeleton
-                width={151}
-                height={SKELETON_LOADER_HEIGHT_SIZES.standard.s}
-              />
-            </StyledSkeletonIconAndText>
-          </RecordBoardCardBodyContainer>
-        ))}
+      </RecordCardHeaderContainer>
+      <StyledBodyContainer>
+        {!isCompactModeActive &&
+          skeletonItems.map(({ id }) => (
+            <RecordCardBodyContainer key={id}>
+              <StyledSkeletonIconAndText>
+                <StyledStaticCellSkeleton
+                  width={16}
+                  height={SKELETON_LOADER_HEIGHT_SIZES.standard.s}
+                />
+                <StyledStaticCellSkeleton
+                  width={151}
+                  height={SKELETON_LOADER_HEIGHT_SIZES.standard.s}
+                />
+              </StyledSkeletonIconAndText>
+            </RecordCardBodyContainer>
+          ))}
+      </StyledBodyContainer>
     </SkeletonTheme>
   );
 };

@@ -1,23 +1,23 @@
 import { SettingsRolePermissions } from '@/settings/roles/role-permissions/components/SettingsRolePermissions';
 import { settingsDraftRoleFamilyState } from '@/settings/roles/states/settingsDraftRoleFamilyState';
-import { type Meta, type StoryObj } from '@storybook/react';
-import { useSetRecoilState } from 'recoil';
+import { useSetAtomFamilyState } from '@/ui/utilities/state/jotai/hooks/useSetAtomFamilyState';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { isDefined } from 'twenty-shared/utils';
 import { ComponentDecorator, RouterDecorator } from 'twenty-ui/testing';
-import { I18nFrontDecorator } from '~/testing/decorators/I18nFrontDecorator';
-import { getRolesMock } from '~/testing/mock-data/roles';
+import { mockedRoles } from '~/testing/mock-data/generated/metadata/roles/mock-roles-data';
 
 const SettingsRolePermissionsWrapper = (
   args: React.ComponentProps<typeof SettingsRolePermissions>,
 ) => {
-  const setDraftRole = useSetRecoilState(
-    settingsDraftRoleFamilyState(args.roleId),
+  const setSettingsDraftRole = useSetAtomFamilyState(
+    settingsDraftRoleFamilyState,
+    args.roleId,
   );
 
-  const role = getRolesMock().find((role) => role.id === args.roleId);
+  const role = mockedRoles.find((role) => role.id === args.roleId);
 
   if (isDefined(role)) {
-    setDraftRole(role);
+    setSettingsDraftRole(role);
   }
 
   return (
@@ -31,7 +31,7 @@ const SettingsRolePermissionsWrapper = (
 const meta: Meta<typeof SettingsRolePermissionsWrapper> = {
   title: 'Modules/Settings/Roles/RolePermissions/SettingsRolePermissions',
   component: SettingsRolePermissionsWrapper,
-  decorators: [RouterDecorator, ComponentDecorator, I18nFrontDecorator],
+  decorators: [RouterDecorator, ComponentDecorator],
 };
 
 export default meta;
@@ -39,14 +39,14 @@ type Story = StoryObj<typeof SettingsRolePermissionsWrapper>;
 
 export const Default: Story = {
   args: {
-    roleId: '1',
+    roleId: mockedRoles[0].id,
     isEditable: true,
   },
 };
 
 export const ReadOnly: Story = {
   args: {
-    roleId: '1',
+    roleId: mockedRoles[0].id,
     isEditable: false,
   },
 };

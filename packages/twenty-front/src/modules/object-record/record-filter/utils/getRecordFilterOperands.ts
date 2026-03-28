@@ -1,15 +1,13 @@
-import { isExpectedSubFieldName } from '@/object-record/object-filter-dropdown/utils/isExpectedSubFieldName';
 import { isFilterOnActorSourceSubField } from '@/object-record/object-filter-dropdown/utils/isFilterOnActorSourceSubField';
-import {
-  type FilterableAndTSVectorFieldType,
-  type FilterableFieldType,
-} from '@/object-record/record-filter/types/FilterableFieldType';
+import { isFilterOnActorWorkspaceMemberSubField } from '@/object-record/object-filter-dropdown/utils/isFilterOnActorWorkspaceMemberSubField';
 import { type CompositeFieldSubFieldName } from '@/settings/data-model/types/CompositeFieldSubFieldName';
 import {
   FieldMetadataType,
   ViewFilterOperand as RecordFilterOperand,
+  type FilterableAndTSVectorFieldType,
+  type FilterableFieldType,
 } from 'twenty-shared/types';
-import { assertUnreachable } from 'twenty-shared/utils';
+import { assertUnreachable, isExpectedSubFieldName } from 'twenty-shared/utils';
 
 export type GetRecordFilterOperandsParams = {
   filterType: FilterableAndTSVectorFieldType;
@@ -17,13 +15,13 @@ export type GetRecordFilterOperandsParams = {
 };
 
 const emptyOperands = [
-  RecordFilterOperand.IsEmpty,
-  RecordFilterOperand.IsNotEmpty,
+  RecordFilterOperand.IS_EMPTY,
+  RecordFilterOperand.IS_NOT_EMPTY,
 ] as const;
 
 const relationOperands = [
-  RecordFilterOperand.Is,
-  RecordFilterOperand.IsNot,
+  RecordFilterOperand.IS,
+  RecordFilterOperand.IS_NOT,
 ] as const;
 
 type FilterOperandMap = {
@@ -41,110 +39,121 @@ type CompositeFieldFilterOperandMap = {
 
 export const FILTER_OPERANDS_MAP = {
   TEXT: [
-    RecordFilterOperand.Contains,
-    RecordFilterOperand.DoesNotContain,
+    RecordFilterOperand.CONTAINS,
+    RecordFilterOperand.DOES_NOT_CONTAIN,
     ...emptyOperands,
   ],
   EMAILS: [
-    RecordFilterOperand.Contains,
-    RecordFilterOperand.DoesNotContain,
+    RecordFilterOperand.CONTAINS,
+    RecordFilterOperand.DOES_NOT_CONTAIN,
     ...emptyOperands,
   ],
   FULL_NAME: [
-    RecordFilterOperand.Contains,
-    RecordFilterOperand.DoesNotContain,
+    RecordFilterOperand.CONTAINS,
+    RecordFilterOperand.DOES_NOT_CONTAIN,
     ...emptyOperands,
   ],
   ADDRESS: [
-    RecordFilterOperand.Contains,
-    RecordFilterOperand.DoesNotContain,
+    RecordFilterOperand.CONTAINS,
+    RecordFilterOperand.DOES_NOT_CONTAIN,
     ...emptyOperands,
   ],
   LINKS: [
-    RecordFilterOperand.Contains,
-    RecordFilterOperand.DoesNotContain,
+    RecordFilterOperand.CONTAINS,
+    RecordFilterOperand.DOES_NOT_CONTAIN,
     ...emptyOperands,
   ],
   PHONES: [
-    RecordFilterOperand.Contains,
-    RecordFilterOperand.DoesNotContain,
+    RecordFilterOperand.CONTAINS,
+    RecordFilterOperand.DOES_NOT_CONTAIN,
     ...emptyOperands,
   ],
   CURRENCY: [
-    RecordFilterOperand.GreaterThanOrEqual,
-    RecordFilterOperand.LessThanOrEqual,
+    RecordFilterOperand.GREATER_THAN_OR_EQUAL,
+    RecordFilterOperand.LESS_THAN_OR_EQUAL,
     ...emptyOperands,
   ],
   NUMBER: [
-    RecordFilterOperand.GreaterThanOrEqual,
-    RecordFilterOperand.LessThanOrEqual,
+    RecordFilterOperand.IS,
+    RecordFilterOperand.IS_NOT,
+    RecordFilterOperand.GREATER_THAN_OR_EQUAL,
+    RecordFilterOperand.LESS_THAN_OR_EQUAL,
     ...emptyOperands,
   ],
   RAW_JSON: [
-    RecordFilterOperand.Contains,
-    RecordFilterOperand.DoesNotContain,
+    RecordFilterOperand.CONTAINS,
+    RecordFilterOperand.DOES_NOT_CONTAIN,
+    ...emptyOperands,
+  ],
+  FILES: [
+    RecordFilterOperand.CONTAINS,
+    RecordFilterOperand.DOES_NOT_CONTAIN,
     ...emptyOperands,
   ],
   DATE_TIME: [
-    RecordFilterOperand.Is,
-    RecordFilterOperand.IsRelative,
-    RecordFilterOperand.IsInPast,
-    RecordFilterOperand.IsInFuture,
-    RecordFilterOperand.IsToday,
-    RecordFilterOperand.IsBefore,
-    RecordFilterOperand.IsAfter,
+    RecordFilterOperand.IS,
+    RecordFilterOperand.IS_RELATIVE,
+    RecordFilterOperand.IS_IN_PAST,
+    RecordFilterOperand.IS_IN_FUTURE,
+    RecordFilterOperand.IS_TODAY,
+    RecordFilterOperand.IS_BEFORE,
+    RecordFilterOperand.IS_AFTER,
     ...emptyOperands,
   ],
   DATE: [
-    RecordFilterOperand.Is,
-    RecordFilterOperand.IsRelative,
-    RecordFilterOperand.IsInPast,
-    RecordFilterOperand.IsInFuture,
-    RecordFilterOperand.IsToday,
-    RecordFilterOperand.IsBefore,
-    RecordFilterOperand.IsAfter,
+    RecordFilterOperand.IS,
+    RecordFilterOperand.IS_RELATIVE,
+    RecordFilterOperand.IS_IN_PAST,
+    RecordFilterOperand.IS_IN_FUTURE,
+    RecordFilterOperand.IS_TODAY,
+    RecordFilterOperand.IS_BEFORE,
+    RecordFilterOperand.IS_AFTER,
     ...emptyOperands,
   ],
   RATING: [
-    RecordFilterOperand.Is,
-    RecordFilterOperand.GreaterThanOrEqual,
-    RecordFilterOperand.LessThanOrEqual,
+    RecordFilterOperand.IS,
+    RecordFilterOperand.GREATER_THAN_OR_EQUAL,
+    RecordFilterOperand.LESS_THAN_OR_EQUAL,
     ...emptyOperands,
   ],
   RELATION: [...relationOperands, ...emptyOperands],
   MULTI_SELECT: [
-    RecordFilterOperand.Contains,
-    RecordFilterOperand.DoesNotContain,
+    RecordFilterOperand.CONTAINS,
+    RecordFilterOperand.DOES_NOT_CONTAIN,
     ...emptyOperands,
   ],
-  SELECT: [RecordFilterOperand.Is, RecordFilterOperand.IsNot, ...emptyOperands],
+  SELECT: [
+    RecordFilterOperand.IS,
+    RecordFilterOperand.IS_NOT,
+    ...emptyOperands,
+  ],
   ACTOR: [
-    RecordFilterOperand.Contains,
-    RecordFilterOperand.DoesNotContain,
+    RecordFilterOperand.CONTAINS,
+    RecordFilterOperand.DOES_NOT_CONTAIN,
     ...emptyOperands,
   ],
   ARRAY: [
-    RecordFilterOperand.Contains,
-    RecordFilterOperand.DoesNotContain,
+    RecordFilterOperand.CONTAINS,
+    RecordFilterOperand.DOES_NOT_CONTAIN,
     ...emptyOperands,
   ],
-  BOOLEAN: [RecordFilterOperand.Is],
-  TS_VECTOR: [RecordFilterOperand.VectorSearch],
-  UUID: [RecordFilterOperand.Is],
+  BOOLEAN: [RecordFilterOperand.IS],
+  TS_VECTOR: [RecordFilterOperand.VECTOR_SEARCH],
+  UUID: [RecordFilterOperand.IS],
 } as const satisfies FilterOperandMap;
 
 export const COMPOSITE_FIELD_FILTER_OPERANDS_MAP = {
   CURRENCY: {
     currencyCode: [
-      RecordFilterOperand.Is,
-      RecordFilterOperand.IsNot,
+      RecordFilterOperand.IS,
+      RecordFilterOperand.IS_NOT,
       ...emptyOperands,
     ],
     amountMicros: [
-      RecordFilterOperand.GreaterThanOrEqual,
-      RecordFilterOperand.LessThanOrEqual,
-      RecordFilterOperand.Is,
-      RecordFilterOperand.IsNot,
+      RecordFilterOperand.GREATER_THAN_OR_EQUAL,
+      RecordFilterOperand.LESS_THAN_OR_EQUAL,
+      RecordFilterOperand.IS,
+      RecordFilterOperand.IS_NOT,
       ...emptyOperands,
     ],
   },
@@ -168,7 +177,7 @@ export const getRecordFilterOperands = ({
           FieldMetadataType.CURRENCY,
           'currencyCode',
           subFieldName,
-        )
+        ) === true
       ) {
         return COMPOSITE_FIELD_FILTER_OPERANDS_MAP.CURRENCY.currencyCode;
       } else {
@@ -179,6 +188,8 @@ export const getRecordFilterOperands = ({
       return FILTER_OPERANDS_MAP.NUMBER;
     case 'RAW_JSON':
       return FILTER_OPERANDS_MAP.RAW_JSON;
+    case 'FILES':
+      return FILTER_OPERANDS_MAP.FILES;
     case 'DATE_TIME':
     case 'DATE':
       return FILTER_OPERANDS_MAP.DATE_TIME;
@@ -191,10 +202,13 @@ export const getRecordFilterOperands = ({
     case 'SELECT':
       return FILTER_OPERANDS_MAP.SELECT;
     case 'ACTOR': {
-      if (isFilterOnActorSourceSubField(subFieldName)) {
+      if (
+        isFilterOnActorSourceSubField(subFieldName) ||
+        isFilterOnActorWorkspaceMemberSubField(subFieldName)
+      ) {
         return [
-          RecordFilterOperand.Is,
-          RecordFilterOperand.IsNot,
+          RecordFilterOperand.IS,
+          RecordFilterOperand.IS_NOT,
           ...emptyOperands,
         ];
       }

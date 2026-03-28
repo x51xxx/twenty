@@ -1,8 +1,8 @@
 import { type RecordFilterGroup } from '@/object-record/record-filter-group/types/RecordFilterGroup';
-import { RecordFilterGroupLogicalOperator } from '@/object-record/record-filter-group/types/RecordFilterGroupLogicalOperator';
 import { type ViewFilterGroup } from '@/views/types/ViewFilterGroup';
 import { ViewFilterGroupLogicalOperator } from '@/views/types/ViewFilterGroupLogicalOperator';
 import { mapViewFilterGroupsToRecordFilterGroups } from '@/views/utils/mapViewFilterGroupsToRecordFilterGroups';
+import { RecordFilterGroupLogicalOperator } from 'twenty-shared/types';
 
 describe('mapViewFilterGroupsToRecordFilterGroups', () => {
   it('should map empty array to empty array', () => {
@@ -17,7 +17,6 @@ describe('mapViewFilterGroupsToRecordFilterGroups', () => {
         logicalOperator: ViewFilterGroupLogicalOperator.AND,
         positionInViewFilterGroup: 0,
         viewId: 'view-1',
-        __typename: 'ViewFilterGroup',
       },
     ];
 
@@ -43,7 +42,6 @@ describe('mapViewFilterGroupsToRecordFilterGroups', () => {
         logicalOperator: ViewFilterGroupLogicalOperator.OR,
         positionInViewFilterGroup: 0,
         viewId: 'view-1',
-        __typename: 'ViewFilterGroup',
       },
       {
         id: 'filter-group-child-1',
@@ -51,7 +49,6 @@ describe('mapViewFilterGroupsToRecordFilterGroups', () => {
         logicalOperator: ViewFilterGroupLogicalOperator.AND,
         positionInViewFilterGroup: 1,
         viewId: 'view-1',
-        __typename: 'ViewFilterGroup',
       },
       {
         id: 'filter-group-child-2',
@@ -59,7 +56,6 @@ describe('mapViewFilterGroupsToRecordFilterGroups', () => {
         logicalOperator: ViewFilterGroupLogicalOperator.AND,
         positionInViewFilterGroup: 2,
         viewId: 'view-1',
-        __typename: 'ViewFilterGroup',
       },
     ];
 

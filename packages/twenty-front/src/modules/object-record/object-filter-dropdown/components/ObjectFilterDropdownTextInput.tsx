@@ -5,10 +5,17 @@ import { useObjectFilterDropdownFilterValue } from '@/object-record/object-filte
 import { fieldMetadataItemUsedInDropdownComponentSelector } from '@/object-record/object-filter-dropdown/states/fieldMetadataItemUsedInDropdownComponentSelector';
 import { DropdownMenuInput } from '@/ui/layout/dropdown/components/DropdownMenuInput';
 import { DropdownMenuItemsContainer } from '@/ui/layout/dropdown/components/DropdownMenuItemsContainer';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useCloseDropdown } from '@/ui/layout/dropdown/hooks/useCloseDropdown';
+import { useAtomComponentSelectorValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentSelectorValue';
 
-export const ObjectFilterDropdownTextInput = () => {
-  const fieldMetadataItemUsedInDropdown = useRecoilComponentValue(
+type ObjectFilterDropdownTextInputProps = {
+  filterDropdownId: string;
+};
+
+export const ObjectFilterDropdownTextInput = ({
+  filterDropdownId,
+}: ObjectFilterDropdownTextInputProps) => {
+  const fieldMetadataItemUsedInDropdown = useAtomComponentSelectorValue(
     fieldMetadataItemUsedInDropdownComponentSelector,
   );
 
@@ -17,6 +24,8 @@ export const ObjectFilterDropdownTextInput = () => {
 
   const { applyObjectFilterDropdownFilterValue } =
     useApplyObjectFilterDropdownFilterValue();
+
+  const { closeDropdown } = useCloseDropdown();
 
   const [hasFocused, setHasFocused] = useState(false);
 
@@ -40,13 +49,16 @@ export const ObjectFilterDropdownTextInput = () => {
   return (
     <DropdownMenuItemsContainer>
       <DropdownMenuInput
-        instanceId="object-filter-dropdown-text-input"
+        instanceId={filterDropdownId}
         ref={handleInputRef}
         value={objectFilterDropdownFilterValue ?? ''}
         autoFocus
         type="text"
         placeholder={fieldMetadataItemUsedInDropdown?.label}
         onChange={handleInputChange}
+        onEnter={() => {
+          closeDropdown(filterDropdownId);
+        }}
       />
     </DropdownMenuItemsContainer>
   );

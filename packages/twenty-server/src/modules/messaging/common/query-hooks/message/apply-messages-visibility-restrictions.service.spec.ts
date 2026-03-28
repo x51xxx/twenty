@@ -2,7 +2,8 @@ import { Test, type TestingModule } from '@nestjs/testing';
 
 import { FIELD_RESTRICTED_ADDITIONAL_PERMISSIONS_REQUIRED } from 'twenty-shared/constants';
 
-import { TwentyORMManager } from 'src/engine/twenty-orm/twenty-orm.manager';
+import { ConnectedAccountDataAccessService } from 'src/engine/metadata-modules/connected-account/data-access/services/connected-account-data-access.service';
+import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
 import { MessageChannelVisibility } from 'src/modules/messaging/common/standard-objects/message-channel.workspace-entity';
 import { type MessageWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message.workspace-entity';
 
@@ -34,26 +35,26 @@ describe('ApplyMessagesVisibilityRestrictionsService', () => {
     find: jest.fn(),
   };
 
-  const mockConnectedAccountRepository = {
-    find: jest.fn(),
-  };
-
   const mockWorkspaceMemberRepository = {
     findOneByOrFail: jest.fn(),
   };
 
-  const mockTwentyORMManager = {
-    getRepository: jest.fn().mockImplementation((name) => {
+  const mockConnectedAccountDataAccessService = {
+    find: jest.fn(),
+  };
+
+  const mockGlobalWorkspaceOrmManager = {
+    getRepository: jest.fn().mockImplementation((workspaceId, name) => {
       if (name === 'messageChannelMessageAssociation') {
         return mockMessageChannelMessageAssociationRepository;
-      }
-      if (name === 'connectedAccount') {
-        return mockConnectedAccountRepository;
       }
       if (name === 'workspaceMember') {
         return mockWorkspaceMemberRepository;
       }
     }),
+    executeInWorkspaceContext: jest
+      .fn()
+      .mockImplementation((fn: () => any, _authContext?: any) => fn()),
   };
 
   beforeEach(async () => {
@@ -61,8 +62,12 @@ describe('ApplyMessagesVisibilityRestrictionsService', () => {
       providers: [
         ApplyMessagesVisibilityRestrictionsService,
         {
-          provide: TwentyORMManager,
-          useValue: mockTwentyORMManager,
+          provide: GlobalWorkspaceOrmManager,
+          useValue: mockGlobalWorkspaceOrmManager,
+        },
+        {
+          provide: ConnectedAccountDataAccessService,
+          useValue: mockConnectedAccountDataAccessService,
         },
       ],
     }).compile();
@@ -91,6 +96,7 @@ describe('ApplyMessagesVisibilityRestrictionsService', () => {
 
     const result = await service.applyMessagesVisibilityRestrictions(
       messages,
+      'test-workspace-id',
       'user-id',
     );
 
@@ -101,7 +107,7 @@ describe('ApplyMessagesVisibilityRestrictionsService', () => {
           item.subject === 'Test Subject' && item.text === 'Test Message',
       ),
     ).toBe(true);
-    expect(mockConnectedAccountRepository.find).not.toHaveBeenCalled();
+    expect(mockConnectedAccountDataAccessService.find).not.toHaveBeenCalled();
   });
 
   it('should return message without obfuscated subject and with obfuscated text if the visibility is SUBJECT', async () => {
@@ -119,7 +125,7 @@ describe('ApplyMessagesVisibilityRestrictionsService', () => {
       },
     ]);
 
-    mockConnectedAccountRepository.find.mockResolvedValue([]);
+    mockConnectedAccountDataAccessService.find.mockResolvedValue([]);
 
     mockWorkspaceMemberRepository.findOneByOrFail.mockResolvedValue({
       id: 'workspace-member-id',
@@ -127,6 +133,7 @@ describe('ApplyMessagesVisibilityRestrictionsService', () => {
 
     const result = await service.applyMessagesVisibilityRestrictions(
       messages,
+      'test-workspace-id',
       'user-id',
     );
 
@@ -153,7 +160,7 @@ describe('ApplyMessagesVisibilityRestrictionsService', () => {
       },
     ]);
 
-    mockConnectedAccountRepository.find.mockResolvedValue([]);
+    mockConnectedAccountDataAccessService.find.mockResolvedValue([]);
 
     mockWorkspaceMemberRepository.findOneByOrFail.mockResolvedValue({
       id: 'workspace-member-id',
@@ -161,6 +168,7 @@ describe('ApplyMessagesVisibilityRestrictionsService', () => {
 
     const result = await service.applyMessagesVisibilityRestrictions(
       messages,
+      'test-workspace-id',
       'user-id',
     );
 
@@ -192,10 +200,11 @@ describe('ApplyMessagesVisibilityRestrictionsService', () => {
       id: 'workspace-member-account-owner-id',
     });
 
-    mockConnectedAccountRepository.find.mockResolvedValue([{ id: '1' }]);
+    mockConnectedAccountDataAccessService.find.mockResolvedValue([{ id: '1' }]);
 
     const result = await service.applyMessagesVisibilityRestrictions(
       messages,
+      'test-workspace-id',
       'user-id',
     );
 
@@ -226,10 +235,11 @@ describe('ApplyMessagesVisibilityRestrictionsService', () => {
       id: 'workspace-member-not-account-owner-id',
     });
 
-    mockConnectedAccountRepository.find.mockResolvedValue([]);
+    mockConnectedAccountDataAccessService.find.mockResolvedValue([]);
 
     const result = await service.applyMessagesVisibilityRestrictions(
       messages,
+      'test-workspace-id',
       'user-id',
     );
 
@@ -271,12 +281,13 @@ describe('ApplyMessagesVisibilityRestrictionsService', () => {
       id: 'workspace-member-id',
     });
 
-    mockConnectedAccountRepository.find
+    mockConnectedAccountDataAccessService.find
       .mockResolvedValueOnce([]) // request for message 3
       .mockResolvedValueOnce([]); // request for message 2
 
     const result = await service.applyMessagesVisibilityRestrictions(
       messages,
+      'test-workspace-id',
       'user-id',
     );
 
@@ -329,12 +340,13 @@ describe('ApplyMessagesVisibilityRestrictionsService', () => {
       id: 'workspace-member-id',
     });
 
-    mockConnectedAccountRepository.find
+    mockConnectedAccountDataAccessService.find
       .mockResolvedValueOnce([]) // request for message 3
       .mockResolvedValueOnce([]); // request for message 2
 
     const result = await service.applyMessagesVisibilityRestrictions(
       messages,
+      'test-workspace-id',
       undefined,
     );
 

@@ -1,4 +1,4 @@
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -9,6 +9,7 @@ import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
 import { useLingui } from '@lingui/react/macro';
 import { isValidHostname } from 'twenty-shared/utils';
 import { Button } from 'twenty-ui/input';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 const StyledContainer = styled.div`
   display: flex;
@@ -17,7 +18,7 @@ const StyledContainer = styled.div`
 
 const StyledLinkContainer = styled.div`
   flex: 1;
-  margin-right: ${({ theme }) => theme.spacing(2)};
+  margin-right: ${themeCssVariables.spacing[2]};
 `;
 
 type SettingsAccountsBlocklistInputProps = {
@@ -41,7 +42,7 @@ export const SettingsAccountsBlocklistInput = ({
         emailOrDomain: z
           .string()
           .trim()
-          .email(t`Invalid email or domain`)
+          .pipe(z.email({ error: t`Invalid email or domain` }))
           .or(
             z.string().refine(
               (value) =>
@@ -96,7 +97,7 @@ export const SettingsAccountsBlocklistInput = ({
             render={({ field: { value, onChange }, fieldState: { error } }) => (
               <SettingsTextInput
                 instanceId="settings-accounts-blocklist-input"
-                placeholder="eddy@gmail.com, @apple.com"
+                placeholder={t`eddy@gmail.com, @apple.com`}
                 value={value}
                 onChange={onChange}
                 error={error?.message}

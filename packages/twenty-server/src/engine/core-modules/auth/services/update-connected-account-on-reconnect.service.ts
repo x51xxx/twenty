@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 
+import { ConnectedAccountDataAccessService } from 'src/engine/metadata-modules/connected-account/data-access/services/connected-account-data-access.service';
 import { type WorkspaceEntityManager } from 'src/engine/twenty-orm/entity-manager/workspace-entity-manager';
-import { TwentyORMGlobalManager } from 'src/engine/twenty-orm/twenty-orm-global.manager';
-import { type ConnectedAccountWorkspaceEntity } from 'src/modules/connected-account/standard-objects/connected-account.workspace-entity';
+import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
+import { buildSystemAuthContext } from 'src/engine/twenty-orm/utils/build-system-auth-context.util';
 
 export type UpdateConnectedAccountOnReconnectInput = {
   workspaceId: string;
@@ -10,14 +11,14 @@ export type UpdateConnectedAccountOnReconnectInput = {
   accessToken: string;
   refreshToken: string;
   scopes: string[];
-  connectedAccount: ConnectedAccountWorkspaceEntity;
   manager: WorkspaceEntityManager;
 };
 
 @Injectable()
 export class UpdateConnectedAccountOnReconnectService {
   constructor(
-    private readonly twentyORMGlobalManager: TwentyORMGlobalManager,
+    private readonly globalWorkspaceOrmManager: GlobalWorkspaceOrmManager,
+    private readonly connectedAccountDataAccessService: ConnectedAccountDataAccessService,
   ) {}
 
   async updateConnectedAccountOnReconnect(
@@ -29,26 +30,23 @@ export class UpdateConnectedAccountOnReconnectService {
       accessToken,
       refreshToken,
       scopes,
-      manager,
     } = input;
 
-    const connectedAccountRepository =
-      await this.twentyORMGlobalManager.getRepositoryForWorkspace<ConnectedAccountWorkspaceEntity>(
-        workspaceId,
-        'connectedAccount',
-      );
+    const authContext = buildSystemAuthContext(workspaceId);
 
-    await connectedAccountRepository.update(
-      {
-        id: connectedAccountId,
-      },
-      {
-        accessToken,
-        refreshToken,
-        scopes,
-        authFailedAt: null,
-      },
-      manager,
-    );
+    await this.globalWorkspaceOrmManager.executeInWorkspaceContext(async () => {
+      await this.connectedAccountDataAccessService.update(
+        workspaceId,
+        {
+          id: connectedAccountId,
+        },
+        {
+          accessToken,
+          refreshToken,
+          scopes,
+          authFailedAt: null,
+        },
+      );
+    }, authContext);
   }
 }

@@ -1,4 +1,5 @@
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
+import { plural } from '@lingui/core/macro';
 import { useMemo, useRef, useState, type MouseEvent } from 'react';
 
 import { Dropdown } from '@/ui/layout/dropdown/components/Dropdown';
@@ -17,10 +18,12 @@ import { SelectableList } from '@/ui/layout/selectable-list/components/Selectabl
 import { SelectableListItem } from '@/ui/layout/selectable-list/components/SelectableListItem';
 import { useSelectableList } from '@/ui/layout/selectable-list/hooks/useSelectableList';
 import { selectedItemIdComponentState } from '@/ui/layout/selectable-list/states/selectedItemIdComponentState';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+import { isNonEmptyString } from '@sniptt/guards';
 import { isDefined } from 'twenty-shared/utils';
 import { IconBox, useIcons, type IconComponent } from 'twenty-ui/display';
 import { MenuItem, MenuItemMultiSelect } from 'twenty-ui/navigation';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 export type SelectSizeVariant = 'small' | 'default';
 
@@ -48,6 +51,7 @@ export type SettingsMorphRelationMultiSelectProps = {
   callToActionButton?: CallToActionButton;
   dropdownOffset?: DropdownOffset;
   hasRightElement?: boolean;
+  error?: string;
 };
 
 const StyledContainer = styled.div<{ fullWidth?: boolean }>`
@@ -55,16 +59,23 @@ const StyledContainer = styled.div<{ fullWidth?: boolean }>`
 `;
 
 const StyledLabel = styled.span`
-  color: ${({ theme }) => theme.font.color.light};
+  color: ${themeCssVariables.font.color.light};
   display: block;
-  font-size: ${({ theme }) => theme.font.size.xs};
-  font-weight: ${({ theme }) => theme.font.weight.semiBold};
-  margin-bottom: ${({ theme }) => theme.spacing(1)};
+  font-size: ${themeCssVariables.font.size.xs};
+  font-weight: ${themeCssVariables.font.weight.semiBold};
+  margin-bottom: ${themeCssVariables.spacing[1]};
 `;
 
 const StyledDescription = styled.span`
-  color: ${({ theme }) => theme.font.color.light};
-  font-size: ${({ theme }) => theme.font.size.sm};
+  color: ${themeCssVariables.font.color.light};
+  font-size: ${themeCssVariables.font.size.sm};
+`;
+
+const StyledError = styled.span`
+  color: ${themeCssVariables.color.red};
+  display: block;
+  font-size: ${themeCssVariables.font.size.xs};
+  margin-top: ${themeCssVariables.spacing[1]};
 `;
 
 export const SettingsMorphRelationMultiSelect = ({
@@ -84,12 +95,16 @@ export const SettingsMorphRelationMultiSelect = ({
   callToActionButton,
   dropdownOffset,
   hasRightElement,
+  error,
 }: SettingsMorphRelationMultiSelectProps) => {
   const selectContainerRef = useRef<HTMLDivElement>(null);
 
   const [searchInputValue, setSearchInputValue] = useState('');
 
   const { activeObjectMetadataItems } = useFilteredObjectMetadataItems();
+
+  const [localSelectedObjectMetadataIds, setLocalSelectedObjectMetadataIds] =
+    useState<string[]>(selectedObjectMetadataIds);
 
   const { getIcon } = useIcons();
   const options = activeObjectMetadataItems
@@ -104,7 +119,7 @@ export const SettingsMorphRelationMultiSelect = ({
     }));
 
   const selectedOptions = options.filter((option) =>
-    selectedObjectMetadataIds.includes(option.objectMetadataId),
+    localSelectedObjectMetadataIds.includes(option.objectMetadataId),
   );
 
   const filteredOptions = useMemo(
@@ -130,7 +145,7 @@ export const SettingsMorphRelationMultiSelect = ({
 
   const selectableItemIdArray = filteredOptions.map((option) => option.label);
 
-  const selectedItemId = useRecoilComponentValue(
+  const selectedItemId = useAtomComponentStateValue(
     selectedItemIdComponentState,
     dropdownId,
   );
@@ -138,7 +153,7 @@ export const SettingsMorphRelationMultiSelect = ({
   const { setSelectedItemId } = useSelectableList(dropdownId);
 
   const handleDropdownOpen = () => {
-    if (selectedOptions && selectedOptions.length > 0 && !searchInputValue) {
+    if (selectedOptions.length > 0 && !searchInputValue) {
       setSelectedItemId(selectedOptions[0].label);
     }
   };
@@ -165,8 +180,15 @@ export const SettingsMorphRelationMultiSelect = ({
       {isDisabled ? (
         <MultiSelectControl
           selectedOptions={selectedOptions}
-          fixedIcon={IconBox}
-          fixedText="Object"
+          fixedIcon={selectedOptions.length < 2 ? undefined : IconBox}
+          fixedText={
+            selectedOptions.length < 2
+              ? undefined
+              : plural(selectedOptions.length, {
+                  one: `# Object`,
+                  other: `# Objects`,
+                })
+          }
           isDisabled={isDisabled}
           selectSizeVariant={selectSizeVariant}
           hasRightElement={hasRightElement}
@@ -180,8 +202,15 @@ export const SettingsMorphRelationMultiSelect = ({
           clickableComponent={
             <MultiSelectControl
               selectedOptions={selectedOptions}
-              fixedIcon={IconBox}
-              fixedText="Object"
+              fixedIcon={selectedOptions.length < 2 ? undefined : IconBox}
+              fixedText={
+                selectedOptions.length < 2
+                  ? undefined
+                  : plural(selectedOptions.length, {
+                      one: `# Object`,
+                      other: `# Objects`,
+                    })
+              }
               isDisabled={isDisabled}
               selectSizeVariant={selectSizeVariant}
               hasRightElement={hasRightElement}
@@ -213,9 +242,12 @@ export const SettingsMorphRelationMultiSelect = ({
                         onEnter={() => {
                           const newSelectedObjectMetadataIds =
                             addOrRemoveFromArray(
-                              selectedObjectMetadataIds,
+                              localSelectedObjectMetadataIds,
                               option.objectMetadataId,
                             );
+                          setLocalSelectedObjectMetadataIds(
+                            newSelectedObjectMetadataIds,
+                          );
                           onChange?.(newSelectedObjectMetadataIds);
                           onBlur?.();
                           closeDropdown(dropdownId);
@@ -234,14 +266,16 @@ export const SettingsMorphRelationMultiSelect = ({
                           onSelectChange={() => {
                             let newSelectedObjectMetadataIds =
                               addOrRemoveFromArray(
-                                selectedObjectMetadataIds,
+                                localSelectedObjectMetadataIds,
                                 option.objectMetadataId,
                               );
-
+                            setLocalSelectedObjectMetadataIds(
+                              newSelectedObjectMetadataIds,
+                            );
                             onChange?.(newSelectedObjectMetadataIds);
                             onBlur?.();
                           }}
-                        />{' '}
+                        />
                       </SelectableListItem>
                     ))}
                   </SelectableList>
@@ -263,7 +297,10 @@ export const SettingsMorphRelationMultiSelect = ({
           }
         />
       )}
-      {!!description && <StyledDescription>{description}</StyledDescription>}
+      {isNonEmptyString(description) && (
+        <StyledDescription>{description}</StyledDescription>
+      )}
+      {isNonEmptyString(error) && <StyledError>{error}</StyledError>}
     </StyledContainer>
   );
 };

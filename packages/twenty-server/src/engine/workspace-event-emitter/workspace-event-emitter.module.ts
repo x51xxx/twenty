@@ -4,7 +4,6 @@ import { WorkspaceEventEmitter } from 'src/engine/workspace-event-emitter/worksp
 
 @Global()
 @Module({
-  imports: [],
   providers: [WorkspaceEventEmitter],
   exports: [WorkspaceEventEmitter],
 })

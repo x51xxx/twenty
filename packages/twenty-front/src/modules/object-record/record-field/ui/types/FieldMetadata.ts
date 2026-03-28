@@ -1,15 +1,16 @@
 import { type FieldMetadataItemRelation } from '@/object-metadata/types/FieldMetadataItemRelation';
-import { type RATING_VALUES } from '@/object-record/record-field/ui/meta-types/constants/RatingValues';
 import { type ZodHelperLiteral } from '@/object-record/record-field/ui/types/ZodHelperLiteral';
 import { type ObjectRecord } from '@/object-record/types/ObjectRecord';
+import { type CurrencyCode } from 'twenty-shared/constants';
 import {
   ConnectedAccountProvider,
   type AllowedAddressSubField,
+  type FieldMetadataMultiItemSettings,
+  type FileCategory,
 } from 'twenty-shared/types';
 import { type ThemeColor } from 'twenty-ui/theme';
 import { z } from 'zod';
 import { type RelationType } from '~/generated-metadata/graphql';
-import { type CurrencyCode } from './CurrencyCode';
 
 type BaseFieldMetadata = {
   fieldName: string;
@@ -83,7 +84,7 @@ export type FieldLinkMetadata = BaseFieldMetadata & {
 };
 
 export type FieldLinksMetadata = BaseFieldMetadata & {
-  settings?: null;
+  settings?: FieldMetadataMultiItemSettings | null;
 };
 
 export type FieldCurrencyMetadata = BaseFieldMetadata & {
@@ -91,6 +92,7 @@ export type FieldCurrencyMetadata = BaseFieldMetadata & {
   isPositive?: boolean;
   settings?: {
     format: FieldCurrencyFormat | null;
+    decimals?: number;
   };
 };
 
@@ -105,7 +107,7 @@ export type FieldEmailMetadata = BaseFieldMetadata & {
 };
 
 export type FieldEmailsMetadata = BaseFieldMetadata & {
-  settings?: null;
+  settings?: FieldMetadataMultiItemSettings | null;
 };
 
 export type FieldPhoneMetadata = BaseFieldMetadata & {
@@ -129,10 +131,6 @@ export type FieldRawJsonMetadata = BaseFieldMetadata & {
   settings?: null;
 };
 
-export type FieldRichTextV2Metadata = BaseFieldMetadata & {
-  settings?: null;
-};
-
 export type FieldRichTextMetadata = BaseFieldMetadata & {
   settings?: null;
 };
@@ -140,6 +138,15 @@ export type FieldRichTextMetadata = BaseFieldMetadata & {
 export type FieldPositionMetadata = BaseFieldMetadata & {
   settings?: null;
 };
+
+export type FieldRelationMetadataSettings = {
+  relationType?: RelationType;
+  // Join column name for the foreign key (e.g., "petId" for a "pet" relation)
+  joinColumnName?: string | null;
+  // Points to the target field on the junction object
+  // For MORPH_RELATION fields, morphRelations already contains all targets
+  junctionTargetFieldId?: string;
+} | null;
 
 // for later: refactor this in order to directly use relation without mapping
 export type FieldRelationMetadata = BaseFieldMetadata & {
@@ -150,14 +157,14 @@ export type FieldRelationMetadata = BaseFieldMetadata & {
   relationType?: RelationType;
   targetFieldMetadataName?: string;
   useEditButton?: boolean;
-  settings?: null;
+  settings?: FieldRelationMetadataSettings;
 };
 
 export type FieldMorphRelationMetadata = BaseFieldMetadata & {
   morphRelations: FieldMetadataItemRelation[];
   relationType: RelationType;
   useEditButton?: boolean;
-  settings?: null;
+  settings?: FieldRelationMetadataSettings;
 };
 
 export type FieldSelectMetadata = BaseFieldMetadata & {
@@ -177,15 +184,19 @@ export type FieldActorMetadata = BaseFieldMetadata & {
 
 export type FieldArrayMetadata = BaseFieldMetadata & {
   values: { label: string; value: string }[];
-  settings?: null;
+  settings?: FieldMetadataMultiItemSettings | null;
 };
 
 export type FieldPhonesMetadata = BaseFieldMetadata & {
-  settings?: null;
+  settings?: FieldMetadataMultiItemSettings | null;
 };
 
 export type FieldTsVectorMetadata = BaseFieldMetadata & {
   settings?: null;
+};
+
+export type FieldFilesMetadata = BaseFieldMetadata & {
+  settings?: FieldMetadataMultiItemSettings | null;
 };
 
 export type FieldMetadata =
@@ -194,14 +205,17 @@ export type FieldMetadata =
   | FieldDateTimeMetadata
   | FieldDateMetadata
   | FieldEmailMetadata
+  | FieldEmailsMetadata
+  | FieldFilesMetadata
   | FieldFullNameMetadata
   | FieldLinkMetadata
+  | FieldLinksMetadata
   | FieldNumberMetadata
   | FieldPhoneMetadata
+  | FieldPhonesMetadata
   | FieldRatingMetadata
   | FieldRelationMetadata
   | FieldMorphRelationMetadata
-  | FieldRichTextMetadata
   | FieldSelectMetadata
   | FieldMultiSelectMetadata
   | FieldTextMetadata
@@ -210,7 +224,7 @@ export type FieldMetadata =
   | FieldActorMetadata
   | FieldArrayMetadata
   | FieldTsVectorMetadata
-  | FieldRichTextV2Metadata
+  | FieldRawJsonMetadata
   | FieldRichTextMetadata;
 
 export type FieldTextValue = string;
@@ -251,7 +265,6 @@ export type FieldAddressValue = {
   addressLat: number | null;
   addressLng: number | null;
 };
-export type FieldRatingValue = (typeof RATING_VALUES)[number] | null;
 export type FieldSelectValue = string | null;
 export type FieldMultiSelectValue = string[] | null;
 
@@ -266,12 +279,10 @@ export type FieldRelationValue<
 export type Json = ZodHelperLiteral | { [key: string]: Json } | Json[];
 export type FieldJsonValue = Record<string, Json> | Json[] | null;
 
-export type FieldRichTextV2Value = {
+export type FieldRichTextValue = {
   blocknote: string | null;
   markdown: string | null;
 };
-
-export type FieldRichTextValue = null | string;
 
 const FieldActorSourceSchema = z.union([
   z.literal('API'),
@@ -282,6 +293,8 @@ const FieldActorSourceSchema = z.union([
   z.literal('SYSTEM'),
   z.literal('WORKFLOW'),
   z.literal('WEBHOOK'),
+  z.literal('AGENT'),
+  z.literal('APPLICATION'),
 ]);
 
 export const FieldActorValueSchema = z.object({
@@ -290,7 +303,7 @@ export const FieldActorValueSchema = z.object({
   name: z.string(),
   context: z
     .object({
-      provider: z.nativeEnum(ConnectedAccountProvider).optional(),
+      provider: z.enum(ConnectedAccountProvider).optional(),
     })
     .nullable(),
 });
@@ -314,4 +327,12 @@ export type FieldPhonesValue = {
   primaryPhoneCountryCode: string;
   primaryPhoneCallingCode?: string;
   additionalPhones?: PhoneRecord[] | null;
+};
+
+export type FieldFilesValue = {
+  fileId: string;
+  label: string;
+  extension?: string;
+  url?: string;
+  fileCategory?: FileCategory;
 };

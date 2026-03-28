@@ -1,4 +1,4 @@
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import { t } from '@lingui/core/macro';
 import { type ZodType, z } from 'zod';
 import { type ReadonlyKeysArray } from '~/types/ReadonlyKeysArray';
@@ -7,7 +7,7 @@ import { camelCaseStringSchema } from '~/utils/validation-schemas/camelCaseStrin
 
 type ZodTypeSettingsDataModelFormFields = ZodType<
   Pick<
-    ObjectMetadataItem,
+    EnrichedObjectMetadataItem,
     | 'labelSingular'
     | 'labelPlural'
     | 'description'
@@ -15,7 +15,7 @@ type ZodTypeSettingsDataModelFormFields = ZodType<
     | 'namePlural'
     | 'nameSingular'
     | 'isLabelSyncedWithName'
-  >
+  > & { skipNameField?: boolean }
 >;
 const settingsDataModelFormFieldsSchema = z.object({
   description: z.string().nullish(),
@@ -25,37 +25,22 @@ const settingsDataModelFormFieldsSchema = z.object({
   namePlural: zodNonEmptyString.and(camelCaseStringSchema),
   nameSingular: zodNonEmptyString.and(camelCaseStringSchema),
   isLabelSyncedWithName: z.boolean(),
+  skipNameField: z.boolean().optional(),
 }) satisfies ZodTypeSettingsDataModelFormFields;
 
 export const settingsDataModelObjectAboutFormSchema =
   settingsDataModelFormFieldsSchema.superRefine(
-    ({ labelPlural, labelSingular, namePlural, nameSingular }, ctx) => {
-      const labelsAreDifferent =
-        labelPlural.trim().toLowerCase() !== labelSingular.trim().toLowerCase();
-      if (!labelsAreDifferent) {
-        const labelFields: ReadonlyKeysArray<ObjectMetadataItem> = [
-          'labelPlural',
-          'labelSingular',
-        ];
-        labelFields.forEach((field) =>
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: t`Singular and plural labels must be different`,
-            path: [field],
-          }),
-        );
-      }
-
+    ({ namePlural, nameSingular }, ctx) => {
       const nameAreDifferent =
         nameSingular.toLowerCase() !== namePlural.toLowerCase();
       if (!nameAreDifferent) {
-        const nameFields: ReadonlyKeysArray<ObjectMetadataItem> = [
+        const nameFields: ReadonlyKeysArray<EnrichedObjectMetadataItem> = [
           'nameSingular',
           'namePlural',
         ];
         nameFields.forEach((field) =>
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             message: t`Singular and plural names must be different`,
             path: [field],
           }),

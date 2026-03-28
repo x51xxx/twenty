@@ -1,11 +1,11 @@
-import { stepsOutputSchemaFamilyState } from '@/workflow/states/stepsOutputSchemaFamilyState';
+import { createAtomFamilySelector } from '@/ui/utilities/state/jotai/utils/createAtomFamilySelector';
 import { getStepOutputSchemaFamilyStateKey } from '@/workflow/utils/getStepOutputSchemaFamilyStateKey';
-import { type StepOutputSchema } from '@/workflow/workflow-variables/types/StepOutputSchema';
-import { selectorFamily } from 'recoil';
+import { stepsOutputSchemaFamilyState } from '@/workflow/workflow-variables/states/stepsOutputSchemaFamilyState';
+import { type StepOutputSchemaV2 } from '@/workflow/workflow-variables/types/StepOutputSchemaV2';
 import { isDefined } from 'twenty-shared/utils';
 
-export const stepsOutputSchemaFamilySelector = selectorFamily<
-  StepOutputSchema[],
+export const stepsOutputSchemaFamilySelector = createAtomFamilySelector<
+  StepOutputSchemaV2[],
   { workflowVersionId: string; stepIds: string[] }
 >({
   key: 'stepsOutputSchemaFamilySelector',
@@ -17,7 +17,7 @@ export const stepsOutputSchemaFamilySelector = selectorFamily<
           getStepOutputSchemaFamilyStateKey(workflowVersionId, stepId),
         )
         .map((stepOutputSchemaKey) =>
-          get(stepsOutputSchemaFamilyState(stepOutputSchemaKey)),
+          get(stepsOutputSchemaFamilyState, stepOutputSchemaKey),
         )
         .filter(isDefined);
 

@@ -1,8 +1,8 @@
-import styled from '@emotion/styled';
+import { t } from '@lingui/core/macro';
 import { useCallback, useState } from 'react';
 import { type WorkBook } from 'xlsx-ugnis';
 
-import { Modal } from '@/ui/layout/modal/components/Modal';
+import { ModalContent } from 'twenty-ui/layout';
 
 import { useComputeColumnSuggestionsAndAutoMatch } from '@/spreadsheet-import/hooks/useComputeColumnSuggestionsAndAutoMatch';
 import { useSpreadsheetImportInternal } from '@/spreadsheet-import/hooks/useSpreadsheetImportInternal';
@@ -11,10 +11,6 @@ import { SpreadsheetImportStepType } from '@/spreadsheet-import/steps/types/Spre
 import { exceedsMaxRecords } from '@/spreadsheet-import/utils/exceedsMaxRecords';
 import { mapWorkbook } from '@/spreadsheet-import/utils/mapWorkbook';
 import { DropZone } from './components/DropZone';
-
-const StyledContent = styled(Modal.Content)`
-  padding: ${({ theme }) => theme.spacing(6)};
-`;
 
 type UploadStepProps = {
   setUploadedFile: (file: File) => void;
@@ -49,7 +45,8 @@ export const UploadStep = ({
           maxRecords > 0 &&
           exceedsMaxRecords(workbook.Sheets[workbook.SheetNames[0]], maxRecords)
         ) {
-          onError(`Too many records. Up to ${maxRecords.toString()} allowed`);
+          const maxRecordsString = maxRecords.toString();
+          onError(t`Too many records. Up to ${maxRecordsString} allowed`);
           return;
         }
         try {
@@ -115,8 +112,8 @@ export const UploadStep = ({
   );
 
   return (
-    <StyledContent>
+    <ModalContent contentPadding={6}>
       <DropZone onContinue={handleOnContinue} isLoading={isLoading} />
-    </StyledContent>
+    </ModalContent>
   );
 };

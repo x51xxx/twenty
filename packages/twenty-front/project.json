@@ -2,21 +2,31 @@
   "name": "twenty-front",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
-  "tags": ["scope:frontend"],
+  "tags": [
+    "scope:frontend"
+  ],
   "targets": {
     "build": {
-      "outputs": ["{options.outputPath}"],
+      "outputs": [
+        "{options.outputPath}"
+      ],
       "options": {
         "outputPath": "{projectRoot}/build"
       },
-      "dependsOn": ["^build"]
+      "dependsOn": [
+        "^build"
+      ]
     },
     "build:sourcemaps": {
-      "outputs": ["{options.outputPath}"],
+      "outputs": [
+        "{options.outputPath}"
+      ],
       "options": {
         "outputPath": "{projectRoot}/build"
       },
-      "dependsOn": ["^build"]
+      "dependsOn": [
+        "^build"
+      ]
     },
     "serve": {
       "executor": "nx:run-commands",
@@ -41,8 +51,12 @@
     },
     "reset:env": {
       "executor": "nx:run-commands",
-      "inputs": ["{projectRoot}/.env.example"],
-      "outputs": ["{projectRoot}/.env"],
+      "inputs": [
+        "{projectRoot}/.env.example"
+      ],
+      "outputs": [
+        "{projectRoot}/.env"
+      ],
       "cache": true,
       "options": {
         "cwd": "{projectRoot}",
@@ -51,12 +65,36 @@
     },
     "typecheck": {},
     "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["twenty-oxlint-rules:build", "twenty-shared:build"],
+      "inputs": [
+        "{projectRoot}/src/**/*.{ts,tsx}",
+        "{projectRoot}/tsconfig*.json",
+        "{workspaceRoot}/tsconfig.base.json",
+        "{projectRoot}/.oxlintrc.json",
+        "{workspaceRoot}/packages/twenty-oxlint-rules/dist/oxlint-plugin.mjs"
+      ],
       "options": {
-        "maxWarnings": 0
+        "cwd": "{projectRoot}",
+        "command": "npx oxlint --type-aware -c .oxlintrc.json src/ && (prettier src/ --check --cache --cache-location ../../.cache/prettier/{projectRoot} --cache-strategy metadata || (echo 'ERROR: Prettier formatting check failed! Fix with: npx nx lint twenty-front --configuration=fix' && false))"
       },
       "configurations": {
-        "ci": {},
-        "fix": {}
+        "fix": {
+          "command": "npx oxlint --type-aware --fix -c .oxlintrc.json src/ && prettier src/ --write --cache --cache-location ../../.cache/prettier/{projectRoot} --cache-strategy metadata"
+        }
+      }
+    },
+    "lint:diff-with-main": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "FILES=$(git diff --name-only --relative --diff-filter=d main...HEAD -- src/ | grep -E '\\.(ts|tsx)$'); [ -z \"$FILES\" ] && echo 'No changed files.' || (npx oxlint --type-aware -c .oxlintrc.json $FILES && (prettier --check $FILES || (echo 'ERROR: Prettier formatting check failed! Fix with: npx nx lint:diff-with-main twenty-front --configuration=fix' && false)))"
+      },
+      "configurations": {
+        "fix": {
+          "command": "FILES=$(git diff --name-only --relative --diff-filter=d main...HEAD -- src/ | grep -E '\\.(ts|tsx)$'); [ -z \"$FILES\" ] && echo 'No changed files.' || (npx oxlint --type-aware --fix -c .oxlintrc.json $FILES && prettier --write $FILES)"
+        }
       }
     },
     "fmt": {
@@ -70,60 +108,158 @@
     "test": {},
     "storybook:build": {
       "options": {
-        "env": { "NODE_OPTIONS": "--max_old_space_size=8000" }
+        "env": {
+          "NODE_OPTIONS": "--max_old_space_size=8000"
+        }
       },
       "configurations": {
-        "docs": { "env": { "STORYBOOK_SCOPE": "ui-docs" } },
-        "modules": { "env": { "STORYBOOK_SCOPE": "modules" } },
-        "pages": { "env": { "STORYBOOK_SCOPE": "pages" } },
-        "performance": { "env": { "STORYBOOK_SCOPE": "performance" } }
+        "docs": {
+          "env": {
+            "STORYBOOK_SCOPE": "ui-docs"
+          }
+        },
+        "modules": {
+          "env": {
+            "STORYBOOK_SCOPE": "modules"
+          }
+        },
+        "pages": {
+          "env": {
+            "STORYBOOK_SCOPE": "pages"
+          }
+        },
+        "performance": {
+          "env": {
+            "STORYBOOK_SCOPE": "performance"
+          }
+        }
       }
     },
     "storybook:serve:dev": {
-      "options": { "port": 6006 },
+      "options": {
+        "port": 6006
+      },
       "configurations": {
-        "docs": { "env": { "STORYBOOK_SCOPE": "ui-docs" } },
-        "modules": { "env": { "STORYBOOK_SCOPE": "modules" } },
-        "pages": { "env": { "STORYBOOK_SCOPE": "pages" } },
-        "performance": { "env": { "STORYBOOK_SCOPE": "performance" } }
+        "docs": {
+          "env": {
+            "STORYBOOK_SCOPE": "ui-docs"
+          }
+        },
+        "modules": {
+          "env": {
+            "STORYBOOK_SCOPE": "modules"
+          }
+        },
+        "pages": {
+          "env": {
+            "STORYBOOK_SCOPE": "pages"
+          }
+        },
+        "performance": {
+          "env": {
+            "STORYBOOK_SCOPE": "performance"
+          }
+        }
       }
     },
     "storybook:serve:static": {
-      "options": { "port": 6006 },
+      "options": {
+        "port": 6006
+      },
       "configurations": {
-        "docs": { "env": { "STORYBOOK_SCOPE": "ui-docs" } },
-        "modules": { "env": { "STORYBOOK_SCOPE": "modules" } },
-        "pages": { "env": { "STORYBOOK_SCOPE": "pages" } },
-        "performance": { "env": { "STORYBOOK_SCOPE": "performance" } }
+        "docs": {
+          "env": {
+            "STORYBOOK_SCOPE": "ui-docs"
+          }
+        },
+        "modules": {
+          "env": {
+            "STORYBOOK_SCOPE": "modules"
+          }
+        },
+        "pages": {
+          "env": {
+            "STORYBOOK_SCOPE": "pages"
+          }
+        },
+        "performance": {
+          "env": {
+            "STORYBOOK_SCOPE": "performance"
+          }
+        }
       }
     },
     "storybook:coverage": {
       "configurations": {
         "text": {},
-        "docs": { "env": { "STORYBOOK_SCOPE": "ui-docs" } },
-        "modules": { "env": { "STORYBOOK_SCOPE": "modules" } },
-        "pages": { "env": { "STORYBOOK_SCOPE": "pages" } },
-        "performance": { "env": { "STORYBOOK_SCOPE": "performance" } }
+        "docs": {
+          "env": {
+            "STORYBOOK_SCOPE": "ui-docs"
+          }
+        },
+        "modules": {
+          "env": {
+            "STORYBOOK_SCOPE": "modules"
+          }
+        },
+        "pages": {
+          "env": {
+            "STORYBOOK_SCOPE": "pages"
+          }
+        },
+        "performance": {
+          "env": {
+            "STORYBOOK_SCOPE": "performance"
+          }
+        }
       }
     },
     "storybook:test": {
-      "options": { "port": 6006 },
       "configurations": {
-        "docs": { "env": { "STORYBOOK_SCOPE": "ui-docs" } },
-        "modules": { "env": { "STORYBOOK_SCOPE": "modules" } },
-        "pages": { "env": { "STORYBOOK_SCOPE": "pages" } },
-        "performance": { "env": { "STORYBOOK_SCOPE": "performance" } }
+        "docs": {
+          "env": {
+            "STORYBOOK_SCOPE": "ui-docs"
+          }
+        },
+        "modules": {
+          "env": {
+            "STORYBOOK_SCOPE": "modules"
+          }
+        },
+        "pages": {
+          "env": {
+            "STORYBOOK_SCOPE": "pages"
+          }
+        },
+        "performance": {
+          "env": {
+            "STORYBOOK_SCOPE": "performance"
+          }
+        }
       }
     },
-    "storybook:serve-and-test:static": {
-      "options": {
-        "port": 6006
-      },
+    "storybook:test:no-coverage": {
       "configurations": {
-        "docs": { "scope": "ui-docs" },
-        "modules": { "scope": "modules" },
-        "pages": { "scope": "pages" },
-        "performance": { "scope": "performance" }
+        "docs": {
+          "env": {
+            "STORYBOOK_SCOPE": "ui-docs"
+          }
+        },
+        "modules": {
+          "env": {
+            "STORYBOOK_SCOPE": "modules"
+          }
+        },
+        "pages": {
+          "env": {
+            "STORYBOOK_SCOPE": "pages"
+          }
+        },
+        "performance": {
+          "env": {
+            "STORYBOOK_SCOPE": "performance"
+          }
+        }
       }
     },
     "graphql:generate": {
@@ -131,7 +267,7 @@
       "defaultConfiguration": "data",
       "options": {
         "cwd": "{projectRoot}",
-        "command": "dotenv cross-var graphql-codegen -- --config={args.config}"
+        "command": "dotenv graphql-codegen -- --config={args.config}"
       },
       "configurations": {
         "data": {
@@ -142,6 +278,13 @@
         }
       }
     },
+    "mock:generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "dotenv npx vite-node scripts/generate-mock-data.ts"
+      }
+    },
     "chromatic": {
       "configurations": {
         "ci": {}
@@ -149,6 +292,7 @@
     },
     "lingui:extract": {
       "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
       "options": {
         "cwd": "{projectRoot}",
         "command": "lingui extract --overwrite --clean"
@@ -156,6 +300,7 @@
     },
     "lingui:compile": {
       "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
       "options": {
         "cwd": "{projectRoot}",
         "command": "lingui compile --typescript"

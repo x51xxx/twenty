@@ -1,13 +1,16 @@
-import { print } from 'graphql';
 import request from 'supertest';
 import { deleteOneRoleOperationFactory } from 'test/integration/graphql/utils/delete-one-role-operation-factory.util';
 import { destroyOneOperationFactory } from 'test/integration/graphql/utils/destroy-one-operation-factory.util';
-import { updateWorkspaceMemberRole } from 'test/integration/graphql/utils/update-workspace-member-role.util';
-import { createOneObjectMetadataQueryFactory } from 'test/integration/metadata/suites/object-metadata/utils/create-one-object-metadata-query-factory.util';
-import { deleteOneObjectMetadataQueryFactory } from 'test/integration/metadata/suites/object-metadata/utils/delete-one-object-metadata-query-factory.util';
+import { createOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/create-one-object-metadata.util';
+import { deleteOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/delete-one-object-metadata.util';
+import { updateOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/update-one-object-metadata.util';
+import { findOneRoleByLabel } from 'test/integration/metadata/suites/role/utils/find-one-role-by-label.util';
+import { findRoles } from 'test/integration/metadata/suites/role/utils/find-roles.util';
+import { updateWorkspaceMemberRole } from 'test/integration/metadata/suites/role/utils/update-workspace-member-role.util';
+import { jestExpectToBeDefined } from 'test/utils/jest-expect-to-be-defined.util.test';
+import { PermissionFlagType } from 'twenty-shared/constants';
 
 import { ErrorCode } from 'src/engine/core-modules/graphql/utils/graphql-errors.util';
-import { PermissionFlagType } from 'src/engine/metadata-modules/permissions/constants/permission-flag-type.constants';
 import { PermissionsExceptionMessage } from 'src/engine/metadata-modules/permissions/permissions.exception';
 import { WORKSPACE_MEMBER_DATA_SEED_IDS } from 'src/engine/workspace-manager/dev-seeder/data/constants/workspace-member-data-seeds.constant';
 
@@ -16,30 +19,16 @@ const client = request(`http://localhost:${APP_PORT}`);
 describe('Granular settings permissions', () => {
   let customRoleId: string;
   let originalMemberRoleId: string;
+  const createdObjectMetadataIds: string[] = [];
 
   beforeAll(async () => {
     // Get the original Member role ID for restoration later
-    const getRolesQuery = {
-      query: `
-        query GetRoles {
-          getRoles {
-            id
-            label
-          }
-        }
-      `,
-    };
+    const memberRole = await findOneRoleByLabel({ label: 'Member' });
 
-    const rolesResponse = await client
-      .post('/graphql')
-      .set('Authorization', `Bearer ${APPLE_JANE_ADMIN_ACCESS_TOKEN}`)
-      .send(getRolesQuery);
-
-    originalMemberRoleId = rolesResponse.body.data.getRoles.find(
-      (role: any) => role.label === 'Member',
-    ).id;
+    originalMemberRoleId = memberRole.id;
 
     // Create a custom role with canUpdateAllSettings = false
+    // canUpdateAllObjectRecords must be true to allow creating records like workflows
     const createRoleQuery = {
       query: `
         mutation CreateOneRole {
@@ -48,7 +37,7 @@ describe('Granular settings permissions', () => {
             description: "Role for testing specific setting permissions"
             canUpdateAllSettings: false
             canReadAllObjectRecords: true
-            canUpdateAllObjectRecords: false
+            canUpdateAllObjectRecords: true
             canSoftDeleteAllObjectRecords: false
             canDestroyAllObjectRecords: false
           }) {
@@ -61,7 +50,7 @@ describe('Granular settings permissions', () => {
     };
 
     const createRoleResponse = await client
-      .post('/graphql')
+      .post('/metadata')
       .set('Authorization', `Bearer ${APPLE_JANE_ADMIN_ACCESS_TOKEN}`)
       .send(createRoleQuery);
 
@@ -84,93 +73,81 @@ describe('Granular settings permissions', () => {
     };
 
     await client
-      .post('/graphql')
+      .post('/metadata')
       .set('Authorization', `Bearer ${APPLE_JANE_ADMIN_ACCESS_TOKEN}`)
       .send(upsertSettingPermissionsQuery);
 
     // Assign the custom role to JONY (who uses APPLE_JONY_MEMBER_ACCESS_TOKEN)
     await updateWorkspaceMemberRole({
-      client,
-      roleId: customRoleId,
-      workspaceMemberId: WORKSPACE_MEMBER_DATA_SEED_IDS.JONY,
+      input: {
+        roleId: customRoleId,
+        workspaceMemberId: WORKSPACE_MEMBER_DATA_SEED_IDS.JONY,
+      },
+      expectToFail: false,
     });
   });
 
   afterAll(async () => {
     // Restore JONY's original Member role
-    const restoreMemberRoleQuery = {
-      query: `
-        mutation UpdateWorkspaceMemberRole {
-          updateWorkspaceMemberRole(
-            workspaceMemberId: "${WORKSPACE_MEMBER_DATA_SEED_IDS.JONY}"
-            roleId: "${originalMemberRoleId}"
-          ) {
-            id
-          }
-        }
-      `,
-    };
-
-    await client
-      .post('/graphql')
-      .set('Authorization', `Bearer ${APPLE_JANE_ADMIN_ACCESS_TOKEN}`)
-      .send(restoreMemberRoleQuery);
+    await updateWorkspaceMemberRole({
+      input: {
+        workspaceMemberId: WORKSPACE_MEMBER_DATA_SEED_IDS.JONY,
+        roleId: originalMemberRoleId,
+      },
+      expectToFail: false,
+    });
 
     // Delete the custom role
     const deleteRoleQuery = deleteOneRoleOperationFactory(customRoleId);
 
     await client
-      .post('/graphql')
+      .post('/metadata')
       .set('Authorization', `Bearer ${APPLE_JANE_ADMIN_ACCESS_TOKEN}`)
       .send(deleteRoleQuery);
+
+    for (const objectMetadataId of createdObjectMetadataIds) {
+      await updateOneObjectMetadata({
+        expectToFail: false,
+        input: {
+          idToUpdate: objectMetadataId,
+          updatePayload: {
+            isActive: false,
+          },
+        },
+      });
+
+      await deleteOneObjectMetadata({
+        input: {
+          idToDelete: objectMetadataId,
+        },
+        expectToFail: false,
+      });
+    }
   });
 
   describe('Data Model Permissions', () => {
     it('should allow access to data model operations when user has DATA_MODEL setting permission', async () => {
-      // Test creating an object metadata (requires DATA_MODEL permission)
-      const { query: createObjectQuery, variables } =
-        createOneObjectMetadataQueryFactory({
-          input: {
-            labelSingular: 'House',
-            labelPlural: 'Houses',
-            nameSingular: 'house',
-            namePlural: 'houses',
-            description: 'a house',
-            icon: 'IconHome',
-          },
-          gqlFields: `
+      const { data, errors } = await createOneObjectMetadata({
+        input: {
+          labelSingular: 'House',
+          labelPlural: 'Houses',
+          nameSingular: 'house',
+          namePlural: 'houses',
+          description: 'a house',
+          icon: 'IconHome',
+        },
+        gqlFields: `
           id
           labelSingular
           labelPlural
         `,
-        });
+        expectToFail: false,
+      });
 
-      const response = await client
-        .post('/metadata')
-        .set('Authorization', `Bearer ${APPLE_JONY_MEMBER_ACCESS_TOKEN}`)
-        .send({ query: print(createObjectQuery), variables });
-
-      expect(response.status).toBe(200);
-      expect(response.body.errors).toBeUndefined();
-      expect(response.body.data.createOneObject).toBeDefined();
-      expect(response.body.data.createOneObject.labelSingular).toBe('House');
-
-      // Clean up - delete the created object
-      const { query: deleteObjectQuery, variables: deleteObjectVariables } =
-        deleteOneObjectMetadataQueryFactory({
-          input: {
-            idToDelete: response.body.data.createOneObject.id,
-          },
-          gqlFields: 'id',
-        });
-
-      await client
-        .post('/graphql')
-        .set('Authorization', `Bearer ${APPLE_JANE_ADMIN_ACCESS_TOKEN}`)
-        .send({
-          query: print(deleteObjectQuery),
-          variables: deleteObjectVariables,
-        });
+      createdObjectMetadataIds.push(data.createOneObject.id);
+      expect(errors).toBeUndefined();
+      expect(data.createOneObject).toBeDefined();
+      expect(data.createOneObject.labelSingular).toBe('House');
     });
   });
 
@@ -191,7 +168,7 @@ describe('Granular settings permissions', () => {
       };
 
       const response = await client
-        .post('/graphql')
+        .post('/metadata')
         .set('Authorization', `Bearer ${APPLE_JONY_MEMBER_ACCESS_TOKEN}`)
         .send(updateWorkspaceQuery);
 
@@ -217,7 +194,7 @@ describe('Granular settings permissions', () => {
       };
 
       await client
-        .post('/graphql')
+        .post('/metadata')
         .set('Authorization', `Bearer ${APPLE_JANE_ADMIN_ACCESS_TOKEN}`)
         .send(restoreWorkspaceQuery);
     });
@@ -281,7 +258,7 @@ describe('Granular settings permissions', () => {
       };
 
       const response = await client
-        .post('/graphql')
+        .post('/metadata')
         .set('Authorization', `Bearer ${APPLE_JONY_MEMBER_ACCESS_TOKEN}`)
         .send(createRoleQuery);
 
@@ -299,7 +276,10 @@ describe('Granular settings permissions', () => {
       const inviteWorkspaceMemberQuery = {
         query: `
           mutation SendWorkspaceInvitation {
-            sendInvitations(emails: ["test@example.com"]) {
+            sendInvitations(
+              emails: ["test@example.com"],
+              roleId: "${originalMemberRoleId}"
+            ) {
               success
             }
           }
@@ -307,7 +287,7 @@ describe('Granular settings permissions', () => {
       };
 
       const response = await client
-        .post('/graphql')
+        .post('/metadata')
         .set('Authorization', `Bearer ${APPLE_JONY_MEMBER_ACCESS_TOKEN}`)
         .send(inviteWorkspaceMemberQuery);
 
@@ -333,7 +313,7 @@ describe('Granular settings permissions', () => {
       };
 
       const response = await client
-        .post('/graphql')
+        .post('/metadata')
         .set('Authorization', `Bearer ${APPLE_JONY_MEMBER_ACCESS_TOKEN}`)
         .send(createApiKeyQuery);
 
@@ -349,38 +329,32 @@ describe('Granular settings permissions', () => {
 
   describe('Permission Inheritance', () => {
     it('should verify that canUpdateAllSettings=false is properly overridden by specific setting permissions', async () => {
-      // Verify the role configuration
-      const getRoleQuery = {
-        query: `
-          query GetRole {
-            getRoles {
-              id
-              label
-              canUpdateAllSettings
-              permissionFlags {
-                flag
-              }
-            }
+      // Verify the role configuration using the new integration test utilities
+      const { data, errors } = await findRoles({
+        gqlFields: `
+          id
+          label
+          canUpdateAllSettings
+          permissionFlags {
+            flag
           }
         `,
-      };
+        expectToFail: false,
+      });
 
-      const response = await client
-        .post('/graphql')
-        .set('Authorization', `Bearer ${APPLE_JANE_ADMIN_ACCESS_TOKEN}`)
-        .send(getRoleQuery);
+      expect(errors).toBeUndefined();
+      expect(data).toBeDefined();
 
-      const customRole = response.body.data.getRoles.find(
-        (role: any) => role.id === customRoleId,
-      );
+      const customRole = data.getRoles.find((role) => role.id === customRoleId);
 
-      expect(customRole).toBeDefined();
+      jestExpectToBeDefined(customRole);
       expect(customRole.canUpdateAllSettings).toBe(false);
       expect(customRole.permissionFlags).toHaveLength(3);
-      expect(customRole.permissionFlags.map((p: any) => p.flag)).toContain(
+      jestExpectToBeDefined(customRole.permissionFlags);
+      expect(customRole.permissionFlags.map((p) => p.flag)).toContain(
         PermissionFlagType.DATA_MODEL,
       );
-      expect(customRole.permissionFlags.map((p: any) => p.flag)).toContain(
+      expect(customRole.permissionFlags.map((p) => p.flag)).toContain(
         PermissionFlagType.WORKSPACE,
       );
     });
@@ -405,7 +379,7 @@ describe('Granular settings permissions', () => {
       };
 
       const response = await client
-        .post('/graphql')
+        .post('/metadata')
         .set('Authorization', `Bearer ${APPLE_JANE_ADMIN_ACCESS_TOKEN}`)
         .send(upsertSecurityPermissionQuery);
 
@@ -413,33 +387,28 @@ describe('Granular settings permissions', () => {
       expect(response.body.errors).toBeUndefined();
       expect(response.body.data.upsertPermissionFlags).toHaveLength(3);
 
-      // Verify the user now has access to security operations
-      // Note: This would require a specific security operation to test
-      // For now, we just verify the permission was added
-      const getRoleQuery = {
-        query: `
-          query GetRole {
-            getRoles {
-              id
-              permissionFlags {
-                flag
-              }
-            }
+      // Verify the permission was added using the new integration test utilities
+      const { data, errors } = await findRoles({
+        gqlFields: `
+          id
+          permissionFlags {
+            flag
           }
         `,
-      };
+        expectToFail: false,
+      });
 
-      const roleResponse = await client
-        .post('/graphql')
-        .set('Authorization', `Bearer ${APPLE_JANE_ADMIN_ACCESS_TOKEN}`)
-        .send(getRoleQuery);
+      expect(errors).toBeUndefined();
+      expect(data).toBeDefined();
 
-      const updatedRole = roleResponse.body.data.getRoles.find(
-        (role: any) => role.id === customRoleId,
+      const updatedRole = data.getRoles.find(
+        (role) => role.id === customRoleId,
       );
 
+      jestExpectToBeDefined(updatedRole);
       expect(updatedRole.permissionFlags).toHaveLength(3);
-      expect(updatedRole.permissionFlags.map((p: any) => p.flag)).toContain(
+      jestExpectToBeDefined(updatedRole.permissionFlags);
+      expect(updatedRole.permissionFlags.map((p) => p.flag)).toContain(
         PermissionFlagType.SECURITY,
       );
     });
@@ -462,7 +431,7 @@ describe('Granular settings permissions', () => {
       };
 
       const response = await client
-        .post('/graphql')
+        .post('/metadata')
         .set('Authorization', `Bearer ${APPLE_JANE_ADMIN_ACCESS_TOKEN}`)
         .send(upsertReducedPermissionsQuery);
 
@@ -470,31 +439,28 @@ describe('Granular settings permissions', () => {
       expect(response.body.errors).toBeUndefined();
       expect(response.body.data.upsertPermissionFlags).toHaveLength(2);
 
-      // Verify SECURITY permission was removed
-      const getRoleQuery = {
-        query: `
-          query GetRole {
-            getRoles {
-              id
-              permissionFlags {
-                flag
-              }
-            }
+      // Verify SECURITY permission was removed using the new integration test utilities
+      const { data, errors } = await findRoles({
+        gqlFields: `
+          id
+          permissionFlags {
+            flag
           }
         `,
-      };
+        expectToFail: false,
+      });
 
-      const roleResponse = await client
-        .post('/graphql')
-        .set('Authorization', `Bearer ${APPLE_JANE_ADMIN_ACCESS_TOKEN}`)
-        .send(getRoleQuery);
+      expect(errors).toBeUndefined();
+      expect(data).toBeDefined();
 
-      const updatedRole = roleResponse.body.data.getRoles.find(
-        (role: any) => role.id === customRoleId,
+      const updatedRole = data.getRoles.find(
+        (role) => role.id === customRoleId,
       );
 
+      jestExpectToBeDefined(updatedRole);
+      jestExpectToBeDefined(updatedRole.permissionFlags);
       expect(updatedRole.permissionFlags).toHaveLength(2);
-      expect(updatedRole.permissionFlags.map((p: any) => p.flag)).not.toContain(
+      expect(updatedRole.permissionFlags.map((p) => p.flag)).not.toContain(
         PermissionFlagType.SECURITY,
       );
     });

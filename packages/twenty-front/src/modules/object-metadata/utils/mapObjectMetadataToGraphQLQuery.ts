@@ -1,16 +1,16 @@
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import { getObjectPermissionsForObject } from '@/object-metadata/utils/getObjectPermissionsForObject';
 import { mapFieldMetadataToGraphQLQuery } from '@/object-metadata/utils/mapFieldMetadataToGraphQLQuery';
 import { shouldFieldBeQueried } from '@/object-metadata/utils/shouldFieldBeQueried';
-import { type RecordGqlFields } from '@/object-record/graphql/types/RecordGqlFields';
+import { type RecordGqlFields } from '@/object-record/graphql/record-gql-fields/types/RecordGqlFields';
 import { isRecordGqlFieldsNode } from '@/object-record/graphql/utils/isRecordGraphlFieldsNode';
 import { FieldMetadataType, type ObjectPermissions } from 'twenty-shared/types';
 import { computeMorphRelationFieldName, isDefined } from 'twenty-shared/utils';
 
 type MapObjectMetadataToGraphQLQueryArgs = {
-  objectMetadataItems: ObjectMetadataItem[];
+  objectMetadataItems: EnrichedObjectMetadataItem[];
   objectMetadataItem: Pick<
-    ObjectMetadataItem,
+    EnrichedObjectMetadataItem,
     'nameSingular' | 'fields' | 'id' | 'readableFields'
   >;
   recordGqlFields?: RecordGqlFields;
@@ -54,29 +54,30 @@ export const mapObjectMetadataToGraphQLQuery = ({
     .filter((field) => isDefined(field.settings?.joinColumnName));
 
   const manyToOneRelationGqlFieldWithFieldMetadata =
-    manyToOneRelationFields.flatMap((field) => {
-      const isMorphRelation = field.type === FieldMetadataType.MORPH_RELATION;
+    manyToOneRelationFields.flatMap((fieldMetadata) => {
+      const isMorphRelation =
+        fieldMetadata.type === FieldMetadataType.MORPH_RELATION;
       if (!isMorphRelation) {
         return {
-          gqlField: field.settings?.joinColumnName,
-          fieldMetadata: field,
+          gqlField: fieldMetadata.settings?.joinColumnName,
+          fieldMetadata: fieldMetadata,
         };
       }
 
-      if (!isDefined(field.morphRelations)) {
-        throw new Error(
-          `Field ${field.name} is missing, please refresh the page. If the problem persists, please contact support.`,
-        );
+      if (!isDefined(fieldMetadata.morphRelations)) {
+        return [];
       }
 
-      return field.morphRelations.map((morphRelation) => ({
-        gqlField: computeMorphRelationFieldName({
-          fieldName: field.name,
-          relationDirection: morphRelation.type,
-          nameSingular: morphRelation.targetObjectMetadata.nameSingular,
-          namePlural: morphRelation.targetObjectMetadata.namePlural,
-        }),
-        fieldMetadata: field,
+      return fieldMetadata.morphRelations.map((morphRelation) => ({
+        gqlField: `${computeMorphRelationFieldName({
+          fieldName: fieldMetadata.name,
+          relationType: morphRelation.type,
+          targetObjectMetadataNameSingular:
+            morphRelation.targetObjectMetadata.nameSingular,
+          targetObjectMetadataNamePlural:
+            morphRelation.targetObjectMetadata.namePlural,
+        })}Id`,
+        fieldMetadata: fieldMetadata,
       }));
     });
 
@@ -97,30 +98,34 @@ export const mapObjectMetadataToGraphQLQuery = ({
     }
 
     if (!isDefined(fieldMetadata.morphRelations)) {
-      throw new Error(
-        `Field ${fieldMetadata.name} is missing, please refresh the page. If the problem persists, please contact support.`,
-      );
+      return [];
     }
 
     return fieldMetadata.morphRelations.map((morphRelation) => ({
       gqlField: computeMorphRelationFieldName({
         fieldName: fieldMetadata.name,
-        relationDirection: morphRelation.type,
-        nameSingular: morphRelation.targetObjectMetadata.nameSingular,
-        namePlural: morphRelation.targetObjectMetadata.namePlural,
+        relationType: morphRelation.type,
+        targetObjectMetadataNameSingular:
+          morphRelation.targetObjectMetadata.nameSingular,
+        targetObjectMetadataNamePlural:
+          morphRelation.targetObjectMetadata.namePlural,
       }),
       fieldMetadata,
     }));
   });
 
-  const gqlFieldWithFieldMetadataThatCouldBeQueried = [
+  const gqlFieldsWithFieldMetadata = [
     ...activeReadableFields,
     ...manyToOneRelationGqlFieldWithFieldMetadata,
-  ].sort((gqlFieldWithFieldMetadataA, gqlFieldWithFieldMetadataB) =>
-    gqlFieldWithFieldMetadataA.gqlField.localeCompare(
-      gqlFieldWithFieldMetadataB.gqlField,
-    ),
-  );
+  ];
+
+  const gqlFieldWithFieldMetadataThatCouldBeQueried =
+    gqlFieldsWithFieldMetadata.sort(
+      (gqlFieldWithFieldMetadataA, gqlFieldWithFieldMetadataB) =>
+        gqlFieldWithFieldMetadataA.gqlField.localeCompare(
+          gqlFieldWithFieldMetadataB.gqlField,
+        ),
+    );
 
   const gqlFieldWithFieldMetadataThatSouldBeQueried =
     gqlFieldWithFieldMetadataThatCouldBeQueried.filter(
@@ -137,7 +142,6 @@ export const mapObjectMetadataToGraphQLQuery = ({
       __ref
     }`;
   }
-
   const mappedFields = gqlFieldWithFieldMetadataThatSouldBeQueried
     .map((gqlFieldWithFieldMetadata) => {
       const currentRecordGqlFields =

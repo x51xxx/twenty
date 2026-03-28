@@ -4,7 +4,6 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import type Stripe from 'stripe';
 
-import { type BillingSubscriptionItem } from 'src/engine/core-modules/billing/entities/billing-subscription-item.entity';
 import { StripeSDKService } from 'src/engine/core-modules/billing/stripe/stripe-sdk/services/stripe-sdk.service';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 
@@ -34,11 +33,10 @@ export class StripeSubscriptionService {
       query: `metadata['workspaceId']:'${workspaceId}'`,
       limit: 1,
     });
-    const stripeCustomerId = subscription.data[0].customer
-      ? String(subscription.data[0].customer)
-      : undefined;
 
-    return stripeCustomerId;
+    return subscription.data[0].customer
+      ? subscription.data[0].customer
+      : undefined;
   }
 
   async collectLastInvoice(stripeSubscriptionId: string) {
@@ -60,23 +58,6 @@ export class StripeSubscriptionService {
     await this.stripe.invoices.pay(latestInvoice.id);
   }
 
-  async updateSubscriptionItems(
-    stripeSubscriptionId: string,
-    billingSubscriptionItems: BillingSubscriptionItem[],
-  ) {
-    const stripeSubscriptionItemsToUpdate = billingSubscriptionItems.map(
-      (item) => ({
-        id: item.stripeSubscriptionItemId,
-        price: item.stripePriceId,
-        quantity: item.quantity === null ? undefined : item.quantity,
-      }),
-    );
-
-    await this.stripe.subscriptions.update(stripeSubscriptionId, {
-      items: stripeSubscriptionItemsToUpdate,
-    });
-  }
-
   async updateSubscription(
     stripeSubscriptionId: string,
     updateData: Stripe.SubscriptionUpdateParams,
@@ -84,15 +65,10 @@ export class StripeSubscriptionService {
     return this.stripe.subscriptions.update(stripeSubscriptionId, updateData);
   }
 
-  async setYearlyThresholds(stripeSubscriptionId: string) {
-    return this.stripe.subscriptions.update(stripeSubscriptionId, {
-      billing_thresholds: {
-        amount_gte:
-          this.twentyConfigService.get(
-            'BILLING_SUBSCRIPTION_THRESHOLD_AMOUNT',
-          ) * 12,
-        reset_billing_cycle_anchor: false,
-      },
-    });
+  getBillingThresholds(meterPriceFlatAmount: number) {
+    return {
+      amount_gte: Math.max(meterPriceFlatAmount * 2, 10000),
+      reset_billing_cycle_anchor: false,
+    };
   }
 }

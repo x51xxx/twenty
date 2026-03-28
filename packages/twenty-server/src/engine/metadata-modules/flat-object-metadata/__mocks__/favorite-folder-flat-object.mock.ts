@@ -1,9 +1,7 @@
-import { FAVORITE_FOLDER_FLAT_FIELDS_MOCK } from 'src/engine/metadata-modules/flat-field-metadata/__mocks__/favorite-folder-flat-fields.mock';
 import { getFlatObjectMetadataMock } from 'src/engine/metadata-modules/flat-object-metadata/__mocks__/get-flat-object-metadata.mock';
 
 export const FAVORITE_FOLDER_FLAT_OBJECT_MOCK = getFlatObjectMetadataMock({
   id: '35763b74-1abe-4c4b-9eab-27693f0ee06d',
-  standardId: '20202020-7cf8-401f-8211-a9587d27fd2d',
   nameSingular: 'favoriteFolder',
   namePlural: 'favoriteFolders',
   labelSingular: 'Favorite Folder',
@@ -23,7 +21,5 @@ export const FAVORITE_FOLDER_FLAT_OBJECT_MOCK = getFlatObjectMetadataMock({
   imageIdentifierFieldMetadataId: null,
   isLabelSyncedWithName: false,
   workspaceId: '20202020-1c25-4d02-bf25-6aeccf7ea419',
-  uniqueIdentifier: '20202020-7cf8-401f-8211-a9587d27fd2d',
-  flatIndexMetadatas: [],
-  flatFieldMetadatas: Object.values(FAVORITE_FOLDER_FLAT_FIELDS_MOCK),
+  universalIdentifier: '20202020-7cf8-401f-8211-a9587d27fd2d',
 });

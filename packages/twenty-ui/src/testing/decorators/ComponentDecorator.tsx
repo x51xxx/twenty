@@ -1,19 +1,22 @@
-import { type Decorator } from '@storybook/react';
+import { type Decorator } from '@storybook/react-vite';
 
-import { GRAY_SCALE, MAIN_COLORS } from '@ui/theme';
+import { themeCssVariables } from '@ui/theme-constants';
 
 import { ComponentStorybookLayout } from '../ComponentStorybookLayout';
 
-const getBackgroundColor = (inverted: boolean, accent: string) => {
+const getBackgroundColor = (
+  inverted: boolean,
+  accent: string,
+): string | undefined => {
   if (!inverted) return undefined;
 
   switch (accent) {
     case 'default':
-      return GRAY_SCALE.gray50;
+      return themeCssVariables.grayScale.gray11;
     case 'danger':
-      return MAIN_COLORS.red;
+      return themeCssVariables.color.red;
     case 'blue':
-      return MAIN_COLORS.blue;
+      return themeCssVariables.color.blue;
     default:
       return undefined;
   }

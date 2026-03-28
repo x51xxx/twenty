@@ -1,6 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 
 import { RecordPositionModule } from 'src/engine/core-modules/record-position/record-position.module';
+import { WORKFLOW_TOOL_SERVICE_TOKEN } from 'src/engine/core-modules/tool-provider/constants/workflow-tool-service.token';
+import { WorkspaceManyOrAllFlatEntityMapsCacheModule } from 'src/engine/metadata-modules/flat-entity/services/workspace-many-or-all-flat-entity-maps-cache.module';
+import { LogicFunctionModule } from 'src/engine/metadata-modules/logic-function/logic-function.module';
 import { WorkflowSchemaModule } from 'src/modules/workflow/workflow-builder/workflow-schema/workflow-schema.module';
 import { WorkflowVersionEdgeModule } from 'src/modules/workflow/workflow-builder/workflow-version-edge/workflow-version-edge.module';
 import { WorkflowVersionStepModule } from 'src/modules/workflow/workflow-builder/workflow-version-step/workflow-version-step.module';
@@ -9,6 +12,9 @@ import { WorkflowTriggerModule } from 'src/modules/workflow/workflow-trigger/wor
 
 import { WorkflowToolWorkspaceService } from './services/workflow-tool.workspace-service';
 
+// Global module to make WORKFLOW_TOOL_SERVICE_TOKEN available to ToolProviderModule
+// without creating a circular dependency (ToolProviderModule cannot import this module directly)
+@Global()
 @Module({
   imports: [
     WorkflowVersionStepModule,
@@ -17,8 +23,16 @@ import { WorkflowToolWorkspaceService } from './services/workflow-tool.workspace
     WorkflowTriggerModule,
     WorkflowSchemaModule,
     RecordPositionModule,
+    LogicFunctionModule,
+    WorkspaceManyOrAllFlatEntityMapsCacheModule,
   ],
-  providers: [WorkflowToolWorkspaceService],
-  exports: [WorkflowToolWorkspaceService],
+  providers: [
+    WorkflowToolWorkspaceService,
+    {
+      provide: WORKFLOW_TOOL_SERVICE_TOKEN,
+      useExisting: WorkflowToolWorkspaceService,
+    },
+  ],
+  exports: [WorkflowToolWorkspaceService, WORKFLOW_TOOL_SERVICE_TOKEN],
 })
 export class WorkflowToolsModule {}

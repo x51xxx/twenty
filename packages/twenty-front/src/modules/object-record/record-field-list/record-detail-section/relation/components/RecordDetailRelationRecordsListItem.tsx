@@ -1,16 +1,17 @@
-import { css } from '@emotion/react';
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import { motion } from 'framer-motion';
 import { useCallback, useContext } from 'react';
 
 import { useObjectMetadataItem } from '@/object-metadata/hooks/useObjectMetadataItem';
-import { CoreObjectNameSingular } from '@/object-metadata/types/CoreObjectNameSingular';
+import { useObjectMetadataItems } from '@/object-metadata/hooks/useObjectMetadataItems';
+import { CoreObjectNameSingular } from 'twenty-shared/types';
 import { getObjectTypename } from '@/object-record/cache/utils/getObjectTypename';
 import { RecordChip } from '@/object-record/components/RecordChip';
 import { useDeleteOneRecord } from '@/object-record/hooks/useDeleteOneRecord';
 import { useObjectPermissionsForObject } from '@/object-record/hooks/useObjectPermissionsForObject';
 import { useUpdateOneRecord } from '@/object-record/hooks/useUpdateOneRecord';
 import { RecordFieldList } from '@/object-record/record-field-list/components/RecordFieldList';
+import { useRecordFieldsScopeContextOrThrow } from '@/object-record/record-field-list/contexts/RecordFieldsScopeContext';
 import { RecordDetailRecordsListItemContainer } from '@/object-record/record-field-list/record-detail-section/components/RecordDetailRecordsListItemContainer';
 import { FieldContext } from '@/object-record/record-field/ui/contexts/FieldContext';
 import { FieldInputEventContext } from '@/object-record/record-field/ui/contexts/FieldInputEventContext';
@@ -26,10 +27,15 @@ import { useCloseDropdown } from '@/ui/layout/dropdown/hooks/useCloseDropdown';
 import { isDropdownOpenComponentState } from '@/ui/layout/dropdown/states/isDropdownOpenComponentState';
 import { ConfirmationModal } from '@/ui/layout/modal/components/ConfirmationModal';
 import { useModal } from '@/ui/layout/modal/hooks/useModal';
-import { useIsInRightDrawerOrThrow } from '@/ui/layout/right-drawer/contexts/RightDrawerContext';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
-import { useSetRecoilComponentState } from '@/ui/utilities/state/component-state/hooks/useSetRecoilComponentState';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+import { useSetAtomComponentState } from '@/ui/utilities/state/jotai/hooks/useSetAtomComponentState';
+import { t } from '@lingui/core/macro';
+import { Trans } from '@lingui/react/macro';
 import { createPortal } from 'react-dom';
+import {
+  computeMorphRelationFieldName,
+  CustomError,
+} from 'twenty-shared/utils';
 import {
   IconChevronDown,
   IconDotsVertical,
@@ -40,31 +46,7 @@ import {
 import { LightIconButton } from 'twenty-ui/input';
 import { MenuItem } from 'twenty-ui/navigation';
 import { AnimatedEaseInOut } from 'twenty-ui/utilities';
-import { RelationType } from '~/generated-metadata/graphql';
-
-const StyledListItem = styled(RecordDetailRecordsListItemContainer)<{
-  isDropdownOpen?: boolean;
-}>`
-  ${({ isDropdownOpen, theme }) =>
-    !isDropdownOpen &&
-    css`
-      .displayOnHover {
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity ${theme.animation.duration.instant}s ease;
-      }
-    `}
-
-  padding-left: ${({ theme }) => theme.spacing(3)};
-  padding-right: ${({ theme }) => theme.spacing(2)};
-
-  &:hover {
-    .displayOnHover {
-      opacity: 1;
-      pointer-events: auto;
-    }
-  }
-`;
+import { FieldMetadataType, RelationType } from '~/generated-metadata/graphql';
 
 const StyledClickableZone = styled.div`
   align-items: center;
@@ -84,13 +66,18 @@ type RecordDetailRelationRecordsListItemProps = {
   isExpanded: boolean;
   onClick: (relationRecordId: string) => void;
   relationRecord: ObjectRecord;
+  relationObjectMetadataNameSingular: string;
+  relationFieldMetadataId: string;
 };
 
 export const RecordDetailRelationRecordsListItem = ({
   isExpanded,
   onClick,
   relationRecord,
+  relationObjectMetadataNameSingular,
+  relationFieldMetadataId,
 }: RecordDetailRelationRecordsListItemProps) => {
+  const { scopeInstanceId } = useRecordFieldsScopeContextOrThrow();
   const {
     fieldDefinition,
     recordId,
@@ -101,11 +88,21 @@ export const RecordDetailRelationRecordsListItem = ({
 
   const { openModal } = useModal();
 
-  const {
-    relationFieldMetadataId,
-    relationObjectMetadataNameSingular,
-    relationType,
-  } = fieldDefinition.metadata as FieldRelationMetadata;
+  const { relationType, objectMetadataNameSingular } =
+    fieldDefinition.metadata as FieldRelationMetadata;
+
+  const { objectMetadataItems } = useObjectMetadataItems();
+  const objectMetadataItem = objectMetadataItems.find(
+    (objectMetadataItemToFind) =>
+      objectMetadataItemToFind.nameSingular === objectMetadataNameSingular,
+  );
+
+  if (!objectMetadataItem) {
+    throw new CustomError(
+      'Object metadata item not found',
+      'OBJECT_METADATA_ITEM_NOT_FOUND',
+    );
+  }
 
   const isToOneObject = relationType === RelationType.MANY_TO_ONE;
   const { objectMetadataItem: relationObjectMetadataItem } =
@@ -121,9 +118,7 @@ export const RecordDetailRelationRecordsListItem = ({
     relationObjectMetadataItem.id,
   );
 
-  const { updateOneRecord: updateOneRelationRecord } = useUpdateOneRecord({
-    objectNameSingular: relationObjectMetadataNameSingular,
-  });
+  const { updateOneRecord: updateOneRelationRecord } = useUpdateOneRecord();
   const { deleteOneRecord: deleteOneRelationRecord } = useDeleteOneRecord({
     objectNameSingular: relationObjectMetadataNameSingular,
   });
@@ -132,10 +127,10 @@ export const RecordDetailRelationRecordsListItem = ({
     relationObjectMetadataNameSingular ===
     CoreObjectNameSingular.WorkspaceMember;
 
-  const dropdownInstanceId = `record-field-card-menu-${relationFieldMetadataId}-${relationRecord.id}`;
+  const dropdownInstanceId = `record-field-card-menu:${scopeInstanceId}:${relationFieldMetadataId}:${relationRecord.id}`;
 
   const { closeDropdown } = useCloseDropdown();
-  const isDropdownOpen = useRecoilComponentValue(
+  const isDropdownOpen = useAtomComponentStateValue(
     isDropdownOpenComponentState,
     dropdownInstanceId,
   );
@@ -143,8 +138,9 @@ export const RecordDetailRelationRecordsListItem = ({
   const dropdownId = getRecordFieldCardRelationPickerDropdownId({
     fieldDefinition,
     recordId,
+    instanceId: scopeInstanceId,
   });
-  const setSingleRecordPickerSelectedId = useSetRecoilComponentState(
+  const setSingleRecordPickerSelectedId = useSetAtomComponentState(
     singleRecordPickerSelectedIdComponentState,
     dropdownId,
   );
@@ -152,6 +148,28 @@ export const RecordDetailRelationRecordsListItem = ({
   const relationFieldMetadataItem = relationObjectMetadataItem.fields.find(
     ({ id }) => id === relationFieldMetadataId,
   );
+
+  const relationFieldMetadataIsMorphRelation =
+    relationFieldMetadataItem?.type === FieldMetadataType.MORPH_RELATION;
+
+  const computedName = relationFieldMetadataItem
+    ? computeMorphRelationFieldName({
+        fieldName: relationFieldMetadataItem.name,
+        relationType: relationFieldMetadataItem.settings.relationType,
+        targetObjectMetadataNameSingular: objectMetadataItem.nameSingular,
+        targetObjectMetadataNamePlural: objectMetadataItem.namePlural,
+      })
+    : '';
+
+  const updateOneRecordInput = relationFieldMetadataIsMorphRelation
+    ? {
+        [getForeignKeyNameFromRelationFieldName(computedName)]: null,
+      }
+    : {
+        [getForeignKeyNameFromRelationFieldName(
+          relationFieldMetadataItem?.name ?? '',
+        )]: null,
+      };
 
   const handleDetach = () => {
     closeDropdown(dropdownInstanceId);
@@ -162,12 +180,9 @@ export const RecordDetailRelationRecordsListItem = ({
       onSubmit?.({ newValue: null });
     } else {
       updateOneRelationRecord({
+        objectNameSingular: relationObjectMetadataNameSingular,
         idToUpdate: relationRecord.id,
-        updateOneRecordInput: {
-          [getForeignKeyNameFromRelationFieldName(
-            relationFieldMetadataItem.name,
-          )]: null,
-        },
+        updateOneRecordInput,
       });
     }
 
@@ -199,16 +214,17 @@ export const RecordDetailRelationRecordsListItem = ({
     [isExpanded],
   );
 
-  const { isInRightDrawer } = useIsInRightDrawerOrThrow();
-
   return (
     <>
-      <StyledListItem isDropdownOpen={isDropdownOpen}>
+      <RecordDetailRecordsListItemContainer
+        isDropdownOpen={isDropdownOpen}
+        data-testid="record-detail-records-list-item"
+      >
         <RecordChip
           record={relationRecord}
           objectNameSingular={relationObjectMetadataItem.nameSingular}
         />
-        <StyledClickableZone onClick={handleClick}>
+        <StyledClickableZone onClick={handleClick} data-testid="expand-button">
           <LightIconButton
             className="displayOnHover"
             Icon={AnimatedIconChevronDown}
@@ -231,14 +247,14 @@ export const RecordDetailRelationRecordsListItem = ({
                 <DropdownMenuItemsContainer>
                   <MenuItem
                     LeftIcon={IconUnlink}
-                    text="Detach"
+                    text={t`Detach`}
                     onClick={handleDetach}
                   />
                   {!isAccountOwnerRelation &&
                     relationObjectPermissions.canSoftDeleteObjectRecords && (
                       <MenuItem
                         LeftIcon={IconTrash}
-                        text="Delete"
+                        text={t`Delete`}
                         accent="danger"
                         onClick={handleDelete}
                       />
@@ -248,10 +264,10 @@ export const RecordDetailRelationRecordsListItem = ({
             }
           />
         )}
-      </StyledListItem>
+      </RecordDetailRecordsListItemContainer>
       <AnimatedEaseInOut isOpen={isExpanded}>
         <RecordFieldList
-          instanceId={`record-detail-relation-${relationRecord.id}-${isInRightDrawer ? 'right-drawer' : ''}`}
+          instanceId={`${scopeInstanceId}-relation-${relationRecord.id}`}
           objectNameSingular={relationObjectMetadataNameSingular}
           objectRecordId={relationRecord.id}
           showDuplicatesSection={false}
@@ -262,18 +278,18 @@ export const RecordDetailRelationRecordsListItem = ({
       </AnimatedEaseInOut>
       {createPortal(
         <ConfirmationModal
-          modalId={getDeleteRelationModalId(relationRecord.id)}
-          title={`Delete Related ${relationObjectTypeName}`}
+          modalInstanceId={getDeleteRelationModalId(relationRecord.id)}
+          title={t`Delete Related ${relationObjectTypeName}`}
           subtitle={
-            <>
+            <Trans>
               Are you sure you want to delete this related{' '}
               {relationObjectMetadataNameSingular}?
               <br />
               This action will break all its relationships with other objects.
-            </>
+            </Trans>
           }
           onConfirmClick={handleConfirmDelete}
-          confirmButtonText={`Delete ${relationObjectTypeName}`}
+          confirmButtonText={t`Delete ${relationObjectTypeName}`}
         />,
         document.body,
       )}

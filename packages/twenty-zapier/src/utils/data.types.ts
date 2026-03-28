@@ -1,4 +1,5 @@
-import { FieldMetadataType } from 'twenty-shared/types';
+import { type FieldMetadataType } from 'twenty-shared/types';
+
 export type InputData = { [x: string]: any };
 
 export type NodeField = {
@@ -7,7 +8,7 @@ export type NodeField = {
   label: string;
   description: string | null;
   isNullable: boolean;
-  defaultValue: object | null;
+  defaultValue: boolean | object | null;
   list?: boolean;
   placeholder?: string;
 };

@@ -4,27 +4,35 @@ import {
 } from 'twenty-shared/utils';
 import { v4 } from 'uuid';
 
-import { type FlatFieldMetadata } from 'src/engine/metadata-modules/flat-field-metadata/types/flat-field-metadata.type';
-import { type FlatObjectMetadataMaps } from 'src/engine/metadata-modules/flat-object-metadata-maps/types/flat-object-metadata-maps.type';
-import { type FlatObjectMetadata } from 'src/engine/metadata-modules/flat-object-metadata/types/flat-object-metadata.type';
+import { type FeatureFlagMap } from 'src/engine/core-modules/feature-flag/interfaces/feature-flag-map.interface';
+
+import { type FlatApplication } from 'src/engine/core-modules/application/types/flat-application.type';
+import { type AllFlatEntityMaps } from 'src/engine/metadata-modules/flat-entity/types/all-flat-entity-maps.type';
 import { type CreateObjectInput } from 'src/engine/metadata-modules/object-metadata/dtos/create-object.input';
 import { buildDefaultFlatFieldMetadatasForCustomObject } from 'src/engine/metadata-modules/object-metadata/utils/build-default-flat-field-metadatas-for-custom-object.util';
+import { buildDefaultIndexesForCustomObject } from 'src/engine/metadata-modules/object-metadata/utils/build-default-index-for-custom-object.util';
 import { buildDefaultRelationFlatFieldMetadatasForCustomObject } from 'src/engine/metadata-modules/object-metadata/utils/build-default-relation-flat-field-metadatas-for-custom-object.util';
+import { type UniversalFlatFieldMetadata } from 'src/engine/workspace-manager/workspace-migration/universal-flat-entity/types/universal-flat-field-metadata.type';
+import { type UniversalFlatIndexMetadata } from 'src/engine/workspace-manager/workspace-migration/universal-flat-entity/types/universal-flat-index-metadata.type';
+import { type UniversalFlatObjectMetadata } from 'src/engine/workspace-manager/workspace-migration/universal-flat-entity/types/universal-flat-object-metadata.type';
 
 type FromCreateObjectInputToFlatObjectMetadataAndFlatFieldMetadatasToCreateArgs =
   {
-    createObjectInput: Omit<CreateObjectInput, 'workspaceId'>;
-    workspaceId: string;
-    existingFlatObjectMetadataMaps: FlatObjectMetadataMaps;
-  };
+    createObjectInput: CreateObjectInput;
+    flatApplication: FlatApplication;
+    existingFeatureFlagsMap: FeatureFlagMap;
+  } & Pick<AllFlatEntityMaps, 'flatObjectMetadataMaps'>;
 export const fromCreateObjectInputToFlatObjectMetadataAndFlatFieldMetadatasToCreate =
   ({
     createObjectInput: rawCreateObjectInput,
-    workspaceId,
-    existingFlatObjectMetadataMaps,
+    flatApplication,
+    flatObjectMetadataMaps: existingFlatObjectMetadataMaps,
+    existingFeatureFlagsMap,
   }: FromCreateObjectInputToFlatObjectMetadataAndFlatFieldMetadatasToCreateArgs): {
-    flatObjectMetadataToCreate: FlatObjectMetadata;
-    relationTargetFlatFieldMetadatas: FlatFieldMetadata[];
+    flatObjectMetadataToCreate: UniversalFlatObjectMetadata & { id: string };
+    relationTargetFlatFieldMetadataToCreate: UniversalFlatFieldMetadata[];
+    flatFieldMetadataToCreateOnObject: UniversalFlatFieldMetadata[];
+    flatIndexMetadataToCreate: UniversalFlatIndexMetadata[];
   } => {
     const createObjectInput =
       trimAndRemoveDuplicatedWhitespacesFromObjectStringProperties(
@@ -41,22 +49,34 @@ export const fromCreateObjectInputToFlatObjectMetadataAndFlatFieldMetadatasToCre
       );
 
     const objectMetadataId = v4();
-    const baseCustomFlatFieldMetadatas =
+    const universalIdentifier = createObjectInput.universalIdentifier ?? v4();
+    const defaultFlatFieldForCustomObjectMaps =
       buildDefaultFlatFieldMetadatasForCustomObject({
-        objectMetadataId,
-        workspaceId,
+        flatObjectMetadata: {
+          applicationUniversalIdentifier: flatApplication.universalIdentifier,
+          universalIdentifier,
+        },
+        skipNameField: createObjectInput.skipNameField,
       });
-    const createdAt = new Date();
-    const flatObjectMetadataToCreate: FlatObjectMetadata = {
+    const createdAt = new Date().toISOString();
+
+    // Use nameField.id if it exists, otherwise use idField.id (for junction tables without name)
+    const nameField = defaultFlatFieldForCustomObjectMaps.fields.nameField;
+    const labelIdentifierFieldMetadataUniversalIdentifier =
+      nameField?.universalIdentifier ??
+      defaultFlatFieldForCustomObjectMaps.fields.id.universalIdentifier;
+
+    const universalFlatObjectMetadataToCreate: UniversalFlatObjectMetadata & {
+      id: string;
+    } = {
+      id: objectMetadataId,
+      universalIdentifier,
       createdAt,
-      flatFieldMetadatas: [],
       updatedAt: createdAt,
       duplicateCriteria: null,
+      color: createObjectInput.color ?? null,
       description: createObjectInput.description ?? null,
-      flatIndexMetadatas: [],
       icon: createObjectInput.icon ?? null,
-      id: objectMetadataId,
-      imageIdentifierFieldMetadataId: null,
       isActive: true,
       isAuditLogged: true,
       isCustom: true,
@@ -65,34 +85,50 @@ export const fromCreateObjectInputToFlatObjectMetadataAndFlatFieldMetadatasToCre
       isSearchable: true,
       isUIReadOnly: false,
       isSystem: false,
-      labelIdentifierFieldMetadataId: baseCustomFlatFieldMetadatas.nameField.id,
       labelPlural: capitalize(createObjectInput.labelPlural),
       labelSingular: capitalize(createObjectInput.labelSingular),
       namePlural: createObjectInput.namePlural,
       nameSingular: createObjectInput.nameSingular,
       shortcut: createObjectInput.shortcut ?? null,
-      standardId: null,
       standardOverrides: null,
-      uniqueIdentifier: objectMetadataId,
       targetTableName: 'DEPRECATED',
-      workspaceId,
+      applicationUniversalIdentifier: flatApplication.universalIdentifier,
+      fieldUniversalIdentifiers: [],
+      objectPermissionUniversalIdentifiers: [],
+      fieldPermissionUniversalIdentifiers: [],
+      viewUniversalIdentifiers: [],
+      indexMetadataUniversalIdentifiers: [],
+      labelIdentifierFieldMetadataUniversalIdentifier,
+      imageIdentifierFieldMetadataUniversalIdentifier: null,
     };
+
     const {
       standardSourceFlatFieldMetadatas,
       standardTargetFlatFieldMetadatas,
     } = buildDefaultRelationFlatFieldMetadatasForCustomObject({
       existingFlatObjectMetadataMaps,
-      sourceFlatObjectMetadata: flatObjectMetadataToCreate,
-      workspaceId,
+      sourceFlatObjectMetadata: universalFlatObjectMetadataToCreate,
+      flatApplication,
+      existingFeatureFlagsMap,
     });
 
-    flatObjectMetadataToCreate.flatFieldMetadatas = [
-      ...Object.values(baseCustomFlatFieldMetadatas),
+    const objectFlatFieldMetadatas: UniversalFlatFieldMetadata[] = [
+      ...Object.values(defaultFlatFieldForCustomObjectMaps.fields),
       ...standardSourceFlatFieldMetadatas,
     ];
 
+    const defaultIndexesForCustomObject = buildDefaultIndexesForCustomObject({
+      objectFlatFieldMetadatas,
+      defaultFlatFieldForCustomObjectMaps,
+      flatObjectMetadata: universalFlatObjectMetadataToCreate,
+    });
+
     return {
-      flatObjectMetadataToCreate,
-      relationTargetFlatFieldMetadatas: standardTargetFlatFieldMetadatas,
+      flatObjectMetadataToCreate: universalFlatObjectMetadataToCreate,
+      flatIndexMetadataToCreate: Object.values(
+        defaultIndexesForCustomObject.indexes,
+      ),
+      relationTargetFlatFieldMetadataToCreate: standardTargetFlatFieldMetadatas,
+      flatFieldMetadataToCreateOnObject: objectFlatFieldMetadatas,
     };
   };

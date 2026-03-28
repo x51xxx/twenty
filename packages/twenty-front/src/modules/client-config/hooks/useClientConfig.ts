@@ -6,11 +6,13 @@ import { billingState } from '@/client-config/states/billingState';
 import { calendarBookingPageIdState } from '@/client-config/states/calendarBookingPageIdState';
 import { canManageFeatureFlagsState } from '@/client-config/states/canManageFeatureFlagsState';
 import { captchaState } from '@/client-config/states/captchaState';
-import { chromeExtensionIdState } from '@/client-config/states/chromeExtensionIdState';
 import { isAnalyticsEnabledState } from '@/client-config/states/isAnalyticsEnabledState';
 import { isAttachmentPreviewEnabledState } from '@/client-config/states/isAttachmentPreviewEnabledState';
 import { isConfigVariablesInDbEnabledState } from '@/client-config/states/isConfigVariablesInDbEnabledState';
 import { isDeveloperDefaultSignInPrefilledState } from '@/client-config/states/isDeveloperDefaultSignInPrefilledState';
+import { isClickHouseConfiguredState } from '@/client-config/states/isClickHouseConfiguredState';
+import { isCloudflareIntegrationEnabledState } from '@/client-config/states/isCloudflareIntegrationEnabledState';
+import { isEmailingDomainsEnabledState } from '@/client-config/states/isEmailingDomainsEnabledState';
 import { isEmailVerificationRequiredState } from '@/client-config/states/isEmailVerificationRequiredState';
 import { isGoogleCalendarEnabledState } from '@/client-config/states/isGoogleCalendarEnabledState';
 import { isGoogleMessagingEnabledState } from '@/client-config/states/isGoogleMessagingEnabledState';
@@ -24,9 +26,11 @@ import { supportChatState } from '@/client-config/states/supportChatState';
 import { type ClientConfig } from '@/client-config/types/ClientConfig';
 import { domainConfigurationState } from '@/domain-manager/states/domainConfigurationState';
 import { useCallback } from 'react';
-import { useRecoilState, useSetRecoilState } from 'recoil';
-import { clientConfigApiStatusState } from '../states/clientConfigApiStatusState';
-import { getClientConfig } from '../utils/getClientConfig';
+import { clientConfigApiStatusState } from '@/client-config/states/clientConfigApiStatusState';
+import { getClientConfig } from '@/client-config/utils/getClientConfig';
+import { allowRequestsToTwentyIconsState } from '@/client-config/states/allowRequestsToTwentyIcons';
+import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
+import { useAtomState } from '@/ui/utilities/state/jotai/hooks/useAtomState';
 
 type UseClientConfigResult = {
   data: { clientConfig: ClientConfig } | undefined;
@@ -37,76 +41,83 @@ type UseClientConfigResult = {
 };
 
 export const useClientConfig = (): UseClientConfigResult => {
-  const setIsAnalyticsEnabled = useSetRecoilState(isAnalyticsEnabledState);
-  const setDomainConfiguration = useSetRecoilState(domainConfigurationState);
-  const setAuthProviders = useSetRecoilState(authProvidersState);
-  const setAiModels = useSetRecoilState(aiModelsState);
+  const setIsAnalyticsEnabled = useSetAtomState(isAnalyticsEnabledState);
+  const setDomainConfiguration = useSetAtomState(domainConfigurationState);
+  const setAuthProviders = useSetAtomState(authProvidersState);
+  const setAiModels = useSetAtomState(aiModelsState);
 
-  const setIsDeveloperDefaultSignInPrefilled = useSetRecoilState(
+  const setIsDeveloperDefaultSignInPrefilled = useSetAtomState(
     isDeveloperDefaultSignInPrefilledState,
   );
-  const setIsMultiWorkspaceEnabled = useSetRecoilState(
+  const setIsMultiWorkspaceEnabled = useSetAtomState(
     isMultiWorkspaceEnabledState,
   );
-  const setIsEmailVerificationRequired = useSetRecoilState(
+  const setIsEmailVerificationRequired = useSetAtomState(
     isEmailVerificationRequiredState,
   );
 
-  const setBilling = useSetRecoilState(billingState);
-  const setSupportChat = useSetRecoilState(supportChatState);
+  const setBilling = useSetAtomState(billingState);
+  const setSupportChat = useSetAtomState(supportChatState);
 
-  const setSentryConfig = useSetRecoilState(sentryConfigState);
-  const [clientConfigApiStatus, setClientConfigApiStatus] = useRecoilState(
+  const setSentryConfig = useSetAtomState(sentryConfigState);
+  const [clientConfigApiStatus, setClientConfigApiStatus] = useAtomState(
     clientConfigApiStatusState,
   );
 
-  const setCaptcha = useSetRecoilState(captchaState);
+  const setCaptcha = useSetAtomState(captchaState);
 
-  const setChromeExtensionId = useSetRecoilState(chromeExtensionIdState);
+  const setApiConfig = useSetAtomState(apiConfigState);
 
-  const setApiConfig = useSetRecoilState(apiConfigState);
+  const setCanManageFeatureFlags = useSetAtomState(canManageFeatureFlagsState);
 
-  const setCanManageFeatureFlags = useSetRecoilState(
-    canManageFeatureFlagsState,
-  );
+  const setLabPublicFeatureFlags = useSetAtomState(labPublicFeatureFlagsState);
 
-  const setLabPublicFeatureFlags = useSetRecoilState(
-    labPublicFeatureFlagsState,
-  );
-
-  const setMicrosoftMessagingEnabled = useSetRecoilState(
+  const setIsMicrosoftMessagingEnabled = useSetAtomState(
     isMicrosoftMessagingEnabledState,
   );
 
-  const setMicrosoftCalendarEnabled = useSetRecoilState(
+  const setIsMicrosoftCalendarEnabled = useSetAtomState(
     isMicrosoftCalendarEnabledState,
   );
 
-  const setGoogleMessagingEnabled = useSetRecoilState(
+  const setIsGoogleMessagingEnabled = useSetAtomState(
     isGoogleMessagingEnabledState,
   );
 
-  const setGoogleCalendarEnabled = useSetRecoilState(
+  const setIsGoogleCalendarEnabled = useSetAtomState(
     isGoogleCalendarEnabledState,
   );
 
-  const setIsAttachmentPreviewEnabled = useSetRecoilState(
+  const setIsAttachmentPreviewEnabled = useSetAtomState(
     isAttachmentPreviewEnabledState,
   );
 
-  const setIsConfigVariablesInDbEnabled = useSetRecoilState(
+  const setIsConfigVariablesInDbEnabled = useSetAtomState(
     isConfigVariablesInDbEnabledState,
   );
 
-  const setCalendarBookingPageId = useSetRecoilState(
-    calendarBookingPageIdState,
-  );
+  const setCalendarBookingPageId = useSetAtomState(calendarBookingPageIdState);
 
-  const setIsImapSmtpCaldavEnabled = useSetRecoilState(
+  const setIsImapSmtpCaldavEnabled = useSetAtomState(
     isImapSmtpCaldavEnabledState,
   );
+  const setIsEmailingDomainsEnabled = useSetAtomState(
+    isEmailingDomainsEnabledState,
+  );
 
-  const setAppVersion = useSetRecoilState(appVersionState);
+  const setAllowRequestsToTwentyIcons = useSetAtomState(
+    allowRequestsToTwentyIconsState,
+  );
+
+  const setIsCloudflareIntegrationEnabled = useSetAtomState(
+    isCloudflareIntegrationEnabledState,
+  );
+
+  const setIsClickHouseConfigured = useSetAtomState(
+    isClickHouseConfiguredState,
+  );
+
+  const setAppVersion = useSetAtomState(appVersionState);
 
   const fetchClientConfig = useCallback(async () => {
     setClientConfigApiStatus((prev) => ({
@@ -133,11 +144,12 @@ export const useClientConfig = (): UseClientConfigResult => {
       setAuthProviders({
         google: clientConfig.authProviders.google,
         microsoft: clientConfig.authProviders.microsoft,
+        casdoor: clientConfig.authProviders.casdoor,
         password: clientConfig.authProviders.password,
         magicLink: false,
         sso: clientConfig.authProviders.sso,
       });
-      setAiModels(clientConfig.aiModels || []);
+      setAiModels(clientConfig.aiModels ?? []);
       setIsAnalyticsEnabled(clientConfig.analyticsEnabled);
       setIsDeveloperDefaultSignInPrefilled(clientConfig.signInPrefilled);
       setIsMultiWorkspaceEnabled(clientConfig.isMultiWorkspaceEnabled);
@@ -156,7 +168,6 @@ export const useClientConfig = (): UseClientConfigResult => {
         siteKey: clientConfig?.captcha?.siteKey,
       });
 
-      setChromeExtensionId(clientConfig?.chromeExtensionId);
       setApiConfig(clientConfig?.api);
       setDomainConfiguration({
         defaultSubdomain: clientConfig?.defaultSubdomain,
@@ -164,10 +175,10 @@ export const useClientConfig = (): UseClientConfigResult => {
       });
       setCanManageFeatureFlags(clientConfig?.canManageFeatureFlags);
       setLabPublicFeatureFlags(clientConfig?.publicFeatureFlags);
-      setMicrosoftMessagingEnabled(clientConfig?.isMicrosoftMessagingEnabled);
-      setMicrosoftCalendarEnabled(clientConfig?.isMicrosoftCalendarEnabled);
-      setGoogleMessagingEnabled(clientConfig?.isGoogleMessagingEnabled);
-      setGoogleCalendarEnabled(clientConfig?.isGoogleCalendarEnabled);
+      setIsMicrosoftMessagingEnabled(clientConfig?.isMicrosoftMessagingEnabled);
+      setIsMicrosoftCalendarEnabled(clientConfig?.isMicrosoftCalendarEnabled);
+      setIsGoogleMessagingEnabled(clientConfig?.isGoogleMessagingEnabled);
+      setIsGoogleCalendarEnabled(clientConfig?.isGoogleCalendarEnabled);
       setIsAttachmentPreviewEnabled(clientConfig?.isAttachmentPreviewEnabled);
       setIsConfigVariablesInDbEnabled(
         clientConfig?.isConfigVariablesInDbEnabled,
@@ -179,6 +190,12 @@ export const useClientConfig = (): UseClientConfigResult => {
 
       setCalendarBookingPageId(clientConfig?.calendarBookingPageId ?? null);
       setIsImapSmtpCaldavEnabled(clientConfig?.isImapSmtpCaldavEnabled);
+      setIsEmailingDomainsEnabled(clientConfig?.isEmailingDomainsEnabled);
+      setAllowRequestsToTwentyIcons(clientConfig?.allowRequestsToTwentyIcons);
+      setIsCloudflareIntegrationEnabled(
+        clientConfig?.isCloudflareIntegrationEnabled,
+      );
+      setIsClickHouseConfigured(clientConfig?.isClickHouseConfigured ?? false);
     } catch (err) {
       const error =
         err instanceof Error ? err : new Error('Failed to fetch client config');
@@ -199,11 +216,10 @@ export const useClientConfig = (): UseClientConfigResult => {
     setCalendarBookingPageId,
     setCanManageFeatureFlags,
     setCaptcha,
-    setChromeExtensionId,
     setClientConfigApiStatus,
     setDomainConfiguration,
-    setGoogleCalendarEnabled,
-    setGoogleMessagingEnabled,
+    setIsGoogleCalendarEnabled,
+    setIsGoogleMessagingEnabled,
     setIsAnalyticsEnabled,
     setIsAttachmentPreviewEnabled,
     setIsConfigVariablesInDbEnabled,
@@ -211,11 +227,15 @@ export const useClientConfig = (): UseClientConfigResult => {
     setIsEmailVerificationRequired,
     setIsImapSmtpCaldavEnabled,
     setIsMultiWorkspaceEnabled,
+    setIsEmailingDomainsEnabled,
+    setIsClickHouseConfigured,
+    setIsCloudflareIntegrationEnabled,
     setLabPublicFeatureFlags,
-    setMicrosoftCalendarEnabled,
-    setMicrosoftMessagingEnabled,
+    setIsMicrosoftCalendarEnabled,
+    setIsMicrosoftMessagingEnabled,
     setSentryConfig,
     setSupportChat,
+    setAllowRequestsToTwentyIcons,
   ]);
 
   return {

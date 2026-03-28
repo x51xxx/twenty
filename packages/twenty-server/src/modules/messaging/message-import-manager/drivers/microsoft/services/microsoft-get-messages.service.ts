@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { type EmailAddress } from 'addressparser';
+import { MessageParticipantRole } from 'twenty-shared/types';
 import { isDefined } from 'twenty-shared/utils';
 
 import { type ConnectedAccountWorkspaceEntity } from 'src/modules/connected-account/standard-objects/connected-account.workspace-entity';
@@ -13,11 +14,16 @@ import { formatAddressObjectAsParticipants } from 'src/modules/messaging/message
 import { safeParseEmailAddress } from 'src/modules/messaging/message-import-manager/utils/safe-parse.util';
 
 import { MicrosoftFetchByBatchService } from './microsoft-fetch-by-batch.service';
-import { MicrosoftHandleErrorService } from './microsoft-handle-error.service';
+import { MicrosoftMessagesImportErrorHandler } from './microsoft-messages-import-error-handler.service';
 
 type ConnectedAccountType = Pick<
   ConnectedAccountWorkspaceEntity,
-  'refreshToken' | 'id' | 'provider' | 'handle' | 'handleAliases'
+  | 'accessToken'
+  | 'refreshToken'
+  | 'id'
+  | 'provider'
+  | 'handle'
+  | 'handleAliases'
 >;
 
 @Injectable()
@@ -26,7 +32,7 @@ export class MicrosoftGetMessagesService {
 
   constructor(
     private readonly microsoftFetchByBatchService: MicrosoftFetchByBatchService,
-    private readonly microsoftHandleErrorService: MicrosoftHandleErrorService,
+    private readonly microsoftMessagesImportErrorHandler: MicrosoftMessagesImportErrorHandler,
   ) {}
 
   async getMessages(
@@ -47,7 +53,7 @@ export class MicrosoftGetMessagesService {
 
       return messages;
     } catch (error) {
-      this.microsoftHandleErrorService.handleMicrosoftGetMessagesError(error);
+      this.microsoftMessagesImportErrorHandler.handleError(error);
 
       return [];
     }
@@ -104,16 +110,28 @@ export class MicrosoftGetMessagesService {
 
       const participants = [
         ...(safeParseFrom
-          ? formatAddressObjectAsParticipants(safeParseFrom, 'from')
+          ? formatAddressObjectAsParticipants(
+              safeParseFrom,
+              MessageParticipantRole.FROM,
+            )
           : []),
         ...(safeParseTo
-          ? formatAddressObjectAsParticipants(safeParseTo, 'to')
+          ? formatAddressObjectAsParticipants(
+              safeParseTo,
+              MessageParticipantRole.TO,
+            )
           : []),
         ...(safeParseCc
-          ? formatAddressObjectAsParticipants(safeParseCc, 'cc')
+          ? formatAddressObjectAsParticipants(
+              safeParseCc,
+              MessageParticipantRole.CC,
+            )
           : []),
         ...(safeParseBcc
-          ? formatAddressObjectAsParticipants(safeParseBcc, 'bcc')
+          ? formatAddressObjectAsParticipants(
+              safeParseBcc,
+              MessageParticipantRole.BCC,
+            )
           : []),
       ];
 
@@ -133,6 +151,9 @@ export class MicrosoftGetMessagesService {
           : MessageDirection.INCOMING,
         participants,
         attachments: [],
+        messageFolderExternalIds: response.parentFolderId
+          ? [response.parentFolderId]
+          : [],
       };
     });
 
@@ -144,7 +165,7 @@ export class MicrosoftGetMessagesService {
       return [];
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line @typescripttypescript/no-explicit-any
     return batchResponse.responses.map((response: any) => {
       if (response.status === 200) {
         return response.body;

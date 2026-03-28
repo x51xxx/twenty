@@ -4,133 +4,130 @@ import { contextStoreCurrentViewIdComponentState } from '@/context-store/states/
 import { useRecordIndexContextOrThrow } from '@/object-record/record-index/contexts/RecordIndexContext';
 import { useLoadRecordIndexStates } from '@/object-record/record-index/hooks/useLoadRecordIndexStates';
 import { recordIndexViewTypeState } from '@/object-record/record-index/states/recordIndexViewTypeState';
-import { prefetchViewFromViewIdFamilySelector } from '@/prefetch/states/selector/prefetchViewFromViewIdFamilySelector';
-import { usePersistViewGroupRecords } from '@/views/hooks/internal/usePersistViewGroupRecords';
 import { useUpdateCurrentView } from '@/views/hooks/useUpdateCurrentView';
+import { viewsSelector } from '@/views/states/selectors/viewsSelector';
 import { type GraphQLView } from '@/views/types/GraphQLView';
-import { type ViewGroup } from '@/views/types/ViewGroup';
 import { ViewType, viewTypeIconMapping } from '@/views/types/ViewType';
-import { useGetAvailableFieldsForKanban } from '@/views/view-picker/hooks/useGetAvailableFieldsForKanban';
+import { useGetAvailableFieldsForCalendar } from '@/views/view-picker/hooks/useGetAvailableFieldsForCalendar';
+import { useGetAvailableFieldsToGroupRecordsBy } from '@/views/view-picker/hooks/useGetAvailableFieldsToGroupRecordsBy';
+import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
+import { useStore } from 'jotai';
 import { useCallback } from 'react';
-import { useRecoilCallback, useSetRecoilState } from 'recoil';
 import { assertUnreachable, isDefined } from 'twenty-shared/utils';
-import { v4 } from 'uuid';
+import { ViewCalendarLayout } from '~/generated-metadata/graphql';
 
 export const useSetViewTypeFromLayoutOptionsMenu = () => {
   const { updateCurrentView } = useUpdateCurrentView();
-  const setRecordIndexViewType = useSetRecoilState(recordIndexViewTypeState);
-  const { availableFieldsForKanban } = useGetAvailableFieldsForKanban();
+  const setRecordIndexViewType = useSetAtomState(recordIndexViewTypeState);
+  const { availableFieldsForGrouping } =
+    useGetAvailableFieldsToGroupRecordsBy();
   const { objectMetadataItem } = useRecordIndexContextOrThrow();
 
   const { loadRecordIndexStates } = useLoadRecordIndexStates();
 
-  const { createViewGroupRecords } = usePersistViewGroupRecords();
+  const { availableFieldsForCalendar } = useGetAvailableFieldsForCalendar();
 
-  const createViewGroupAssociatedWithKanbanField = useCallback(
-    async (randomFieldForKanban: string, currentViewId: string) => {
-      const viewGroupsToCreate =
-        objectMetadataItem.fields
-          ?.find((field) => field.id === randomFieldForKanban)
-          ?.options?.map(
-            (option, index) =>
-              ({
-                id: v4(),
-                __typename: 'ViewGroup',
-                fieldMetadataId: randomFieldForKanban,
-                fieldValue: option.value,
-                isVisible: true,
-                position: index,
-              }) satisfies ViewGroup,
-          ) ?? [];
+  const store = useStore();
 
-      viewGroupsToCreate.push({
-        __typename: 'ViewGroup',
-        id: v4(),
-        fieldValue: '',
-        position: viewGroupsToCreate.length,
-        isVisible: true,
-        fieldMetadataId: randomFieldForKanban,
-      } satisfies ViewGroup);
+  const setAndPersistViewType = useCallback(
+    async (viewType: ViewType) => {
+      const currentViewId = store.get(
+        contextStoreCurrentViewIdComponentState.atomFamily({
+          instanceId: MAIN_CONTEXT_STORE_INSTANCE_ID,
+        }),
+      );
 
-      await createViewGroupRecords({
-        viewGroupsToCreate,
-        viewId: currentViewId,
-      });
+      const existingViews = store.get(viewsSelector.atom);
 
-      return viewGroupsToCreate;
+      if (!isDefined(currentViewId)) {
+        throw new Error('No view id found');
+      }
+
+      const currentView = existingViews.find(
+        (view) => view.id === currentViewId,
+      );
+
+      if (!isDefined(currentView)) {
+        throw new Error('No current view found');
+      }
+
+      const updateCurrentViewParams: Partial<GraphQLView> = {};
+      updateCurrentViewParams.type = viewType;
+
+      switch (viewType) {
+        case ViewType.KANBAN: {
+          if (availableFieldsForGrouping.length === 0) {
+            throw new Error('No fields for kanban - should not happen');
+          }
+
+          const mainGroupByFieldMetadataId = availableFieldsForGrouping[0].id;
+          updateCurrentViewParams.mainGroupByFieldMetadataId =
+            mainGroupByFieldMetadataId;
+
+          if (shouldChangeIcon(currentView.icon, currentView.type)) {
+            updateCurrentViewParams.icon =
+              viewTypeIconMapping(viewType).displayName;
+          }
+
+          setRecordIndexViewType(viewType);
+          await updateCurrentView(updateCurrentViewParams);
+          return;
+        }
+        case ViewType.TABLE: {
+          if (shouldChangeIcon(currentView.icon, currentView.type)) {
+            updateCurrentViewParams.icon =
+              viewTypeIconMapping(viewType).displayName;
+          }
+          updateCurrentViewParams.mainGroupByFieldMetadataId = null;
+          await updateCurrentView(updateCurrentViewParams);
+          setRecordIndexViewType(viewType);
+          return;
+        }
+        case ViewType.CALENDAR: {
+          if (availableFieldsForCalendar.length === 0) {
+            throw new Error('No date fields for calendar');
+          }
+
+          const calendarFieldMetadataId = availableFieldsForCalendar[0].id;
+
+          setRecordIndexViewType(viewType);
+
+          loadRecordIndexStates(
+            {
+              ...currentView,
+              type: viewType,
+              calendarFieldMetadataId,
+              calendarLayout: ViewCalendarLayout.MONTH,
+            },
+            objectMetadataItem,
+          );
+
+          if (shouldChangeIcon(currentView.icon, currentView.type)) {
+            updateCurrentViewParams.icon =
+              viewTypeIconMapping(viewType).displayName;
+          }
+          updateCurrentViewParams.calendarLayout = ViewCalendarLayout.MONTH;
+          updateCurrentViewParams.calendarFieldMetadataId =
+            calendarFieldMetadataId;
+          updateCurrentViewParams.mainGroupByFieldMetadataId = null;
+          return await updateCurrentView(updateCurrentViewParams);
+        }
+        case ViewType.FIELDS_WIDGET: {
+          return;
+        }
+        default: {
+          return assertUnreachable(viewType);
+        }
+      }
     },
-    [objectMetadataItem, createViewGroupRecords],
-  );
-
-  const setAndPersistViewType = useRecoilCallback(
-    ({ snapshot }) =>
-      async (viewType: ViewType) => {
-        const currentViewId = snapshot
-          .getLoadable(
-            contextStoreCurrentViewIdComponentState.atomFamily({
-              instanceId: MAIN_CONTEXT_STORE_INSTANCE_ID,
-            }),
-          )
-          .getValue();
-
-        if (!isDefined(currentViewId)) {
-          throw new Error('No view id found');
-        }
-        const currentView = snapshot
-          .getLoadable(
-            prefetchViewFromViewIdFamilySelector({ viewId: currentViewId }),
-          )
-          .getValue();
-        if (!isDefined(currentView)) {
-          throw new Error('No current view found');
-        }
-
-        const updateCurrentViewParams: Partial<GraphQLView> = {};
-        updateCurrentViewParams.type = viewType;
-
-        switch (viewType) {
-          case ViewType.Kanban: {
-            if (availableFieldsForKanban.length === 0) {
-              throw new Error('No fields for kanban - should not happen');
-            }
-
-            if (currentView.viewGroups.length === 0) {
-              const viewGroups = await createViewGroupAssociatedWithKanbanField(
-                availableFieldsForKanban[0].id,
-                currentView.id,
-              );
-              loadRecordIndexStates(
-                { ...currentView, viewGroups },
-                objectMetadataItem,
-              );
-            }
-            setRecordIndexViewType(viewType);
-
-            if (shouldChangeIcon(currentView.icon, currentView.type)) {
-              updateCurrentViewParams.icon =
-                viewTypeIconMapping(viewType).displayName;
-            }
-            return await updateCurrentView(updateCurrentViewParams);
-          }
-          case ViewType.Table:
-            setRecordIndexViewType(viewType);
-            if (shouldChangeIcon(currentView.icon, currentView.type)) {
-              updateCurrentViewParams.icon =
-                viewTypeIconMapping(viewType).displayName;
-            }
-            return await updateCurrentView(updateCurrentViewParams);
-          default: {
-            return assertUnreachable(viewType);
-          }
-        }
-      },
     [
-      availableFieldsForKanban,
-      objectMetadataItem,
-      updateCurrentView,
+      availableFieldsForGrouping,
       setRecordIndexViewType,
-      createViewGroupAssociatedWithKanbanField,
+      store,
+      updateCurrentView,
+      availableFieldsForCalendar,
       loadRecordIndexStates,
+      objectMetadataItem,
     ],
   );
 
@@ -139,14 +136,20 @@ export const useSetViewTypeFromLayoutOptionsMenu = () => {
     oldViewType: ViewType,
   ): boolean => {
     if (
-      oldViewType === ViewType.Kanban &&
-      oldIcon === viewTypeIconMapping(ViewType.Kanban).displayName
+      oldViewType === ViewType.KANBAN &&
+      oldIcon === viewTypeIconMapping(ViewType.KANBAN).displayName
     ) {
       return true;
     }
     if (
-      oldViewType === ViewType.Table &&
-      oldIcon === viewTypeIconMapping(ViewType.Table).displayName
+      oldViewType === ViewType.TABLE &&
+      oldIcon === viewTypeIconMapping(ViewType.TABLE).displayName
+    ) {
+      return true;
+    }
+    if (
+      oldViewType === ViewType.CALENDAR &&
+      oldIcon === viewTypeIconMapping(ViewType.CALENDAR).displayName
     ) {
       return true;
     }

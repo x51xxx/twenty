@@ -1,48 +1,38 @@
 import { AdvancedFilterContext } from '@/object-record/advanced-filter/states/context/AdvancedFilterContext';
 import { currentRecordFiltersComponentState } from '@/object-record/record-filter/states/currentRecordFiltersComponentState';
-import { useRecoilComponentCallbackState } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentCallbackState';
-import { getSnapshotValue } from '@/ui/utilities/state/utils/getSnapshotValue';
-import { VIEW_BAR_FILTER_DROPDOWN_ID } from '@/views/constants/ViewBarFilterDropdownId';
-import { vectorSearchInputComponentState } from '@/views/states/vectorSearchInputComponentState';
-import { isVectorSearchFilter } from '@/views/utils/isVectorSearchFilter';
-import { useContext } from 'react';
-import { useRecoilCallback } from 'recoil';
+import { type RecordFilter } from '@/object-record/record-filter/types/RecordFilter';
+import { useAtomComponentStateCallbackState } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateCallbackState';
+import { useStore } from 'jotai';
+import { useCallback, useContext } from 'react';
 import { isDefined } from 'twenty-shared/utils';
 
-export const useRemoveRecordFilter = () => {
-  const currentRecordFiltersCallbackState = useRecoilComponentCallbackState(
+export const useRemoveRecordFilter = (instanceId?: string) => {
+  const currentRecordFilters = useAtomComponentStateCallbackState(
     currentRecordFiltersComponentState,
+    instanceId,
   );
 
+  const store = useStore();
   const { onUpdate } = useContext(AdvancedFilterContext);
 
-  const removeRecordFilterCallback = useRecoilCallback(
-    ({ set, snapshot }) =>
-      ({ recordFilterId }: { recordFilterId: string }) => {
-        const currentRecordFilters = getSnapshotValue(
-          snapshot,
-          currentRecordFiltersCallbackState,
-        );
+  const removeRecordFilterCallback = useCallback(
+    ({ recordFilterId }: { recordFilterId: string }) => {
+      const existingRecordFilters = store.get(
+        currentRecordFilters,
+      ) as RecordFilter[];
 
-        const filterToRemove = currentRecordFilters.find(
-          (existingFilter) => existingFilter.id === recordFilterId,
-        );
+      const filterToRemove = existingRecordFilters.find(
+        (existingFilter) => existingFilter.id === recordFilterId,
+      );
 
-        if (!isDefined(filterToRemove)) {
-          return;
-        }
+      if (!isDefined(filterToRemove)) {
+        return;
+      }
 
-        if (isVectorSearchFilter(filterToRemove)) {
-          set(
-            vectorSearchInputComponentState.atomFamily({
-              instanceId: VIEW_BAR_FILTER_DROPDOWN_ID,
-            }),
-            '',
-          );
-        }
-
-        set(currentRecordFiltersCallbackState, (currentRecordFilters) => {
-          const newCurrentRecordFilters = [...currentRecordFilters];
+      store.set(
+        currentRecordFilters,
+        (previousRecordFilters: RecordFilter[]) => {
+          const newCurrentRecordFilters = [...previousRecordFilters];
 
           const indexOfFilterToRemove = newCurrentRecordFilters.findIndex(
             (existingFilter) => existingFilter.id === recordFilterId,
@@ -51,9 +41,10 @@ export const useRemoveRecordFilter = () => {
           newCurrentRecordFilters.splice(indexOfFilterToRemove, 1);
 
           return newCurrentRecordFilters;
-        });
-      },
-    [currentRecordFiltersCallbackState],
+        },
+      );
+    },
+    [currentRecordFilters, store],
   );
 
   const removeRecordFilter = ({

@@ -1,10 +1,9 @@
-import { CustomError } from '@/error-handler/CustomError';
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
-import { isDefined } from 'twenty-shared/utils';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
+import { CustomError, isDefined } from 'twenty-shared/utils';
 
 type GetFieldMetadataItemByIdParams = {
   fieldMetadataId: string;
-  objectMetadataItems: ObjectMetadataItem[];
+  objectMetadataItems: EnrichedObjectMetadataItem[];
 };
 
 const FIELD_METADATA_ITEM_NOT_FOUND_ERROR_CODE =

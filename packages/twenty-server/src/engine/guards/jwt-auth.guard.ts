@@ -2,13 +2,19 @@ import {
   type CanActivate,
   type ExecutionContext,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 
+import { isDefined } from 'twenty-shared/utils';
+
 import { AccessTokenService } from 'src/engine/core-modules/auth/token/services/access-token.service';
+import { bindDataToRequestObject } from 'src/engine/utils/bind-data-to-request-object.util';
 import { WorkspaceCacheStorageService } from 'src/engine/workspace-cache-storage/workspace-cache-storage.service';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  private readonly logger = new Logger(JwtAuthGuard.name);
+
   constructor(
     private readonly accessTokenService: AccessTokenService,
     private readonly workspaceStorageCacheService: WorkspaceCacheStorageService,
@@ -26,16 +32,27 @@ export class JwtAuthGuard implements CanActivate {
           )
         : undefined;
 
-      request.user = data.user;
-      request.apiKey = data.apiKey;
-      request.workspace = data.workspace;
-      request.workspaceId = data.workspace?.id;
-      request.workspaceMetadataVersion = metadataVersion;
-      request.workspaceMemberId = data.workspaceMemberId;
-      request.userWorkspaceId = data.userWorkspaceId;
+      if (
+        !isDefined(data.apiKey) &&
+        !isDefined(data.userWorkspaceId) &&
+        !isDefined(data.application)
+      ) {
+        this.logger.warn(
+          `Auth failed: no apiKey, userWorkspaceId, or application in context`,
+        );
+
+        return false;
+      }
+
+      bindDataToRequestObject(data, request, metadataVersion);
 
       return true;
-    } catch {
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      this.logger.warn(`Auth failed: ${errorMessage}`);
+
       return false;
     }
   }

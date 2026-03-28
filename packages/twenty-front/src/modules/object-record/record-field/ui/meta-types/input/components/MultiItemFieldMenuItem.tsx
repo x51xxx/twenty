@@ -1,9 +1,10 @@
+import { t } from '@lingui/core/macro';
 import { DropdownContent } from '@/ui/layout/dropdown/components/DropdownContent';
 import { DropdownMenuItemsContainer } from '@/ui/layout/dropdown/components/DropdownMenuItemsContainer';
 import { useCloseDropdown } from '@/ui/layout/dropdown/hooks/useCloseDropdown';
 import { isDropdownOpenComponentState } from '@/ui/layout/dropdown/states/isDropdownOpenComponentState';
 import { MenuItemWithOptionDropdown } from '@/ui/navigation/menu-item/components/MenuItemWithOptionDropdown';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 import React, { useState } from 'react';
 import {
   IconBookmark,
@@ -21,6 +22,7 @@ type MultiItemFieldMenuItemProps<T> = {
   onSetAsPrimary?: () => void;
   onDelete?: () => void;
   onCopy?: (value: T) => void;
+  onClick?: () => void;
   DisplayComponent: React.ComponentType<{ value: T }>;
   showPrimaryIcon: boolean;
   showSetAsPrimaryButton: boolean;
@@ -33,6 +35,7 @@ export const MultiItemFieldMenuItem = <T,>({
   onEdit,
   onSetAsPrimary,
   onDelete,
+  onClick,
   DisplayComponent,
   showPrimaryIcon,
   showSetAsPrimaryButton,
@@ -41,7 +44,7 @@ export const MultiItemFieldMenuItem = <T,>({
 }: MultiItemFieldMenuItemProps<T>) => {
   const [isHovered, setIsHovered] = useState(false);
   const { closeDropdown } = useCloseDropdown();
-  const isDropdownOpen = useRecoilComponentValue(
+  const isDropdownOpen = useAtomComponentStateValue(
     isDropdownOpenComponentState,
     dropdownId,
   );
@@ -51,35 +54,23 @@ export const MultiItemFieldMenuItem = <T,>({
     setIsHovered(false);
   };
 
-  const handleDeleteClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    event.stopPropagation();
-    event.preventDefault();
-
+  const handleDeleteClick = () => {
     closeDropdown(dropdownId);
     setIsHovered(false);
     onDelete?.();
   };
 
-  const handleSetAsPrimaryClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    event.stopPropagation();
-    event.preventDefault();
-
+  const handleSetAsPrimaryClick = () => {
     closeDropdown(dropdownId);
     onSetAsPrimary?.();
   };
 
-  const handleEditClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    event.stopPropagation();
-    event.preventDefault();
-
+  const handleEditClick = () => {
     closeDropdown(dropdownId);
     onEdit?.();
   };
 
-  const handleCopyClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    event.stopPropagation();
-    event.preventDefault();
-
+  const handleCopyClick = () => {
     closeDropdown(dropdownId);
     onCopy?.(value);
   };
@@ -88,6 +79,7 @@ export const MultiItemFieldMenuItem = <T,>({
     <MenuItemWithOptionDropdown
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onClick={onClick}
       text={<DisplayComponent value={value} />}
       isIconDisplayedOnHoverOnly={!showPrimaryIcon && !isDropdownOpen}
       RightIcon={!isHovered && showPrimaryIcon ? IconBookmark : null}
@@ -98,25 +90,25 @@ export const MultiItemFieldMenuItem = <T,>({
             {showSetAsPrimaryButton && (
               <MenuItem
                 LeftIcon={IconBookmarkPlus}
-                text="Set as Primary"
+                text={t`Set as Primary`}
                 onClick={handleSetAsPrimaryClick}
               />
             )}
             <MenuItem
               LeftIcon={IconPencil}
-              text="Edit"
+              text={t`Edit`}
               onClick={handleEditClick}
             />
             <MenuItem
               accent="danger"
               LeftIcon={IconTrash}
-              text="Delete"
+              text={t`Delete`}
               onClick={handleDeleteClick}
             />
             {showCopyButton && (
               <MenuItem
                 LeftIcon={IconCopy}
-                text="Copy"
+                text={t`Copy`}
                 onClick={handleCopyClick}
               />
             )}

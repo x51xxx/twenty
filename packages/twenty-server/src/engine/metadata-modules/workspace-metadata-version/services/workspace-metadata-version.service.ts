@@ -1,29 +1,30 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Repository } from 'typeorm';
 import { isDefined } from 'twenty-shared/utils';
+import { Repository } from 'typeorm';
 
-import { Workspace } from 'src/engine/core-modules/workspace/workspace.entity';
-import { WorkspaceMetadataCacheService } from 'src/engine/metadata-modules/workspace-metadata-cache/services/workspace-metadata-cache.service';
+import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import {
   WorkspaceMetadataVersionException,
   WorkspaceMetadataVersionExceptionCode,
 } from 'src/engine/metadata-modules/workspace-metadata-version/exceptions/workspace-metadata-version.exception';
+import { WorkspaceCacheStorageService } from 'src/engine/workspace-cache-storage/workspace-cache-storage.service';
 
 @Injectable()
 export class WorkspaceMetadataVersionService {
-  logger = new Logger(WorkspaceMetadataCacheService.name);
+  logger = new Logger(WorkspaceMetadataVersionService.name);
 
   constructor(
-    @InjectRepository(Workspace)
-    private readonly workspaceRepository: Repository<Workspace>,
-    private readonly workspaceMetadataCacheService: WorkspaceMetadataCacheService,
+    @InjectRepository(WorkspaceEntity)
+    private readonly workspaceRepository: Repository<WorkspaceEntity>,
+    private readonly workspaceCacheStorageService: WorkspaceCacheStorageService,
   ) {}
 
   async incrementMetadataVersion(workspaceId: string): Promise<void> {
     const workspace = await this.workspaceRepository.findOne({
       where: { id: workspaceId },
+      withDeleted: true,
     });
 
     const metadataVersion = workspace?.metadataVersion;
@@ -42,8 +43,9 @@ export class WorkspaceMetadataVersionService {
       { metadataVersion: newMetadataVersion },
     );
 
-    await this.workspaceMetadataCacheService.recomputeMetadataCache({
+    await this.workspaceCacheStorageService.setMetadataVersion(
       workspaceId,
-    });
+      newMetadataVersion,
+    );
   }
 }

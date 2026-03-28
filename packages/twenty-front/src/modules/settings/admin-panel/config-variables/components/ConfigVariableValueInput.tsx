@@ -2,16 +2,16 @@ import { useLingui } from '@lingui/react/macro';
 
 import { isConfigVariablesInDbEnabledState } from '@/client-config/states/isConfigVariablesInDbEnabledState';
 import { TextInput } from '@/ui/input/components/TextInput';
-import styled from '@emotion/styled';
-import { useRecoilValue } from 'recoil';
+import { styled } from '@linaria/react';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { type ConfigVariableValue } from 'twenty-shared/types';
-import { type ConfigVariable } from '~/generated/graphql';
+import { type ConfigVariable } from '~/generated-metadata/graphql';
 import { ConfigVariableDatabaseInput } from './ConfigVariableDatabaseInput';
 
 type ConfigVariableValueInputProps = {
   variable: ConfigVariable;
   value: ConfigVariableValue;
-  onChange: (value: string | number | boolean | string[] | null) => void;
+  onChange: (value: ConfigVariableValue) => void;
   disabled?: boolean;
 };
 
@@ -26,7 +26,7 @@ export const ConfigVariableValueInput = ({
   disabled,
 }: ConfigVariableValueInputProps) => {
   const { t } = useLingui();
-  const isConfigVariablesInDbEnabled = useRecoilValue(
+  const isConfigVariablesInDbEnabled = useAtomStateValue(
     isConfigVariablesInDbEnabledState,
   );
 
@@ -41,7 +41,7 @@ export const ConfigVariableValueInput = ({
           options={variable.options}
           disabled={disabled}
           placeholder={
-            disabled ? 'Undefined' : t`Enter a value to store in database`
+            disabled ? t`Undefined` : t`Enter a value to store in database`
           }
         />
       ) : (

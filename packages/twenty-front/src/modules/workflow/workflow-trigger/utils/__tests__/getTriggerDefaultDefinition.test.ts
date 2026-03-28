@@ -1,7 +1,7 @@
 import { COMMAND_MENU_DEFAULT_ICON } from '@/workflow/workflow-trigger/constants/CommandMenuDefaultIcon';
 import { DatabaseTriggerDefaultLabel } from '@/workflow/workflow-trigger/constants/DatabaseTriggerDefaultLabel';
-import { generatedMockObjectMetadataItems } from '~/testing/utils/generatedMockObjectMetadataItems';
-import { getTriggerDefaultDefinition } from '../getTriggerDefaultDefinition';
+import { getTestEnrichedObjectMetadataItemsMock } from '~/testing/utils/getTestEnrichedObjectMetadataItemsMock';
+import { getTriggerDefaultDefinition } from '@/workflow/workflow-trigger/utils/getTriggerDefaultDefinition';
 
 describe('getTriggerDefaultDefinition', () => {
   it('throws if the activeNonSystemObjectMetadataItems list is empty', () => {
@@ -19,16 +19,16 @@ describe('getTriggerDefaultDefinition', () => {
       getTriggerDefaultDefinition({
         defaultLabel: DatabaseTriggerDefaultLabel.RECORD_IS_CREATED,
         type: 'DATABASE_EVENT',
-        activeNonSystemObjectMetadataItems: generatedMockObjectMetadataItems,
+        activeNonSystemObjectMetadataItems:
+          getTestEnrichedObjectMetadataItemsMock(),
       }),
     ).toStrictEqual({
       type: 'DATABASE_EVENT',
       name: 'Record is created',
       settings: {
-        eventName: `${generatedMockObjectMetadataItems[0].nameSingular}.created`,
+        eventName: `${getTestEnrichedObjectMetadataItemsMock()[0].nameSingular}.created`,
         outputSchema: {},
       },
-      nextStepIds: [],
       position: {
         x: 0,
         y: 0,
@@ -41,16 +41,16 @@ describe('getTriggerDefaultDefinition', () => {
       getTriggerDefaultDefinition({
         defaultLabel: DatabaseTriggerDefaultLabel.RECORD_IS_UPDATED,
         type: 'DATABASE_EVENT',
-        activeNonSystemObjectMetadataItems: generatedMockObjectMetadataItems,
+        activeNonSystemObjectMetadataItems:
+          getTestEnrichedObjectMetadataItemsMock(),
       }),
     ).toStrictEqual({
       type: 'DATABASE_EVENT',
       name: 'Record is updated',
       settings: {
-        eventName: `${generatedMockObjectMetadataItems[0].nameSingular}.updated`,
+        eventName: `${getTestEnrichedObjectMetadataItemsMock()[0].nameSingular}.updated`,
         outputSchema: {},
       },
-      nextStepIds: [],
       position: {
         x: 0,
         y: 0,
@@ -63,38 +63,16 @@ describe('getTriggerDefaultDefinition', () => {
       getTriggerDefaultDefinition({
         defaultLabel: DatabaseTriggerDefaultLabel.RECORD_IS_DELETED,
         type: 'DATABASE_EVENT',
-        activeNonSystemObjectMetadataItems: generatedMockObjectMetadataItems,
+        activeNonSystemObjectMetadataItems:
+          getTestEnrichedObjectMetadataItemsMock(),
       }),
     ).toStrictEqual({
       type: 'DATABASE_EVENT',
       name: 'Record is deleted',
       settings: {
-        eventName: `${generatedMockObjectMetadataItems[0].nameSingular}.deleted`,
+        eventName: `${getTestEnrichedObjectMetadataItemsMock()[0].nameSingular}.deleted`,
         outputSchema: {},
       },
-      nextStepIds: [],
-      position: {
-        x: 0,
-        y: 0,
-      },
-    });
-  });
-
-  it('returns a valid configuration for DATABASE_EVENT trigger type creation', () => {
-    expect(
-      getTriggerDefaultDefinition({
-        defaultLabel: DatabaseTriggerDefaultLabel.RECORD_IS_CREATED,
-        type: 'DATABASE_EVENT',
-        activeNonSystemObjectMetadataItems: generatedMockObjectMetadataItems,
-      }),
-    ).toStrictEqual({
-      type: 'DATABASE_EVENT',
-      name: 'Record is created',
-      settings: {
-        eventName: `${generatedMockObjectMetadataItems[0].nameSingular}.created`,
-        outputSchema: {},
-      },
-      nextStepIds: [],
       position: {
         x: 0,
         y: 0,
@@ -107,18 +85,22 @@ describe('getTriggerDefaultDefinition', () => {
       getTriggerDefaultDefinition({
         defaultLabel: 'Launch manually',
         type: 'MANUAL',
-        activeNonSystemObjectMetadataItems: generatedMockObjectMetadataItems,
+        activeNonSystemObjectMetadataItems:
+          getTestEnrichedObjectMetadataItemsMock(),
       }),
     ).toStrictEqual({
       type: 'MANUAL',
       name: 'Launch manually',
       settings: {
-        objectType: generatedMockObjectMetadataItems[0].nameSingular,
+        availability: {
+          type: 'GLOBAL',
+          locations: undefined,
+        },
         outputSchema: {},
         icon: COMMAND_MENU_DEFAULT_ICON,
         isPinned: false,
+        objectType: undefined,
       },
-      nextStepIds: [],
       position: {
         x: 0,
         y: 0,
@@ -131,7 +113,8 @@ describe('getTriggerDefaultDefinition', () => {
       getTriggerDefaultDefinition({
         defaultLabel: 'On a schedule',
         type: 'CRON',
-        activeNonSystemObjectMetadataItems: generatedMockObjectMetadataItems,
+        activeNonSystemObjectMetadataItems:
+          getTestEnrichedObjectMetadataItemsMock(),
       }),
     ).toStrictEqual({
       type: 'CRON',
@@ -141,7 +124,6 @@ describe('getTriggerDefaultDefinition', () => {
         schedule: { day: 1, hour: 0, minute: 0 },
         outputSchema: {},
       },
-      nextStepIds: [],
       position: {
         x: 0,
         y: 0,
@@ -154,7 +136,8 @@ describe('getTriggerDefaultDefinition', () => {
       getTriggerDefaultDefinition({
         defaultLabel: 'Webhook',
         type: 'WEBHOOK',
-        activeNonSystemObjectMetadataItems: generatedMockObjectMetadataItems,
+        activeNonSystemObjectMetadataItems:
+          getTestEnrichedObjectMetadataItemsMock(),
       }),
     ).toStrictEqual({
       type: 'WEBHOOK',
@@ -164,7 +147,6 @@ describe('getTriggerDefaultDefinition', () => {
         httpMethod: 'GET',
         authentication: null,
       },
-      nextStepIds: [],
       position: {
         x: 0,
         y: 0,
@@ -177,7 +159,8 @@ describe('getTriggerDefaultDefinition', () => {
       getTriggerDefaultDefinition({
         defaultLabel: DatabaseTriggerDefaultLabel.RECORD_IS_CREATED,
         type: 'unknown' as any,
-        activeNonSystemObjectMetadataItems: generatedMockObjectMetadataItems,
+        activeNonSystemObjectMetadataItems:
+          getTestEnrichedObjectMetadataItemsMock(),
       });
     }).toThrow('Unknown type: unknown');
   });

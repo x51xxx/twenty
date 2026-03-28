@@ -1,8 +1,10 @@
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { read, type WorkBook } from 'xlsx-ugnis';
 
+import { useNumberFormat } from '@/localization/hooks/useNumberFormat';
 import { SPREADSHEET_MAX_RECORD_IMPORT_CAPACITY } from '@/spreadsheet-import/constants/SpreadsheetMaxRecordImportCapacity';
 import { useSpreadsheetImportInternal } from '@/spreadsheet-import/hooks/useSpreadsheetImportInternal';
 import { useDownloadFakeRecords } from '@/spreadsheet-import/steps/components/UploadStep/hooks/useDownloadFakeRecords';
@@ -10,44 +12,41 @@ import { readFileAsync } from '@/spreadsheet-import/utils/readFilesAsync';
 import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { MainButton } from 'twenty-ui/input';
-import { formatNumber } from '~/utils/format/number';
 
 const StyledContainer = styled.div`
   align-items: center;
-  background: ${({ theme }) => `
-    repeating-linear-gradient(
+  background: repeating-linear-gradient(
       0deg,
-      ${theme.font.color.primary},
-      ${theme.font.color.primary} 10px,
+      ${themeCssVariables.font.color.primary},
+      ${themeCssVariables.font.color.primary} 10px,
       transparent 10px,
       transparent 20px,
-      ${theme.font.color.primary} 20px
+      ${themeCssVariables.font.color.primary} 20px
     ),
     repeating-linear-gradient(
       90deg,
-      ${theme.font.color.primary},
-      ${theme.font.color.primary} 10px,
+      ${themeCssVariables.font.color.primary},
+      ${themeCssVariables.font.color.primary} 10px,
       transparent 10px,
       transparent 20px,
-      ${theme.font.color.primary} 20px
+      ${themeCssVariables.font.color.primary} 20px
     ),
     repeating-linear-gradient(
       180deg,
-      ${theme.font.color.primary},
-      ${theme.font.color.primary} 10px,
+      ${themeCssVariables.font.color.primary},
+      ${themeCssVariables.font.color.primary} 10px,
       transparent 10px,
       transparent 20px,
-      ${theme.font.color.primary} 20px
+      ${themeCssVariables.font.color.primary} 20px
     ),
     repeating-linear-gradient(
       270deg,
-      ${theme.font.color.primary},
-      ${theme.font.color.primary} 10px,
+      ${themeCssVariables.font.color.primary},
+      ${themeCssVariables.font.color.primary} 10px,
       transparent 10px,
       transparent 20px,
-      ${theme.font.color.primary} 20px
+      ${themeCssVariables.font.color.primary} 20px
     );
-  `};
   background-position:
     0 0,
     0 0,
@@ -59,7 +58,7 @@ const StyledContainer = styled.div`
     100% 2px,
     2px 100%,
     100% 2px;
-  border-radius: ${({ theme }) => theme.border.radius.sm};
+  border-radius: ${themeCssVariables.border.radius.sm};
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -68,8 +67,8 @@ const StyledContainer = styled.div`
 `;
 
 const StyledOverlay = styled.div`
-  background: ${({ theme }) => theme.background.transparent.medium};
-  border-radius: ${({ theme }) => theme.border.radius.sm};
+  background: ${themeCssVariables.background.transparent.medium};
+  border-radius: ${themeCssVariables.border.radius.sm};
   bottom: 0px;
   left: 0px;
   position: absolute;
@@ -78,28 +77,32 @@ const StyledOverlay = styled.div`
 `;
 
 const StyledText = styled.span`
-  color: ${({ theme }) => theme.font.color.primary};
-  font-size: ${({ theme }) => theme.font.size.sm};
-  font-weight: ${({ theme }) => theme.font.weight.medium};
-  text-align: center;
+  color: ${themeCssVariables.font.color.primary};
+  font-size: ${themeCssVariables.font.size.sm};
+  font-weight: ${themeCssVariables.font.weight.medium};
   padding: 16px;
+  text-align: center;
 `;
 
 const StyledFooterText = styled.span`
-  color: ${({ theme }) => theme.font.color.tertiary};
-  font-size: ${({ theme }) => theme.font.size.xs};
-  font-weight: ${({ theme }) => theme.font.weight.regular};
-  text-align: center;
-  position: absolute;
-  bottom: ${({ theme }) => theme.spacing(4)};
+  bottom: ${themeCssVariables.spacing[4]};
+  color: ${themeCssVariables.font.color.tertiary};
+  font-size: ${themeCssVariables.font.size.xs};
+  font-weight: ${themeCssVariables.font.weight.regular};
   left: 50%;
+  position: absolute;
+  text-align: center;
   transform: translateX(-50%);
   width: 100%;
 `;
 
-const StyledTextAction = styled.span`
-  cursor: pointer;
-  text-decoration: underline;
+const StyledButtonsContainer = styled.div`
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: ${themeCssVariables.spacing[2]};
+  max-width: 200px;
+  width: 100%;
 `;
 
 type DropZoneProps = {
@@ -109,6 +112,7 @@ type DropZoneProps = {
 
 export const DropZone = ({ onContinue, isLoading }: DropZoneProps) => {
   const { maxFileSize, dateFormat, parseRaw } = useSpreadsheetImportInternal();
+  const { formatNumber } = useNumberFormat();
 
   const [loading, setLoading] = useState(false);
 
@@ -131,8 +135,9 @@ export const DropZone = ({ onContinue, isLoading }: DropZoneProps) => {
     onDropRejected: (fileRejections) => {
       setLoading(false);
       fileRejections.forEach((fileRejection) => {
+        const fileName = fileRejection.file.name;
         enqueueErrorSnackBar({
-          message: `${fileRejection.file.name} upload rejected`,
+          message: t`${fileName} upload rejected`,
           options: {
             detailedMessage: fileRejection.errors[0].message,
           },
@@ -162,12 +167,12 @@ export const DropZone = ({ onContinue, isLoading }: DropZoneProps) => {
 
   return (
     <StyledContainer
-      // eslint-disable-next-line react/jsx-props-no-spreading
+      // oxlint-disable-next-line react/jsx-props-no-spreading
       {...getRootProps()}
     >
       {isDragActive && <StyledOverlay />}
       <input
-        // eslint-disable-next-line react/jsx-props-no-spreading
+        // oxlint-disable-next-line react/jsx-props-no-spreading
         {...getInputProps()}
       />
       {isDragActive ? (
@@ -183,12 +188,17 @@ export const DropZone = ({ onContinue, isLoading }: DropZoneProps) => {
           <StyledText>
             <Trans>Upload .xlsx, .xls or .csv file</Trans>
           </StyledText>
-          <MainButton onClick={open} title={t`Select file`} />
+          <StyledButtonsContainer>
+            <MainButton onClick={open} title={t`Select file`} fullWidth />
+            <MainButton
+              onClick={downloadSample}
+              title={t`Download sample`}
+              variant="secondary"
+              fullWidth
+            />
+          </StyledButtonsContainer>
           <StyledFooterText>
-            {t`Max import capacity: ${formatSpreadsheetMaxRecordImportCapacity} records. Otherwise, consider splitting your file or using the API.`}{' '}
-            <StyledTextAction onClick={downloadSample}>
-              {t`Download sample file.`}
-            </StyledTextAction>
+            {t`Max import capacity: ${formatSpreadsheetMaxRecordImportCapacity} records. Otherwise, consider splitting your file or using the API.`}
           </StyledFooterText>
         </>
       )}

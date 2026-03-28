@@ -1,59 +1,124 @@
-import { type WorkflowManualTriggerAvailability } from '@/workflow/types/Workflow';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import { COMMAND_MENU_DEFAULT_ICON } from '@/workflow/workflow-trigger/constants/CommandMenuDefaultIcon';
-import { generatedMockObjectMetadataItems } from '~/testing/utils/generatedMockObjectMetadataItems';
-import { getManualTriggerDefaultSettings } from '../getManualTriggerDefaultSettings';
+import { getManualTriggerDefaultSettings } from '@/workflow/workflow-trigger/utils/getManualTriggerDefaultSettings';
 
-it('returns settings for a manual trigger that can be activated from any where', () => {
-  expect(
-    getManualTriggerDefaultSettings({
-      availability: 'EVERYWHERE',
-      activeNonSystemObjectMetadataItems: generatedMockObjectMetadataItems,
-    }),
-  ).toStrictEqual({
-    objectType: undefined,
-    outputSchema: {},
-    icon: COMMAND_MENU_DEFAULT_ICON,
-    isPinned: false,
+const mockObjectMetadataItems: EnrichedObjectMetadataItem[] = [
+  {
+    id: 'company-id',
+    nameSingular: 'company',
+    namePlural: 'companies',
+    labelSingular: 'Company',
+    labelPlural: 'Companies',
+    icon: 'IconBuilding',
+    fields: [],
+    createdAt: new Date(),
+  } as unknown as EnrichedObjectMetadataItem,
+];
+
+describe('getManualTriggerDefaultSettings', () => {
+  describe('GLOBAL availability', () => {
+    it('should return correct settings for GLOBAL type', () => {
+      const result = getManualTriggerDefaultSettings({
+        availabilityType: 'GLOBAL',
+        activeNonSystemObjectMetadataItems: mockObjectMetadataItems,
+      });
+
+      expect(result).toEqual({
+        objectType: undefined,
+        availability: {
+          type: 'GLOBAL',
+          locations: undefined,
+        },
+        outputSchema: {},
+        icon: COMMAND_MENU_DEFAULT_ICON,
+        isPinned: false,
+      });
+    });
+
+    it('should use custom icon when provided', () => {
+      const result = getManualTriggerDefaultSettings({
+        availabilityType: 'GLOBAL',
+        activeNonSystemObjectMetadataItems: mockObjectMetadataItems,
+        icon: 'IconCustom',
+      });
+
+      expect(result.icon).toBe('IconCustom');
+    });
+
+    it('should use isPinned when provided', () => {
+      const result = getManualTriggerDefaultSettings({
+        availabilityType: 'GLOBAL',
+        activeNonSystemObjectMetadataItems: mockObjectMetadataItems,
+        isPinned: true,
+      });
+
+      expect(result.isPinned).toBe(true);
+    });
   });
-});
 
-it('returns settings for a manual trigger that can be activated from any where', () => {
-  expect(
-    getManualTriggerDefaultSettings({
-      availability: 'WHEN_RECORD_SELECTED',
-      activeNonSystemObjectMetadataItems: generatedMockObjectMetadataItems,
-      icon: 'IconTest',
-    }),
-  ).toStrictEqual({
-    objectType: generatedMockObjectMetadataItems[0].nameSingular,
-    outputSchema: {},
-    icon: 'IconTest',
-    isPinned: false,
+  describe('SINGLE_RECORD availability', () => {
+    it('should return correct settings for SINGLE_RECORD type', () => {
+      const result = getManualTriggerDefaultSettings({
+        availabilityType: 'SINGLE_RECORD',
+        activeNonSystemObjectMetadataItems: mockObjectMetadataItems,
+      });
+
+      expect(result).toEqual({
+        objectType: 'company',
+        availability: {
+          type: 'SINGLE_RECORD',
+          objectNameSingular: 'company',
+        },
+        outputSchema: {},
+        icon: COMMAND_MENU_DEFAULT_ICON,
+        isPinned: false,
+      });
+    });
+
+    it('should use the first object metadata item', () => {
+      const multipleObjects: EnrichedObjectMetadataItem[] = [
+        ...mockObjectMetadataItems,
+        {
+          id: 'person-id',
+          nameSingular: 'person',
+          namePlural: 'people',
+          labelSingular: 'Person',
+          labelPlural: 'People',
+          icon: 'IconUser',
+          fields: [],
+        } as unknown as EnrichedObjectMetadataItem,
+      ];
+
+      const result = getManualTriggerDefaultSettings({
+        availabilityType: 'SINGLE_RECORD',
+        activeNonSystemObjectMetadataItems: multipleObjects,
+      });
+
+      expect(result.objectType).toBe('company');
+      expect(
+        (result.availability as { objectNameSingular: string })
+          .objectNameSingular,
+      ).toBe('company');
+    });
   });
-});
 
-it('returns settings for WHEN_RECORD_SELECTED with default icon when no custom icon provided', () => {
-  expect(
-    getManualTriggerDefaultSettings({
-      availability: 'WHEN_RECORD_SELECTED',
-      activeNonSystemObjectMetadataItems: generatedMockObjectMetadataItems,
-    }),
-  ).toStrictEqual({
-    objectType: generatedMockObjectMetadataItems[0].nameSingular,
-    outputSchema: {},
-    icon: COMMAND_MENU_DEFAULT_ICON,
-    isPinned: false,
+  describe('BULK_RECORDS availability', () => {
+    it('should return correct settings for BULK_RECORDS type', () => {
+      const result = getManualTriggerDefaultSettings({
+        availabilityType: 'BULK_RECORDS',
+        activeNonSystemObjectMetadataItems: mockObjectMetadataItems,
+      });
+
+      expect(result).toEqual({
+        objectType: 'company',
+        availability: {
+          type: 'BULK_RECORDS',
+          objectNameSingular: 'company',
+        },
+        outputSchema: {},
+        icon: COMMAND_MENU_DEFAULT_ICON,
+        isPinned: false,
+      });
+    });
   });
-});
-
-it('throws error for unsupported availability type', () => {
-  const invalidAvailability =
-    'INVALID_AVAILABILITY' as WorkflowManualTriggerAvailability;
-
-  expect(() =>
-    getManualTriggerDefaultSettings({
-      availability: invalidAvailability,
-      activeNonSystemObjectMetadataItems: generatedMockObjectMetadataItems,
-    }),
-  ).toThrow("Didn't expect to get here.");
 });

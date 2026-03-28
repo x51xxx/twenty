@@ -1,8 +1,9 @@
 import { type WorkflowHttpRequestAction } from '@/workflow/types/Workflow';
-import { type Meta, type StoryObj } from '@storybook/react';
-import { expect, fn, waitFor, within } from '@storybook/test';
+import { WorkflowEditActionHttpRequest } from '@/workflow/workflow-steps/workflow-actions/http-request-action/components/WorkflowEditActionHttpRequest';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
+import { expect, fn, waitFor, within } from 'storybook/test';
 import { ComponentWithRouterDecorator } from '~/testing/decorators/ComponentWithRouterDecorator';
-import { I18nFrontDecorator } from '~/testing/decorators/I18nFrontDecorator';
+import { ObjectMetadataItemsDecorator } from '~/testing/decorators/ObjectMetadataItemsDecorator';
 import { SnackBarDecorator } from '~/testing/decorators/SnackBarDecorator';
 import { WorkflowStepActionDrawerDecorator } from '~/testing/decorators/WorkflowStepActionDrawerDecorator';
 import { WorkflowStepDecorator } from '~/testing/decorators/WorkflowStepDecorator';
@@ -12,7 +13,6 @@ import {
   getWorkflowNodeIdMock,
   MOCKED_STEP_ID,
 } from '~/testing/mock-data/workflow';
-import { WorkflowEditActionHttpRequest } from '../WorkflowEditActionHttpRequest';
 
 const DEFAULT_ACTION: WorkflowHttpRequestAction = {
   id: getWorkflowNodeIdMock(),
@@ -48,7 +48,7 @@ const CONFIGURED_ACTION: WorkflowHttpRequestAction = {
       url: 'https://api.example.com/data',
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'content-type': 'application/json',
         Authorization: 'Bearer token123',
       },
       body: {
@@ -83,7 +83,7 @@ const meta: Meta<typeof WorkflowEditActionHttpRequest> = {
     ComponentWithRouterDecorator,
     SnackBarDecorator,
     WorkspaceDecorator,
-    I18nFrontDecorator,
+    ObjectMetadataItemsDecorator,
   ],
 };
 
@@ -116,13 +116,8 @@ export const Configured: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    const header = await canvas.findByTestId('workflow-step-header');
-    const headerCanvas = within(header);
-    expect(await headerCanvas.findByText('API Call')).toBeVisible();
-
     const urlLabel = await canvas.findByText('URL');
-    const urlInputContainer = urlLabel.closest('div')?.nextElementSibling;
-    const urlEditor = urlInputContainer?.querySelector('.ProseMirror');
+    const urlEditor = urlLabel.parentElement?.querySelector('.ProseMirror');
     expect(urlEditor).toBeVisible();
     expect(urlEditor).toHaveTextContent('https://api.example.com/data');
 
@@ -142,8 +137,7 @@ export const ReadOnly: Story = {
     const canvas = within(canvasElement);
 
     const urlLabel = await canvas.findByText('URL');
-    const urlInputContainer = urlLabel.closest('div')?.nextElementSibling;
-    const urlEditor = urlInputContainer?.querySelector('.ProseMirror');
+    const urlEditor = urlLabel.parentElement?.querySelector('.ProseMirror');
     expect(urlEditor).toBeVisible();
     expect(urlEditor).toHaveTextContent('https://api.example.com/data');
     expect(urlEditor).toHaveAttribute('contenteditable', 'false');
@@ -165,7 +159,7 @@ export const WithArrayStringBody: Story = {
           url: 'https://api.example.com/tags',
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'content-type': 'application/x-www-form-urlencoded',
           },
           body: `[
   "frontend",
@@ -215,12 +209,12 @@ export const WithObjectStringBody: Story = {
           url: 'https://api.example.com/tags',
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'content-type': 'application/x-www-form-urlencoded',
           },
           body: `{
   "hey": "frontend",
   "oh": "backend",
-  "amazing": "database {{${MOCKED_STEP_ID}.salary}}"
+  "amazing": "database {{${MOCKED_STEP_ID}.name}}"
 }`,
         },
         outputSchema: {},
@@ -255,7 +249,7 @@ export const WithObjectStringBody: Story = {
 
     expect(textboxes[6]).toHaveTextContent('frontend');
     expect(textboxes[8]).toHaveTextContent('backend');
-    expect(textboxes[10]).toHaveTextContent('database Salary');
+    expect(textboxes[10]).toHaveTextContent('database');
   },
 };
 
@@ -271,11 +265,11 @@ export const WithArrayContainingNonStringVariablesBody: Story = {
           url: 'https://api.example.com/tags',
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'content-type': 'application/json',
           },
           body: `[
   "frontend",
-  {{${MOCKED_STEP_ID}.salary}},
+  {{${MOCKED_STEP_ID}.name}},
   "database"
 ]`,
         },
@@ -302,9 +296,7 @@ export const WithArrayContainingNonStringVariablesBody: Story = {
     await waitFor(() => {
       const textboxes = canvas.getAllByRole('textbox');
 
-      expect(textboxes[5]).toHaveTextContent(
-        '[ "frontend", Salary, "database"]',
-      );
+      expect(textboxes[5]).toHaveTextContent('[ "frontend", Name, "database"]');
     });
   },
 };
@@ -321,11 +313,11 @@ export const WithObjectContainingNonStringVariablesBody: Story = {
           url: 'https://api.example.com/tags',
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'content-type': 'application/json',
           },
           body: `{
   "speciality": "frontend",
-  "salary": {{${MOCKED_STEP_ID}.salary}}
+  "name": {{${MOCKED_STEP_ID}.name}}
 }`,
         },
         outputSchema: {},
@@ -352,7 +344,7 @@ export const WithObjectContainingNonStringVariablesBody: Story = {
       const textboxes = canvas.getAllByRole('textbox');
 
       expect(textboxes[5]).toHaveTextContent(
-        '{ "speciality": "frontend", "salary": Salary}',
+        '{ "speciality": "frontend", "name": Name}',
       );
     });
   },

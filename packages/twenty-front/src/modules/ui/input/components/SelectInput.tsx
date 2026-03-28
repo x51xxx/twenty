@@ -1,3 +1,4 @@
+import { AddSelectOptionMenuItem } from '@/settings/data-model/fields/forms/select/components/AddSelectOptionMenuItem';
 import { DropdownContent } from '@/ui/layout/dropdown/components/DropdownContent';
 import { DropdownMenuItemsContainer } from '@/ui/layout/dropdown/components/DropdownMenuItemsContainer';
 import { DropdownMenuSearchInput } from '@/ui/layout/dropdown/components/DropdownMenuSearchInput';
@@ -7,12 +8,14 @@ import { SelectableListComponentInstanceContext } from '@/ui/layout/selectable-l
 import { selectedItemIdComponentState } from '@/ui/layout/selectable-list/states/selectedItemIdComponentState';
 import { useListenClickOutside } from '@/ui/utilities/pointer-event/hooks/useListenClickOutside';
 import { useAvailableComponentInstanceIdOrThrow } from '@/ui/utilities/state/component-state/hooks/useAvailableComponentInstanceIdOrThrow';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { t } from '@lingui/core/macro';
 import { isDefined } from 'twenty-shared/utils';
 import { type TagColor } from 'twenty-ui/components';
 import { type SelectOption } from 'twenty-ui/input';
 import { MenuItemSelectTag } from 'twenty-ui/navigation';
+import { normalizeSearchText } from '~/utils/normalizeSearchText';
 
 interface SelectInputProps {
   onOptionSelected: (selectedOption: SelectOption) => void;
@@ -23,6 +26,7 @@ interface SelectInputProps {
   onClear?: () => void;
   clearLabel?: string;
   focusId: string;
+  onAddSelectOption?: (optionName: string) => void;
 }
 
 export const SelectInput = ({
@@ -33,6 +37,7 @@ export const SelectInput = ({
   onCancel,
   defaultOption,
   onFilterChange,
+  onAddSelectOption,
 }: SelectInputProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +46,7 @@ export const SelectInput = ({
     SelectableListComponentInstanceContext,
   );
 
-  const selectedItemId = useRecoilComponentValue(
+  const selectedItemId = useAtomComponentStateValue(
     selectedItemIdComponentState,
     selectableListInstanceId,
   );
@@ -51,16 +56,15 @@ export const SelectInput = ({
     SelectOption | undefined
   >(defaultOption);
 
-  const optionsToSelect = useMemo(
-    () =>
-      options.filter((option) => {
-        return (
-          option.value !== selectedOption?.value &&
-          option.label.toLowerCase().includes(searchFilter.toLowerCase())
-        );
-      }) || [],
-    [options, searchFilter, selectedOption?.value],
-  );
+  const optionsToSelect = useMemo(() => {
+    const searchTerm = normalizeSearchText(searchFilter);
+    return options.filter((option) => {
+      return (
+        option.value !== selectedOption?.value &&
+        normalizeSearchText(option.label).includes(searchTerm)
+      );
+    });
+  }, [options, searchFilter, selectedOption?.value]);
 
   const optionsInDropDown = useMemo(
     () =>
@@ -109,16 +113,16 @@ export const SelectInput = ({
       <DropdownMenuItemsContainer hasMaxHeight>
         {onClear && clearLabel && (
           <SelectableListItem
-            itemId={`No ${clearLabel}`}
+            itemId={t`No ${clearLabel}`}
             onEnter={handleClearOption}
           >
             <MenuItemSelectTag
-              key={`No ${clearLabel}`}
-              text={`No ${clearLabel}`}
+              key={t`No ${clearLabel}`}
+              text={t`No ${clearLabel}`}
               color="transparent"
-              variant={'outline'}
+              variant="outline"
               onClick={handleClearOption}
-              isKeySelected={selectedItemId === `No ${clearLabel}`}
+              isKeySelected={selectedItemId === t`No ${clearLabel}`}
             />
           </SelectableListItem>
         )}
@@ -142,6 +146,17 @@ export const SelectInput = ({
           );
         })}
       </DropdownMenuItemsContainer>
+      {onAddSelectOption && searchFilter && optionsToSelect.length === 0 && (
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuItemsContainer scrollable={false}>
+            <AddSelectOptionMenuItem
+              name={searchFilter}
+              onAddSelectOption={onAddSelectOption}
+            />
+          </DropdownMenuItemsContainer>
+        </>
+      )}
     </DropdownContent>
   );
 };

@@ -1,5 +1,5 @@
 import { REACT_APP_SERVER_BASE_URL } from '~/config';
-import { getClientConfig } from '../getClientConfig';
+import { getClientConfig } from '@/client-config/utils/getClientConfig';
 
 global.fetch = jest.fn();
 
@@ -14,6 +14,7 @@ const mockClientConfig = {
     magicLink: false,
     password: true,
     microsoft: false,
+    casdoor: false,
     sso: [],
   },
   signInPrefilled: false,
@@ -21,7 +22,6 @@ const mockClientConfig = {
   isEmailVerificationRequired: false,
   defaultSubdomain: 'app',
   frontDomain: 'localhost',
-  debugMode: true,
   support: {
     supportDriver: 'none',
     supportFrontChatId: undefined,
@@ -35,7 +35,6 @@ const mockClientConfig = {
     provider: undefined,
     siteKey: undefined,
   },
-  chromeExtensionId: undefined,
   api: {
     mutationMaximumAffectedRecords: 100,
   },

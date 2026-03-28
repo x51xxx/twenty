@@ -1,6 +1,5 @@
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import { settingsObjectIndexesFamilyState } from '@/settings/data-model/object-details/states/settingsObjectIndexesFamilyState';
-import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
 import { SortableTableHeader } from '@/ui/layout/table/components/SortableTableHeader';
 import { Table } from '@/ui/layout/table/components/Table';
 import { TableCell } from '@/ui/layout/table/components/TableCell';
@@ -8,26 +7,28 @@ import { TableHeader } from '@/ui/layout/table/components/TableHeader';
 import { TableRow } from '@/ui/layout/table/components/TableRow';
 import { useSortedArray } from '@/ui/layout/table/hooks/useSortedArray';
 import { type TableMetadata } from '@/ui/layout/table/types/TableMetadata';
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react/macro';
 import { isNonEmptyArray } from '@sniptt/guards';
+import { useAtomFamilyStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomFamilyStateValue';
+import { useSetAtomFamilyState } from '@/ui/utilities/state/jotai/hooks/useSetAtomFamilyState';
 import { useEffect, useMemo, useState } from 'react';
-import { useRecoilState } from 'recoil';
-import { IconSearch, IconSquareKey } from 'twenty-ui/display';
+import { IconSquareKey } from 'twenty-ui/display';
+import { SearchInput } from 'twenty-ui/input';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { type SettingsObjectIndexesTableItem } from '~/pages/settings/data-model/types/SettingsObjectIndexesTableItem';
+import { normalizeSearchText } from '~/utils/normalizeSearchText';
 
-export const StyledObjectIndexTableRow = styled(TableRow)`
-  grid-template-columns: 350px 70px 80px;
-`;
+const OBJECT_INDEX_TABLE_ROW_GRID_TEMPLATE_COLUMNS = '350px 70px 80px';
 
-const StyledSearchInput = styled(SettingsTextInput)`
-  padding-bottom: ${({ theme }) => theme.spacing(2)};
+const StyledSearchInputContainer = styled.div`
+  padding-bottom: ${themeCssVariables.spacing[2]};
   width: 100%;
 `;
 
 export type SettingsObjectIndexTableProps = {
-  objectMetadataItem: ObjectMetadataItem;
+  objectMetadataItem: EnrichedObjectMetadataItem;
 };
 
 export const SettingsObjectIndexTable = ({
@@ -65,10 +66,13 @@ export const SettingsObjectIndexTable = ({
     },
   };
 
-  const [settingsObjectIndexes, setSettingsObjectIndexes] = useRecoilState(
-    settingsObjectIndexesFamilyState({
-      objectMetadataItemId: objectMetadataItem.id,
-    }),
+  const settingsObjectIndexes = useAtomFamilyStateValue(
+    settingsObjectIndexesFamilyState,
+    { objectMetadataItemId: objectMetadataItem.id },
+  );
+  const setSettingsObjectIndexes = useSetAtomFamilyState(
+    settingsObjectIndexesFamilyState,
+    { objectMetadataItemId: objectMetadataItem.id },
   );
 
   useEffect(() => {
@@ -102,25 +106,29 @@ export const SettingsObjectIndexTable = ({
 
   const filteredActiveItems = useMemo(
     () =>
-      sortedActiveObjectSettingsDetailItems.filter(
-        (item) =>
-          item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.indexType.toLowerCase().includes(searchTerm.toLowerCase()),
-      ),
+      sortedActiveObjectSettingsDetailItems.filter((item) => {
+        const searchNormalized = normalizeSearchText(searchTerm);
+        return (
+          normalizeSearchText(item.name).includes(searchNormalized) ||
+          normalizeSearchText(item.indexType).includes(searchNormalized)
+        );
+      }),
     [sortedActiveObjectSettingsDetailItems, searchTerm],
   );
 
   return (
     <>
-      <StyledSearchInput
-        instanceId="object-index-table-search"
-        LeftIcon={IconSearch}
-        placeholder={t`Search an index...`}
-        value={searchTerm}
-        onChange={setSearchTerm}
-      />
+      <StyledSearchInputContainer>
+        <SearchInput
+          placeholder={t`Search an index...`}
+          value={searchTerm}
+          onChange={setSearchTerm}
+        />
+      </StyledSearchInputContainer>
       <Table>
-        <StyledObjectIndexTableRow>
+        <TableRow
+          gridTemplateColumns={OBJECT_INDEX_TABLE_ROW_GRID_TEMPLATE_COLUMNS}
+        >
           {tableMetadata.fields.map((item) => (
             <SortableTableHeader
               key={item.fieldName}
@@ -132,10 +140,13 @@ export const SettingsObjectIndexTable = ({
             />
           ))}
           <TableHeader></TableHeader>
-        </StyledObjectIndexTableRow>
+        </TableRow>
         {isNonEmptyArray(filteredActiveItems) &&
           filteredActiveItems.map((objectSettingsIndex) => (
-            <StyledObjectIndexTableRow key={objectSettingsIndex.name}>
+            <TableRow
+              gridTemplateColumns={OBJECT_INDEX_TABLE_ROW_GRID_TEMPLATE_COLUMNS}
+              key={objectSettingsIndex.name}
+            >
               <TableCell>{objectSettingsIndex.indexFields}</TableCell>
               <TableCell>
                 {objectSettingsIndex.isUnique ? (
@@ -145,7 +156,7 @@ export const SettingsObjectIndexTable = ({
                 )}
               </TableCell>
               <TableCell>{objectSettingsIndex.indexType}</TableCell>
-            </StyledObjectIndexTableRow>
+            </TableRow>
           ))}
       </Table>
     </>

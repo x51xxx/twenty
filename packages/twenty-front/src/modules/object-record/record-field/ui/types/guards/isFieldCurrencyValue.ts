@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
-import { CurrencyCode } from '../CurrencyCode';
-import { type FieldCurrencyValue } from '../FieldMetadata';
+import { CurrencyCode } from 'twenty-shared/constants';
+import { type FieldCurrencyValue } from '@/object-record/record-field/ui/types/FieldMetadata';
 
 const currencySchema = z.object({
-  currencyCode: z.nativeEnum(CurrencyCode).nullable(),
+  currencyCode: z.union([z.enum(CurrencyCode), z.literal('')]).nullable(),
   amountMicros: z.number().nullable(),
 });
 

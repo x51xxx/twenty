@@ -6,24 +6,32 @@ import { isDefined } from 'twenty-shared/utils';
 import { Repository } from 'typeorm';
 
 import {
+  ActiveOrSuspendedWorkspacesMigrationCommandOptions,
   ActiveOrSuspendedWorkspacesMigrationCommandRunner,
-  type RunOnWorkspaceArgs,
 } from 'src/database/commands/command-runners/active-or-suspended-workspaces-migration.command-runner';
+import {
+  RunOnWorkspaceArgs,
+  WorkspacesMigrationCommandRunner,
+} from 'src/database/commands/command-runners/workspaces-migration.command-runner';
+import { CoreMigrationRunnerService } from 'src/database/commands/core-migration-runner/services/core-migration-runner.service';
+import { type UpgradeCommandVersion } from 'src/engine/constants/upgrade-command-supported-versions.constant';
+import { CoreEngineVersionService } from 'src/engine/core-engine-version/services/core-engine-version.service';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
-import { Workspace } from 'src/engine/core-modules/workspace/workspace.entity';
-import { TwentyORMGlobalManager } from 'src/engine/twenty-orm/twenty-orm-global.manager';
-import { SyncWorkspaceMetadataCommand } from 'src/engine/workspace-manager/workspace-sync-metadata/commands/sync-workspace-metadata.command';
+import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
+import { type DataSourceService } from 'src/engine/metadata-modules/data-source/data-source.service';
+import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
+import { WorkspaceVersionService } from 'src/engine/workspace-manager/workspace-version/services/workspace-version.service';
 import {
   type CompareVersionMajorAndMinorReturnType,
   compareVersionMajorAndMinor,
 } from 'src/utils/version/compare-version-minor-and-major';
-import { getPreviousVersion } from 'src/utils/version/get-previous-version';
 
-export type VersionCommands = {
-  beforeSyncMetadata: ActiveOrSuspendedWorkspacesMigrationCommandRunner[];
-  afterSyncMetadata: ActiveOrSuspendedWorkspacesMigrationCommandRunner[];
-};
-export type AllCommands = Record<string, VersionCommands>;
+export type VersionCommands = (
+  | WorkspacesMigrationCommandRunner
+  | ActiveOrSuspendedWorkspacesMigrationCommandRunner
+)[];
+export type AllCommands = Record<UpgradeCommandVersion, VersionCommands>;
+
 export abstract class UpgradeCommandRunner extends ActiveOrSuspendedWorkspacesMigrationCommandRunner {
   private fromWorkspaceVersion: SemVer;
   private currentAppVersion: SemVer;
@@ -32,28 +40,32 @@ export abstract class UpgradeCommandRunner extends ActiveOrSuspendedWorkspacesMi
   public readonly VALIDATE_WORKSPACE_VERSION_FEATURE_FLAG?: true;
 
   constructor(
-    @InjectRepository(Workspace)
-    protected readonly workspaceRepository: Repository<Workspace>,
+    @InjectRepository(WorkspaceEntity)
+    protected readonly workspaceRepository: Repository<WorkspaceEntity>,
     protected readonly twentyConfigService: TwentyConfigService,
-    protected readonly twentyORMGlobalManager: TwentyORMGlobalManager,
-    protected readonly syncWorkspaceMetadataCommand: SyncWorkspaceMetadataCommand,
+    protected readonly globalWorkspaceOrmManager: GlobalWorkspaceOrmManager,
+    protected readonly dataSourceService: DataSourceService,
+    protected readonly coreEngineVersionService: CoreEngineVersionService,
+    protected readonly workspaceVersionService: WorkspaceVersionService,
+    protected readonly coreMigrationRunnerService: CoreMigrationRunnerService,
   ) {
-    super(workspaceRepository, twentyORMGlobalManager);
+    super(workspaceRepository, globalWorkspaceOrmManager, dataSourceService);
   }
 
   private setUpgradeContextVersionsAndCommandsForCurrentAppVersion() {
-    const ugpradeContextIsAlreadyDefined = [
+    const upgradeContextIsAlreadyDefined = [
       this.currentAppVersion,
       this.commands,
       this.fromWorkspaceVersion,
     ].every(isDefined);
 
-    if (ugpradeContextIsAlreadyDefined) {
+    if (upgradeContextIsAlreadyDefined) {
       return;
     }
 
-    const currentAppVersion = this.retrieveCurrentAppVersion();
-    const currentVersionMajorMinor = `${currentAppVersion.major}.${currentAppVersion.minor}.0`;
+    const currentAppVersion = this.coreEngineVersionService.getCurrentVersion();
+    const currentVersionMajorMinor =
+      `${currentAppVersion.major}.${currentAppVersion.minor}.0` as UpgradeCommandVersion;
     const currentCommands = this.allCommands[currentVersionMajorMinor];
 
     if (!isDefined(currentCommands)) {
@@ -62,17 +74,8 @@ export abstract class UpgradeCommandRunner extends ActiveOrSuspendedWorkspacesMi
       );
     }
 
-    const allCommandsVersions = Object.keys(this.allCommands);
-    const previousVersion = getPreviousVersion({
-      currentVersion: currentVersionMajorMinor,
-      versions: allCommandsVersions,
-    });
+    const previousVersion = this.coreEngineVersionService.getPreviousVersion();
 
-    if (!isDefined(previousVersion)) {
-      throw new Error(
-        `No previous version found for version ${currentAppVersion}. Please review the "allCommands" record. Available versions are: ${allCommandsVersions.join(', ')}`,
-      );
-    }
     this.commands = currentCommands;
     this.fromWorkspaceVersion = previousVersion;
     this.currentAppVersion = currentAppVersion;
@@ -81,10 +84,68 @@ export abstract class UpgradeCommandRunner extends ActiveOrSuspendedWorkspacesMi
       'Initialized upgrade context with:',
       `- currentVersion (migrating to): ${currentAppVersion}`,
       `- fromWorkspaceVersion: ${previousVersion}`,
-      `- ${this.commands.beforeSyncMetadata.length + this.commands.afterSyncMetadata.length} commands`,
+      `- ${this.commands.length} commands`,
     ];
 
     this.logger.log(chalk.blue(message.join('\n   ')));
+  }
+
+  override async runMigrationCommand(
+    passedParams: string[],
+    options: ActiveOrSuspendedWorkspacesMigrationCommandOptions,
+  ): Promise<void> {
+    try {
+      this.setUpgradeContextVersionsAndCommandsForCurrentAppVersion();
+
+      // On fresh installs there are no workspaces yet, so skip the
+      // per-workspace upgrade loop (core migrations already ran above).
+      const hasWorkspaces =
+        await this.workspaceVersionService.hasActiveOrSuspendedWorkspaces();
+
+      if (!hasWorkspaces) {
+        this.logger.log(
+          chalk.blue('Fresh installation detected, skipping migration'),
+        );
+
+        return;
+      }
+
+      const workspacesThatAreBelowFromWorkspaceVersion =
+        await this.workspaceVersionService.getWorkspacesBelowVersion(
+          this.fromWorkspaceVersion.version,
+        );
+
+      if (workspacesThatAreBelowFromWorkspaceVersion.length > 0) {
+        this.migrationReport.fail.push(
+          ...workspacesThatAreBelowFromWorkspaceVersion.map((workspace) => ({
+            error: new Error(
+              `Unable to run the upgrade command. Aborting the upgrade process.
+Please ensure that all workspaces are on at least the previous minor version (${this.fromWorkspaceVersion.version}).
+If any workspaces are not on the previous minor version, roll back to that version and run the upgrade command again.`,
+            ),
+            workspaceId: workspace.id,
+          })),
+        );
+      }
+    } catch (error) {
+      this.migrationReport.fail.push({
+        error,
+        workspaceId: 'global',
+      });
+    }
+
+    if (this.migrationReport.fail.length > 0) {
+      this.migrationReport.fail.forEach(({ error, workspaceId }) =>
+        this.logger.error(
+          `Error in workspace ${workspaceId}: ${error.message}`,
+        ),
+      );
+
+      return;
+    }
+
+    await this.coreMigrationRunnerService.run();
+    await super.runMigrationCommand(passedParams, options);
   }
 
   override async runOnWorkspace(args: RunOnWorkspaceArgs): Promise<void> {
@@ -110,9 +171,9 @@ export abstract class UpgradeCommandRunner extends ActiveOrSuspendedWorkspacesMi
         );
       }
       case 'equal': {
-        await this.runBeforeSyncMetadata(args);
-        await this.syncWorkspaceMetadataCommand.runOnWorkspace(args);
-        await this.runAfterSyncMetadata(args);
+        for (const command of this.commands) {
+          await command.runOnWorkspace(args);
+        }
 
         if (!options.dryRun) {
           await this.workspaceRepository.update(
@@ -141,36 +202,6 @@ export abstract class UpgradeCommandRunner extends ActiveOrSuspendedWorkspacesMi
           `Should never occur, encountered unexpected value from retrieveWorkspaceVersionAndCompareToWorkspaceFromVersion ${workspaceVersionCompareResult}`,
         );
       }
-    }
-  }
-
-  public readonly runBeforeSyncMetadata = async (args: RunOnWorkspaceArgs) => {
-    for (const command of this.commands.beforeSyncMetadata) {
-      await command.runOnWorkspace(args);
-    }
-  };
-
-  public readonly runAfterSyncMetadata = async (args: RunOnWorkspaceArgs) => {
-    for (const command of this.commands.afterSyncMetadata) {
-      await command.runOnWorkspace(args);
-    }
-  };
-
-  private retrieveCurrentAppVersion() {
-    const appVersion = this.twentyConfigService.get('APP_VERSION');
-
-    if (!isDefined(appVersion)) {
-      throw new Error(
-        'Cannot run upgrade command when APP_VERSION is not defined, please double check your env variables',
-      );
-    }
-
-    try {
-      return new SemVer(appVersion);
-    } catch {
-      throw new Error(
-        `Should never occur, APP_VERSION is invalid ${appVersion}`,
-      );
     }
   }
 

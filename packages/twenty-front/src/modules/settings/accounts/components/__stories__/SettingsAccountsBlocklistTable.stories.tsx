@@ -1,10 +1,14 @@
-import { type Decorator, type Meta, type StoryObj } from '@storybook/react';
-import { expect, fn, userEvent, within } from '@storybook/test';
+import {
+  type Decorator,
+  type Meta,
+  type StoryObj,
+} from '@storybook/react-vite';
+import { expect, fn, userEvent, within } from 'storybook/test';
 
 import { mockedBlocklist } from '@/settings/accounts/components/__stories__/mockedBlocklist';
 import { SettingsAccountsBlocklistTable } from '@/settings/accounts/components/SettingsAccountsBlocklistTable';
-import { formatToHumanReadableDate } from '~/utils/date-utils';
 import { ComponentDecorator } from 'twenty-ui/testing';
+import { formatToHumanReadableDate } from '~/utils/date-utils';
 
 const handleBlockedEmailRemoveJestFn = fn();
 

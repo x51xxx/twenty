@@ -4,13 +4,12 @@ import {
   percentage,
   sleep,
   useRecordIndexLazyFetchRecords,
-} from '../useRecordIndexLazyFetchRecords';
+} from '@/object-record/record-index/export/hooks/useRecordIndexLazyFetchRecords';
 
-import { useColumnDefinitionsFromFieldMetadata } from '@/object-metadata/hooks/useColumnDefinitionsFromFieldMetadata';
 import { useLazyFetchAllRecords } from '@/object-record/hooks/useLazyFetchAllRecords';
 import { ViewType } from '@/views/types/ViewType';
-import { getJestMetadataAndApolloMocksAndActionMenuWrapper } from '~/testing/jest/getJestMetadataAndApolloMocksAndActionMenuWrapper';
-import { generatedMockObjectMetadataItems } from '~/testing/utils/generatedMockObjectMetadataItems';
+import { getJestMetadataAndApolloMocksAndCommandMenuWrapper } from '~/testing/jest/getJestMetadataAndApolloMocksAndCommandMenuWrapper';
+import { getTestEnrichedObjectMetadataItemsMock } from '~/testing/utils/getTestEnrichedObjectMetadataItemsMock';
 
 const mockPerson = {
   __typename: 'Person',
@@ -62,7 +61,7 @@ const mockPerson = {
   },
 };
 
-const Wrapper = getJestMetadataAndApolloMocksAndActionMenuWrapper({
+const Wrapper = getJestMetadataAndApolloMocksAndCommandMenuWrapper({
   apolloMocks: [],
   componentInstanceId: 'recordIndexId',
   contextStoreTargetedRecordsRule: {
@@ -78,7 +77,7 @@ jest.mock('@/object-record/hooks/useLazyFetchAllRecords', () => ({
 
 describe('useRecordData', () => {
   const recordIndexId = 'people';
-  const objectMetadataItem = generatedMockObjectMetadataItems.find(
+  const objectMetadataItem = getTestEnrichedObjectMetadataItemsMock().find(
     (item) => item.nameSingular === 'person',
   );
   let mockFetchAllRecords: jest.Mock;
@@ -110,7 +109,7 @@ describe('useRecordData', () => {
             pageSize: 30,
             callback,
             delayMs: 0,
-            viewType: ViewType.Kanban,
+            viewType: ViewType.KANBAN,
           }),
         {
           wrapper: Wrapper,
@@ -132,9 +131,6 @@ describe('useRecordData', () => {
 
       const { result } = renderHook(
         () => {
-          const { columnDefinitions } =
-            useColumnDefinitionsFromFieldMetadata(objectMetadataItem);
-
           const lazyFetchResult = useRecordIndexLazyFetchRecords({
             recordIndexId,
             objectMetadataItem,
@@ -144,7 +140,6 @@ describe('useRecordData', () => {
           });
 
           return {
-            columnDefinitions,
             lazyFetchResult,
           };
         },
@@ -156,10 +151,7 @@ describe('useRecordData', () => {
       });
 
       await waitFor(() => {
-        expect(callback).toHaveBeenCalledWith(
-          [mockPerson],
-          result.current.columnDefinitions,
-        );
+        expect(callback).toHaveBeenCalledWith([mockPerson], []);
       });
     });
   });

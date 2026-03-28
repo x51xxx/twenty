@@ -1,24 +1,47 @@
-import styled from '@emotion/styled';
+import { useLayoutRenderingContext } from '@/ui/layout/contexts/LayoutRenderingContext';
+import { styled } from '@linaria/react';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
+import { PageLayoutType } from '~/generated-metadata/graphql';
 
 interface PropertyBoxProps {
   children: React.ReactNode;
   className?: string;
+  dataTestId?: string;
 }
 
-const StyledPropertyBoxContainer = styled.div`
+const StyledPropertyBoxContainer = styled.div<{
+  noHorizontalPadding?: boolean;
+}>`
   align-self: stretch;
-  border-radius: ${({ theme }) => theme.border.radius.sm};
+  border-radius: ${themeCssVariables.border.radius.sm};
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.spacing(2)};
-  padding-top: ${({ theme }) => theme.spacing(3)};
-  padding-bottom: ${({ theme }) => theme.spacing(3)};
-  padding-left: ${({ theme }) => theme.spacing(3)};
-  padding-right: ${({ theme }) => theme.spacing(2)};
+  gap: ${themeCssVariables.spacing[2]};
+  padding-bottom: ${themeCssVariables.spacing[3]};
+  padding-left: ${({ noHorizontalPadding }) =>
+    noHorizontalPadding ? 0 : themeCssVariables.spacing[3]};
+  padding-right: ${({ noHorizontalPadding }) =>
+    noHorizontalPadding ? 0 : themeCssVariables.spacing[2]};
+  padding-top: ${themeCssVariables.spacing[3]};
 `;
 
-export const PropertyBox = ({ children, className }: PropertyBoxProps) => (
-  <StyledPropertyBoxContainer className={className}>
-    {children}
-  </StyledPropertyBoxContainer>
-);
+export const PropertyBox = ({
+  children,
+  className,
+  dataTestId,
+}: PropertyBoxProps) => {
+  const layoutRenderingContext = useLayoutRenderingContext();
+
+  const isInRecordPageLayout =
+    layoutRenderingContext.layoutType === PageLayoutType.RECORD_PAGE;
+
+  return (
+    <StyledPropertyBoxContainer
+      className={className}
+      data-testid={dataTestId}
+      noHorizontalPadding={isInRecordPageLayout}
+    >
+      {children}
+    </StyledPropertyBoxContainer>
+  );
+};

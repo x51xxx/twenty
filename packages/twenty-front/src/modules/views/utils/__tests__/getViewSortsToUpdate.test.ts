@@ -1,13 +1,13 @@
-import { type RecordSortDirection } from '@/object-record/record-sort/types/RecordSortDirection';
 import { type ViewSort } from '@/views/types/ViewSort';
-import { getViewSortsToUpdate } from '../getViewSortsToUpdate';
+import { ViewSortDirection } from '~/generated-metadata/graphql';
+import { getViewSortsToUpdate } from '@/views/utils/getViewSortsToUpdate';
 
 describe('getViewSortsToUpdate', () => {
   const baseSort: ViewSort = {
-    __typename: 'ViewSort',
     id: 'sort-1',
     fieldMetadataId: 'field-1',
-    direction: 'asc' as RecordSortDirection,
+    direction: ViewSortDirection.ASC,
+    viewId: 'view-1',
   };
 
   it('should return empty array when current sorts array is empty', () => {
@@ -32,7 +32,7 @@ describe('getViewSortsToUpdate', () => {
     const existingSort = { ...baseSort };
     const updatedSort = {
       ...baseSort,
-      direction: 'desc',
+      direction: ViewSortDirection.DESC,
     } satisfies ViewSort;
 
     const currentViewSorts: ViewSort[] = [existingSort];

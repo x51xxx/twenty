@@ -1,20 +1,19 @@
 import { mapObjectMetadataToGraphQLQuery } from '@/object-metadata/utils/mapObjectMetadataToGraphQLQuery';
-import { FieldMetadataType, RelationType } from '~/generated-metadata/graphql';
 
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
+import { type FieldMetadataItem } from '@/object-metadata/types/FieldMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import { getObjectPermissionsForObject } from '@/object-metadata/utils/getObjectPermissionsForObject';
-import { type RecordGqlFields } from '@/object-record/graphql/types/RecordGqlFields';
+import { type RecordGqlFields } from '@/object-record/graphql/record-gql-fields/types/RecordGqlFields';
 import { isNonCompositeField } from '@/object-record/object-filter-dropdown/utils/isNonCompositeField';
-import { type ObjectPermissions } from 'twenty-shared/types';
 import {
-  computeMorphRelationFieldJoinColumnName,
-  computeMorphRelationFieldName,
-  isDefined,
-} from 'twenty-shared/utils';
-import { type FieldMetadataItem } from '../types/FieldMetadataItem';
+  FieldMetadataType,
+  type ObjectPermissions,
+  RelationType,
+} from 'twenty-shared/types';
+import { computeMorphRelationFieldName, isDefined } from 'twenty-shared/utils';
 
 type MapFieldMetadataToGraphQLQueryArgs = {
-  objectMetadataItems: ObjectMetadataItem[];
+  objectMetadataItems: EnrichedObjectMetadataItem[];
   gqlField: string;
   fieldMetadata: Pick<
     FieldMetadataItem,
@@ -44,6 +43,8 @@ export const mapFieldMetadataToGraphQLQuery = ({
     return gqlField;
   }
 
+  // We could factorize morph relation fields mapping to be passing through the RELATION handler too as now they share
+  // the same name and join column name logic
   if (
     fieldType === FieldMetadataType.MORPH_RELATION &&
     (fieldMetadata.settings?.relationType === RelationType.ONE_TO_MANY ||
@@ -53,9 +54,11 @@ export const mapFieldMetadataToGraphQLQuery = ({
     for (const morphRelation of fieldMetadata.morphRelations ?? []) {
       const relationFieldName = computeMorphRelationFieldName({
         fieldName: fieldMetadata.name,
-        relationDirection: fieldMetadata.settings?.relationType,
-        nameSingular: morphRelation.targetObjectMetadata.nameSingular,
-        namePlural: morphRelation.targetObjectMetadata.namePlural,
+        relationType: fieldMetadata.settings?.relationType,
+        targetObjectMetadataNameSingular:
+          morphRelation.targetObjectMetadata.nameSingular,
+        targetObjectMetadataNamePlural:
+          morphRelation.targetObjectMetadata.namePlural,
       });
       const relationMetadataItem = objectMetadataItems.find(
         (objectMetadataItem) =>
@@ -87,6 +90,10 @@ export const mapFieldMetadataToGraphQLQuery = ({
       }
 
       if (fieldMetadata.settings?.relationType === RelationType.ONE_TO_MANY) {
+        if (gqlField !== relationFieldName) {
+          continue;
+        }
+
         gqlMorphField += `${relationFieldName}
 {
   edges {
@@ -103,14 +110,13 @@ export const mapFieldMetadataToGraphQLQuery = ({
       }
 
       if (fieldMetadata.settings?.relationType === RelationType.MANY_TO_ONE) {
-        const joinColumnName = computeMorphRelationFieldJoinColumnName({
-          name: fieldMetadata.name,
-          targetObjectMetadataNameSingular:
-            morphRelation.targetObjectMetadata.nameSingular,
-        });
-        if (gqlField === joinColumnName) {
+        if (gqlField === `${relationFieldName}Id`) {
           gqlMorphField += `${gqlField}
     `;
+          continue;
+        }
+
+        if (gqlField !== relationFieldName) {
           continue;
         }
 
@@ -294,7 +300,17 @@ ${mapObjectMetadataToGraphQLQuery({
     }`;
   }
 
-  if (fieldType === FieldMetadataType.RICH_TEXT_V2) {
+  if (fieldType === FieldMetadataType.FILES) {
+    return `${gqlField}
+    {
+      fileId
+      label
+      extension
+      url
+    }`;
+  }
+
+  if (fieldType === FieldMetadataType.RICH_TEXT) {
     return `${gqlField}
 {
   blocknote

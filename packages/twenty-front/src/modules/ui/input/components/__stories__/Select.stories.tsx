@@ -1,10 +1,10 @@
-import { type Meta, type StoryObj } from '@storybook/react';
-import { userEvent, within } from '@storybook/test';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
+import { userEvent, within } from 'storybook/test';
 
-import { Select, type SelectProps } from '../Select';
-import { ComponentDecorator } from 'twenty-ui/testing';
+import { Select, type SelectProps } from '@/ui/input/components/Select';
 import { IconPlus } from 'twenty-ui/display';
+import { ComponentDecorator } from 'twenty-ui/testing';
 
 type RenderProps = SelectProps<string | number | boolean | null>;
 
@@ -15,7 +15,7 @@ const Render = (args: RenderProps) => {
     setValue(value);
   };
 
-  // eslint-disable-next-line react/jsx-props-no-spreading
+  // oxlint-disable-next-line react/jsx-props-no-spreading
   return <Select {...args} value={value} onChange={handleChange} />;
 };
 
@@ -65,5 +65,33 @@ export const CallToActionButton: Story = {
       Icon: IconPlus,
       text: 'Add action',
     },
+  },
+};
+
+export const WithLabel: Story = {
+  args: {
+    label: 'Test label',
+  },
+};
+
+export const WithDescription: Story = {
+  args: {
+    description: 'Test description',
+  },
+};
+
+export const WithNullOption: Story = {
+  args: {
+    options: [
+      { value: 'a', label: 'Option A' },
+      { value: 'b', label: 'Option B' },
+      { value: null, label: 'Option C' },
+    ],
+  },
+};
+
+export const WithoutOptions: Story = {
+  args: {
+    options: [],
   },
 };

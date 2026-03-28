@@ -1,17 +1,20 @@
 import { DropdownOnToggleEffect } from '@/ui/layout/dropdown/components/DropdownOnToggleEffect';
 import { DropdownInternalContainer } from '@/ui/layout/dropdown/components/internal/DropdownInternalContainer';
+import { DROPDOWN_BOUNDARY_BOTTOM_PADDING_DESKTOP } from '@/ui/layout/dropdown/constants/DropdownBoundaryBottomPaddingDesktop';
+import { DROPDOWN_BOUNDARY_BOTTOM_PADDING_MOBILE } from '@/ui/layout/dropdown/constants/DropdownBoundaryBottomPaddingMobile';
+import { DROPDOWN_BOUNDARY_HORIZONTAL_PADDING } from '@/ui/layout/dropdown/constants/DropdownBoundaryHorizontalPadding';
 import { DROPDOWN_RESIZE_MIN_HEIGHT } from '@/ui/layout/dropdown/constants/DropdownResizeMinHeight';
 import { DROPDOWN_RESIZE_MIN_WIDTH } from '@/ui/layout/dropdown/constants/DropdownResizeMinWidth';
 import { DropdownComponentInstanceContext } from '@/ui/layout/dropdown/contexts/DropdownComponentInstanceContext';
 import { useToggleDropdown } from '@/ui/layout/dropdown/hooks/useToggleDropdown';
 import { dropdownMaxHeightComponentState } from '@/ui/layout/dropdown/states/internal/dropdownMaxHeightComponentState';
 import { dropdownMaxWidthComponentState } from '@/ui/layout/dropdown/states/internal/dropdownMaxWidthComponentState';
+import { dropdownYPositionComponentState } from '@/ui/layout/dropdown/states/internal/dropdownYPositionComponentState';
 import { isDropdownOpenComponentState } from '@/ui/layout/dropdown/states/isDropdownOpenComponentState';
 import { type DropdownOffset } from '@/ui/layout/dropdown/types/DropdownOffset';
 import { type GlobalHotkeysConfig } from '@/ui/utilities/hotkey/types/GlobalHotkeysConfig';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
-import { useSetRecoilComponentState } from '@/ui/utilities/state/component-state/hooks/useSetRecoilComponentState';
-import styled from '@emotion/styled';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+import { useSetAtomComponentState } from '@/ui/utilities/state/jotai/hooks/useSetAtomComponentState';
 import {
   type Placement,
   autoUpdate,
@@ -20,10 +23,10 @@ import {
   size,
   useFloating,
 } from '@floating-ui/react';
-import { type MouseEvent, type ReactNode } from 'react';
+import { styled } from '@linaria/react';
+import { type MouseEvent, type ReactNode, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { type Keys } from 'react-hotkeys-hook';
-import { useRecoilCallback } from 'recoil';
 import { isDefined } from 'twenty-shared/utils';
 import { useIsMobile } from 'twenty-ui/utilities';
 
@@ -59,6 +62,12 @@ export type DropdownProps = {
   excludedClickOutsideIds?: string[];
   isDropdownInModal?: boolean;
   disableClickForClickableComponent?: boolean;
+  middlewareBoundaryPadding?: {
+    right?: number;
+    left?: number;
+    bottomDesktop?: number;
+    bottomMobile?: number;
+  };
 };
 
 export const Dropdown = ({
@@ -77,8 +86,9 @@ export const Dropdown = ({
   excludedClickOutsideIds,
   isDropdownInModal = false,
   disableClickForClickableComponent = false,
+  middlewareBoundaryPadding = {},
 }: DropdownProps) => {
-  const isDropdownOpen = useRecoilComponentValue(
+  const isDropdownOpen = useAtomComponentStateValue(
     isDropdownOpenComponentState,
     dropdownId,
   );
@@ -97,24 +107,35 @@ export const Dropdown = ({
       ]
     : [];
 
-  const setDropdownMaxHeight = useSetRecoilComponentState(
+  const setDropdownMaxHeight = useSetAtomComponentState(
     dropdownMaxHeightComponentState,
     dropdownId,
   );
 
-  const setDropdownMaxWidth = useSetRecoilComponentState(
+  const setDropdownMaxWidth = useSetAtomComponentState(
     dropdownMaxWidthComponentState,
     dropdownId,
   );
 
+  const setDropdownYPosition = useSetAtomComponentState(
+    dropdownYPositionComponentState,
+    dropdownId,
+  );
+
   const isMobile = useIsMobile();
-  const bottomAutoresizePadding = isMobile ? 64 : 32;
+  const bottomAutoresizePadding = isMobile
+    ? (middlewareBoundaryPadding.bottomMobile ??
+      DROPDOWN_BOUNDARY_BOTTOM_PADDING_MOBILE)
+    : (middlewareBoundaryPadding.bottomDesktop ??
+      DROPDOWN_BOUNDARY_BOTTOM_PADDING_DESKTOP);
 
   const boundaryOptions = {
     boundary: document.querySelector('#root') ?? undefined,
     padding: {
-      right: 32,
-      left: 32,
+      right:
+        middlewareBoundaryPadding.right ?? DROPDOWN_BOUNDARY_HORIZONTAL_PADDING,
+      left:
+        middlewareBoundaryPadding.left ?? DROPDOWN_BOUNDARY_HORIZONTAL_PADDING,
       bottom: bottomAutoresizePadding,
     },
   };
@@ -127,7 +148,7 @@ export const Dropdown = ({
         ...boundaryOptions,
       }),
       size({
-        apply: ({ availableHeight, availableWidth }) => {
+        apply: ({ availableHeight, availableWidth, y: floatingY }) => {
           flushSync(() => {
             const maxHeightToApply =
               availableHeight < DROPDOWN_RESIZE_MIN_HEIGHT
@@ -141,6 +162,7 @@ export const Dropdown = ({
 
             setDropdownMaxHeight(maxHeightToApply);
             setDropdownMaxWidth(maxWidthToApply);
+            setDropdownYPosition(floatingY);
           });
         },
         ...boundaryOptions,
@@ -150,8 +172,8 @@ export const Dropdown = ({
     strategy: dropdownStrategy,
   });
 
-  const handleClickableComponentClick = useRecoilCallback(
-    () => async (event: MouseEvent) => {
+  const handleClickableComponentClick = useCallback(
+    async (event: MouseEvent) => {
       if (disableClickForClickableComponent) return;
       event.stopPropagation();
       event.preventDefault();

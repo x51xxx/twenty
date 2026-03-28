@@ -1,3 +1,4 @@
+import { t } from '@lingui/core/macro';
 import React, { useMemo } from 'react';
 
 import { type FieldPhonesValue } from '@/object-record/record-field/ui/types/FieldMetadata';
@@ -7,7 +8,6 @@ import { styled } from '@linaria/react';
 import { parsePhoneNumber } from 'libphonenumber-js';
 import { isDefined } from 'twenty-shared/utils';
 import { RoundedLink } from 'twenty-ui/navigation';
-import { THEME_COMMON } from 'twenty-ui/theme';
 import { logError } from '~/utils/logError';
 
 type PhonesDisplayProps = {
@@ -19,12 +19,10 @@ type PhonesDisplayProps = {
   ) => void;
 };
 
-const themeSpacing = THEME_COMMON.spacingMultiplicator;
-
 const StyledContainer = styled.div`
   align-items: center;
   display: flex;
-  gap: ${themeSpacing * 1}px;
+  gap: 4px;
   justify-content: flex-start;
 
   max-width: 100%;
@@ -75,13 +73,6 @@ export const PhonesDisplay = ({
     }
   };
 
-  const handleClick = (
-    number: string,
-    event: React.MouseEvent<HTMLElement>,
-  ) => {
-    onPhoneNumberClick?.(number, event);
-  };
-
   return isFocused ? (
     <ExpandableList isChipCountDisplayed>
       {phones.map(({ number, callingCode }, index) => {
@@ -95,7 +86,9 @@ export const PhonesDisplay = ({
             label={
               parsedPhone ? parsedPhone.formatInternational() : invalidPhone
             }
-            onClick={(event) => handleClick(callingCode + number, event)}
+            onClick={(event) =>
+              onPhoneNumberClick?.(callingCode + number, event)
+            }
           />
         );
       })}
@@ -113,7 +106,9 @@ export const PhonesDisplay = ({
             label={
               parsedPhone ? parsedPhone.formatInternational() : invalidPhone
             }
-            onClick={(event) => handleClick(callingCode + number, event)}
+            onClick={(event) =>
+              onPhoneNumberClick?.(callingCode + number, event)
+            }
           />
         );
       })}
@@ -134,7 +129,7 @@ const parseAdditionalPhones = (additionalPhones?: any) => {
     try {
       return JSON.parse(additionalPhones);
     } catch (error) {
-      logError(`Error parsing additional phones' : ` + error);
+      logError(t`Error parsing additional phones: ${error}`);
     }
   }
 

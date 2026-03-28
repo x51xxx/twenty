@@ -1,15 +1,24 @@
-import { useTheme } from '@emotion/react';
-import styled from '@emotion/styled';
-import { motion } from 'framer-motion';
+import { styled } from '@linaria/react';
 import { type ReactNode, useState } from 'react';
-import { useRecoilValue } from 'recoil';
-
-import { NAV_DRAWER_WIDTHS } from '@/ui/navigation/navigation-drawer/constants/NavDrawerWidths';
-import { useIsMobile } from '@/ui/utilities/responsive/hooks/useIsMobile';
 
 import { useIsSettingsDrawer } from '@/navigation/hooks/useIsSettingsDrawer';
-import { MOBILE_VIEWPORT } from 'twenty-ui/theme';
-import { isNavigationDrawerExpandedState } from '../../states/isNavigationDrawerExpanded';
+import { tableWidthResizeIsActiveState } from '@/object-record/record-table/states/tableWidthResizeIsActivedState';
+import { ResizablePanelEdge } from '@/ui/layout/resizable-panel/components/ResizablePanelEdge';
+import { NAVIGATION_DRAWER_COLLAPSED_WIDTH } from '@/ui/layout/resizable-panel/constants/NavigationDrawerCollapsedWidth';
+import { NAVIGATION_DRAWER_CONSTRAINTS } from '@/ui/layout/resizable-panel/constants/NavigationDrawerConstraints';
+import { NavigationDrawerWidthEffect } from '@/ui/navigation/components/NavigationDrawerWidthEffect';
+import { NAVIGATION_DRAWER_CLICK_OUTSIDE_ID } from '@/ui/navigation/navigation-drawer/constants/NavigationDrawerClickOutsideId';
+import { isNavigationDrawerExpandedState } from '@/ui/navigation/states/isNavigationDrawerExpanded';
+import { navigationDrawerActiveTabState } from '@/ui/navigation/states/navigationDrawerActiveTabState';
+import { NAVIGATION_DRAWER_TABS } from '@/ui/navigation/states/navigationDrawerTabs';
+import {
+  NAVIGATION_DRAWER_WIDTH_VAR,
+  navigationDrawerWidthState,
+} from '@/ui/navigation/states/navigationDrawerWidthState';
+import { useIsMobile } from '@/ui/utilities/responsive/hooks/useIsMobile';
+import { useAtomState } from '@/ui/utilities/state/jotai/hooks/useAtomState';
+import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
+import { MOBILE_VIEWPORT, themeCssVariables } from 'twenty-ui/theme-constants';
 import { NavigationDrawerBackButton } from './NavigationDrawerBackButton';
 import { NavigationDrawerHeader } from './NavigationDrawerHeader';
 
@@ -19,32 +28,50 @@ export type NavigationDrawerProps = {
   title: string;
 };
 
-const StyledAnimatedContainer = styled(motion.div)`
-  max-height: 100vh;
+const StyledAnimatedContainer = styled.div<{
+  isExpanded: boolean;
+  isResizing: boolean;
+}>`
+  height: 100%;
+  max-height: 100%;
   overflow: hidden;
+  position: relative;
+  transition: ${({ isResizing }) =>
+    isResizing
+      ? 'none'
+      : `width calc(${themeCssVariables.animation.duration.normal} * 1s)`};
+  width: ${({ isExpanded }) =>
+    isExpanded
+      ? `var(${NAVIGATION_DRAWER_WIDTH_VAR})`
+      : `${NAVIGATION_DRAWER_COLLAPSED_WIDTH}px`};
+
+  @media (max-width: ${MOBILE_VIEWPORT}px) {
+    width: ${({ isExpanded }) => (isExpanded ? '100%' : '0')};
+  }
 `;
 
 const StyledContainer = styled.div<{
   isSettings?: boolean;
   isMobile?: boolean;
+  isExpanded?: boolean;
 }>`
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  width: ${({ isSettings }) =>
-    isSettings ? '100%' : NAV_DRAWER_WIDTHS.menu.desktop.expanded + 'px'};
-  gap: ${({ theme }) => theme.spacing(3)};
+  gap: ${themeCssVariables.spacing[3]};
   height: 100%;
-  padding: ${({ theme, isSettings, isMobile }) =>
+  padding: ${({ isSettings, isMobile }) =>
     isSettings
       ? isMobile
-        ? theme.spacing(3, 0, 0, 8)
-        : theme.spacing(3, 0, 4, 0)
-      : theme.spacing(3, 0, 4, 2)};
+        ? `${themeCssVariables.spacing[3]} 0 0 ${themeCssVariables.spacing[8]}`
+        : `${themeCssVariables.spacing[3]} 0 ${themeCssVariables.spacing[4]} 0`
+      : `${themeCssVariables.spacing[3]} 0 ${themeCssVariables.spacing[4]} ${themeCssVariables.spacing[2]}`};
+  width: ${({ isExpanded }) =>
+    isExpanded ? `var(${NAVIGATION_DRAWER_WIDTH_VAR})` : '100%'};
   @media (max-width: ${MOBILE_VIEWPORT}px) {
     width: 100%;
-    padding-left: ${({ theme }) => theme.spacing(5)};
-    padding-right: ${({ theme }) => theme.spacing(5)};
+    padding-left: ${themeCssVariables.spacing[5]};
+    padding-right: ${themeCssVariables.spacing[5]};
   }
 `;
 
@@ -53,56 +80,75 @@ export const NavigationDrawer = ({
   className,
   title,
 }: NavigationDrawerProps) => {
-  const [isHovered, setIsHovered] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const isMobile = useIsMobile();
   const isSettingsDrawer = useIsSettingsDrawer();
-  const theme = useTheme();
-  const isNavigationDrawerExpanded = useRecoilValue(
-    isNavigationDrawerExpandedState,
+
+  const [isNavigationDrawerExpanded, setIsNavigationDrawerExpanded] =
+    useAtomState(isNavigationDrawerExpandedState);
+  const [navigationDrawerWidth, setNavigationDrawerWidth] = useAtomState(
+    navigationDrawerWidthState,
+  );
+  const setNavigationDrawerActiveTab = useSetAtomState(
+    navigationDrawerActiveTabState,
+  );
+  const setTableWidthResizeIsActive = useSetAtomState(
+    tableWidthResizeIsActiveState,
   );
 
-  const handleHover = () => {
-    setIsHovered(true);
+  const handleCollapse = () => {
+    setIsNavigationDrawerExpanded(false);
+    setNavigationDrawerActiveTab(NAVIGATION_DRAWER_TABS.NAVIGATION_MENU);
+    setIsResizing(false);
+    setTableWidthResizeIsActive(true);
   };
 
-  const handleMouseLeave = () => {
-    setIsHovered(false);
+  const handleWidthChange = (width: number) => {
+    setNavigationDrawerWidth(width);
+    setIsResizing(false);
+    setTableWidthResizeIsActive(true);
   };
 
-  const desktopWidth = isNavigationDrawerExpanded
-    ? NAV_DRAWER_WIDTHS.menu.desktop.expanded
-    : NAV_DRAWER_WIDTHS.menu.desktop.collapsed;
-
-  const mobileWidth = isNavigationDrawerExpanded
-    ? NAV_DRAWER_WIDTHS.menu.mobile.expanded
-    : NAV_DRAWER_WIDTHS.menu.mobile.collapsed;
-
-  const navigationDrawerAnimate = {
-    width: isMobile ? mobileWidth : desktopWidth,
-    opacity: isNavigationDrawerExpanded || !isSettingsDrawer ? 1 : 0,
+  const handleResizeStart = () => {
+    setIsResizing(true);
+    setTableWidthResizeIsActive(false);
   };
 
   return (
-    <StyledAnimatedContainer
-      className={className}
-      initial={false}
-      animate={navigationDrawerAnimate}
-      transition={{ duration: theme.animation.duration.normal }}
-    >
-      <StyledContainer
-        isSettings={isSettingsDrawer}
-        isMobile={isMobile}
-        onMouseEnter={handleHover}
-        onMouseLeave={handleMouseLeave}
+    <>
+      <NavigationDrawerWidthEffect />
+      <StyledAnimatedContainer
+        className={className}
+        data-click-outside-id={NAVIGATION_DRAWER_CLICK_OUTSIDE_ID}
+        isExpanded={isNavigationDrawerExpanded}
+        isResizing={isResizing}
       >
-        {isSettingsDrawer && title ? (
-          !isMobile && <NavigationDrawerBackButton title={title} />
-        ) : (
-          <NavigationDrawerHeader showCollapseButton={isHovered} />
-        )}
+        <StyledContainer
+          isSettings={isSettingsDrawer}
+          isMobile={isMobile}
+          isExpanded={isNavigationDrawerExpanded}
+        >
+          {isSettingsDrawer && title ? (
+            <NavigationDrawerBackButton title={title} />
+          ) : (
+            <NavigationDrawerHeader showCollapseButton />
+          )}
+          {children}
+        </StyledContainer>
 
-        {children}
-      </StyledContainer>
-    </StyledAnimatedContainer>
+        {isNavigationDrawerExpanded && !isMobile && !isSettingsDrawer && (
+          <ResizablePanelEdge
+            side="right"
+            constraints={NAVIGATION_DRAWER_CONSTRAINTS}
+            currentWidth={navigationDrawerWidth}
+            onWidthChange={handleWidthChange}
+            onCollapse={handleCollapse}
+            showHandle={false}
+            cssVariableName={NAVIGATION_DRAWER_WIDTH_VAR}
+            onResizeStart={handleResizeStart}
+          />
+        )}
+      </StyledAnimatedContainer>
+    </>
   );
 };

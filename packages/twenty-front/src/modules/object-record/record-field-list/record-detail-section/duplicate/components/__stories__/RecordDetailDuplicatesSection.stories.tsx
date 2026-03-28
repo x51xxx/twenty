@@ -1,29 +1,42 @@
-import { type Meta, type StoryObj } from '@storybook/react';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
 
-import { CoreObjectNameSingular } from '@/object-metadata/types/CoreObjectNameSingular';
+import { CoreObjectNameSingular } from 'twenty-shared/types';
+import { LayoutRenderingProvider } from '@/ui/layout/contexts/LayoutRenderingContext';
 import { MemoryRouterDecorator } from '~/testing/decorators/MemoryRouterDecorator';
 import { ObjectMetadataItemsDecorator } from '~/testing/decorators/ObjectMetadataItemsDecorator';
 import { SnackBarDecorator } from '~/testing/decorators/SnackBarDecorator';
 import { graphqlMocks } from '~/testing/graphqlMocks';
-import { getCompaniesMock } from '~/testing/mock-data/companies';
-
+import { RecordDetailDuplicatesSection } from '@/object-record/record-field-list/record-detail-section/duplicate/components/RecordDetailDuplicatesSection';
 import { ComponentDecorator } from 'twenty-ui/testing';
-import { RecordDetailDuplicatesSection } from '../../components/RecordDetailDuplicatesSection';
-
-const companiesMock = getCompaniesMock();
+import { PageLayoutType } from '~/generated-metadata/graphql';
+import { mockedCompanyRecords } from '~/testing/mock-data/generated/data/companies/mock-companies-data';
 
 const meta: Meta<typeof RecordDetailDuplicatesSection> = {
   title:
     'Modules/ObjectRecord/RecordShow/RecordDetailSection/RecordDetailDuplicatesSection',
   component: RecordDetailDuplicatesSection,
   decorators: [
+    (Story) => (
+      <LayoutRenderingProvider
+        value={{
+          targetRecordIdentifier: {
+            id: mockedCompanyRecords[0].id,
+            targetObjectNameSingular: 'company',
+          },
+          layoutType: PageLayoutType.RECORD_PAGE,
+          isInSidePanel: false,
+        }}
+      >
+        <Story />
+      </LayoutRenderingProvider>
+    ),
     ComponentDecorator,
     ObjectMetadataItemsDecorator,
     SnackBarDecorator,
     MemoryRouterDecorator,
   ],
   args: {
-    objectRecordId: companiesMock[0].id,
+    objectRecordId: mockedCompanyRecords[0].id,
     objectNameSingular: CoreObjectNameSingular.Company,
   },
   parameters: {

@@ -38,15 +38,25 @@ services:
 
       # EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-contact@yourdomain.com}
       # EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-"John from YourDomain"}
-      # EMAIL_SYSTEM_ADDRESS: ${EMAIL_SYSTEM_ADDRESS:-system@yourdomain.com}
       # EMAIL_DRIVER: ${EMAIL_DRIVER:-smtp}
       # EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST:-smtp.gmail.com}
       # EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-465}
       # EMAIL_SMTP_USER: ${EMAIL_SMTP_USER:-}
       # EMAIL_SMTP_PASSWORD: ${EMAIL_SMTP_PASSWORD:-}
 
+      AUTH_CASDOOR_ENABLED: ${AUTH_CASDOOR_ENABLED:-false}
+      CASDOOR_ENDPOINT: ${CASDOOR_ENDPOINT:-http://casdoor:8000}
+      CASDOOR_URL: ${CASDOOR_URL:-http://localhost:8000}
+      CASDOOR_CLIENT_ID: ${CASDOOR_CLIENT_ID:-}
+      CASDOOR_CLIENT_SECRET: ${CASDOOR_CLIENT_SECRET:-}
+      CASDOOR_ORG_NAME: ${CASDOOR_ORG_NAME:-built-in}
+      CASDOOR_APP_NAME: ${CASDOOR_APP_NAME:-twenty}
+      AUTH_CASDOOR_CALLBACK_URL: ${AUTH_CASDOOR_CALLBACK_URL:-http://localhost:3000/auth/casdoor/redirect}
+
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: curl --fail http://localhost:3000/healthz
@@ -90,12 +100,20 @@ services:
 
       # EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-contact@yourdomain.com}
       # EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-"John from YourDomain"}
-      # EMAIL_SYSTEM_ADDRESS: ${EMAIL_SYSTEM_ADDRESS:-system@yourdomain.com}
       # EMAIL_DRIVER: ${EMAIL_DRIVER:-smtp}
       # EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST:-smtp.gmail.com}
       # EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-465}
       # EMAIL_SMTP_USER: ${EMAIL_SMTP_USER:-}
       # EMAIL_SMTP_PASSWORD: ${EMAIL_SMTP_PASSWORD:-}
+
+      AUTH_CASDOOR_ENABLED: ${AUTH_CASDOOR_ENABLED:-false}
+      CASDOOR_ENDPOINT: ${CASDOOR_ENDPOINT:-http://casdoor:8000}
+      CASDOOR_URL: ${CASDOOR_URL:-http://localhost:8000}
+      CASDOOR_CLIENT_ID: ${CASDOOR_CLIENT_ID:-}
+      CASDOOR_CLIENT_SECRET: ${CASDOOR_CLIENT_SECRET:-}
+      CASDOOR_ORG_NAME: ${CASDOOR_ORG_NAME:-built-in}
+      CASDOOR_APP_NAME: ${CASDOOR_APP_NAME:-twenty}
+      AUTH_CASDOOR_CALLBACK_URL: ${AUTH_CASDOOR_CALLBACK_URL:-http://localhost:3000/auth/casdoor/redirect}
 
     depends_on:
       db:
@@ -104,13 +122,29 @@ services:
         condition: service_healthy
     restart: always
 
+  casdoor:
+    image: casbin/casdoor:v1.901.0
+    ports:
+      - "8000:8000"
+    environment:
+      RUNNING_IN_DOCKER: "true"
+      driverName: postgres
+      dataSourceName: "user=${PG_DATABASE_USER:-postgres} password=${PG_DATABASE_PASSWORD:-postgres} host=db port=5432 sslmode=disable dbname=casdoor"
+      origin: ${CASDOOR_URL:-http://localhost:8000}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: always
+
   db:
     image: postgres:16
     volumes:
       - db-data:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d
     environment:
-      POSTGRES_USER: ${PG_DATABASE_USER:-postgres}
+      POSTGRES_DB: ${PG_DATABASE_NAME:-default}
       POSTGRES_PASSWORD: ${PG_DATABASE_PASSWORD:-postgres}
+      POSTGRES_USER: ${PG_DATABASE_USER:-postgres}
     healthcheck:
       test: pg_isready -U ${PG_DATABASE_USER:-postgres} -h localhost -d postgres
       interval: 5s
@@ -122,6 +156,11 @@ services:
     image: redis
     restart: always
     command: ["--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   db-data:

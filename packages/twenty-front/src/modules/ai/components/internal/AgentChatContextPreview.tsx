@@ -1,19 +1,14 @@
-import { AgentChatContextRecordPreview } from '@/ai/components/internal/AgentChatContextRecordPreview';
-import { agentChatSelectedFilesComponentState } from '@/ai/states/agentChatSelectedFilesComponentState';
-import { agentChatUploadedFilesComponentState } from '@/ai/states/agentChatUploadedFilesComponentState';
-import { contextStoreCurrentObjectMetadataItemIdComponentState } from '@/context-store/states/contextStoreCurrentObjectMetadataItemIdComponentState';
-import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
-import { useRecoilComponentState } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentState';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
-import styled from '@emotion/styled';
-import { useLingui } from '@lingui/react/macro';
-import { useDeleteFileMutation } from '~/generated-metadata/graphql';
+import { agentChatSelectedFilesState } from '@/ai/states/agentChatSelectedFilesState';
+import { agentChatUploadedFilesState } from '@/ai/states/agentChatUploadedFilesState';
+import { useAtomState } from '@/ui/utilities/state/jotai/hooks/useAtomState';
+import { styled } from '@linaria/react';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { AgentChatFilePreview } from './AgentChatFilePreview';
 
 const StyledContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.spacing(1)};
+  gap: ${themeCssVariables.spacing[1]};
   width: 100%;
 `;
 
@@ -21,40 +16,29 @@ const StyledPreviewsContainer = styled.div`
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  gap: ${({ theme }) => theme.spacing(1)};
+  gap: ${themeCssVariables.spacing[1]};
 `;
 
-export const AgentChatContextPreview = ({ agentId }: { agentId: string }) => {
-  const { t } = useLingui();
-  const [agentChatSelectedFiles, setAgentChatSelectedFiles] =
-    useRecoilComponentState(agentChatSelectedFilesComponentState, agentId);
-  const [agentChatUploadedFiles, setAgentChatUploadedFiles] =
-    useRecoilComponentState(agentChatUploadedFilesComponentState, agentId);
+export const AgentChatContextPreview = () => {
+  const [agentChatSelectedFiles, setAgentChatSelectedFiles] = useAtomState(
+    agentChatSelectedFilesState,
+  );
+  const [agentChatUploadedFiles, setAgentChatUploadedFiles] = useAtomState(
+    agentChatUploadedFilesState,
+  );
 
-  const { enqueueErrorSnackBar } = useSnackBar();
-
-  const [deleteFile] = useDeleteFileMutation();
-
-  const handleRemoveUploadedFile = async (fileId: string) => {
-    const originalFiles = agentChatUploadedFiles;
-
+  const handleRemoveUploadedFile = (fileIndex: number) => {
     setAgentChatUploadedFiles(
-      agentChatUploadedFiles.filter((f) => f.id !== fileId),
+      agentChatUploadedFiles.filter((_, index) => fileIndex !== index),
     );
-
-    try {
-      await deleteFile({ variables: { fileId } });
-    } catch {
-      setAgentChatUploadedFiles(originalFiles);
-      enqueueErrorSnackBar({
-        message: t`Failed to remove file`,
-      });
-    }
   };
 
-  const contextStoreCurrentObjectMetadataItemId = useRecoilComponentValue(
-    contextStoreCurrentObjectMetadataItemIdComponentState,
-  );
+  const hasFiles =
+    agentChatSelectedFiles.length > 0 || agentChatUploadedFiles.length > 0;
+
+  if (!hasFiles) {
+    return null;
+  }
 
   return (
     <StyledContainer>
@@ -71,22 +55,14 @@ export const AgentChatContextPreview = ({ agentId }: { agentId: string }) => {
             isUploading
           />
         ))}
-        {agentChatUploadedFiles.map((file) => (
+        {agentChatUploadedFiles.map((file, index) => (
           <AgentChatFilePreview
             file={file}
-            key={file.id}
-            onRemove={() => handleRemoveUploadedFile(file.id)}
+            key={index}
+            onRemove={() => handleRemoveUploadedFile(index)}
             isUploading={false}
           />
         ))}
-        {contextStoreCurrentObjectMetadataItemId && (
-          <AgentChatContextRecordPreview
-            agentId={agentId}
-            contextStoreCurrentObjectMetadataItemId={
-              contextStoreCurrentObjectMetadataItemId
-            }
-          />
-        )}
       </StyledPreviewsContainer>
     </StyledContainer>
   );

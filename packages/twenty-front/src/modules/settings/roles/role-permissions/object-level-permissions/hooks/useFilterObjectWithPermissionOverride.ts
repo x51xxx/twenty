@@ -1,4 +1,4 @@
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import { useGetObjectPermissionDerivedStates } from '@/settings/roles/role-permissions/object-level-permissions/field-permissions/hooks/useGetObjectPermissionDerivedStates';
 import { useCallback } from 'react';
 
@@ -13,14 +13,16 @@ export const useFilterObjectMetadataItemsWithPermissionOverride = ({
     });
 
   const filterObjectMetadataItemsWithPermissionOverride = useCallback(
-    (objectMetadataItem: ObjectMetadataItem) => {
+    (objectMetadataItem: EnrichedObjectMetadataItem) => {
       const {
         objectHasOverrideOnObjectPermissions,
         objectHasNoOverrideButFieldPermissionsShouldBeTakenIntoAccount,
+        objectHasNoOverrideButRowLevelPermissionShouldBeTakenIntoAccount,
       } = getObjectPermissionDerivedStates(objectMetadataItem.id);
 
       const hasOverride =
         objectHasNoOverrideButFieldPermissionsShouldBeTakenIntoAccount ||
+        objectHasNoOverrideButRowLevelPermissionShouldBeTakenIntoAccount ||
         objectHasOverrideOnObjectPermissions;
 
       return hasOverride;

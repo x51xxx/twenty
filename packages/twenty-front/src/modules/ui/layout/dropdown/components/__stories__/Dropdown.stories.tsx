@@ -1,7 +1,11 @@
-import styled from '@emotion/styled';
-import { type Decorator, type Meta, type StoryObj } from '@storybook/react';
-import { expect, userEvent, waitFor, within } from '@storybook/test';
-import { type PlayFunction } from '@storybook/types';
+import { styled } from '@linaria/react';
+import {
+  type Decorator,
+  type Meta,
+  type StoryObj,
+} from '@storybook/react-vite';
+import { type PlayFunction } from 'storybook/internal/types';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 // TEMP_DISABLED_TEST: Commented out unused import
 // import { useState } from 'react';
 
@@ -12,9 +16,13 @@ import { DropdownMenuHeaderLeftComponent } from '@/ui/layout/dropdown/components
 // TEMP_DISABLED_TEST: Commented out unused imports due to commented tests
 // import { Modal } from '@/ui/layout/modal/components/Modal';
 // import { isModalOpenedComponentState } from '@/ui/layout/modal/states/isModalOpenedComponentState';
-// import { focusStackState } from '@/ui/utilities/focus/states/focusStackState';
-// import { FocusComponentType } from '@/ui/utilities/focus/types/FocusComponentType';
-// import { type SetRecoilState } from 'recoil';
+import { Dropdown } from '@/ui/layout/dropdown/components/Dropdown';
+import { DropdownMenuHeader } from '@/ui/layout/dropdown/components/DropdownMenuHeader/DropdownMenuHeader';
+import { DropdownMenuInput } from '@/ui/layout/dropdown/components/DropdownMenuInput';
+import { DropdownMenuItemsContainer } from '@/ui/layout/dropdown/components/DropdownMenuItemsContainer';
+import { DropdownMenuSearchInput } from '@/ui/layout/dropdown/components/DropdownMenuSearchInput';
+import { DropdownMenuSeparator } from '@/ui/layout/dropdown/components/DropdownMenuSeparator';
+import { StyledDropdownMenuSubheader } from '@/ui/layout/dropdown/components/StyledDropdownMenuSubheader';
 import {
   // TEMP_DISABLED_TEST: Commented out unused import
   // Avatar,
@@ -23,13 +31,6 @@ import {
 import { Button } from 'twenty-ui/input';
 import { MenuItem } from 'twenty-ui/navigation';
 import { ComponentDecorator } from 'twenty-ui/testing';
-import { Dropdown } from '../Dropdown';
-import { DropdownMenuHeader } from '../DropdownMenuHeader/DropdownMenuHeader';
-import { DropdownMenuInput } from '../DropdownMenuInput';
-import { DropdownMenuItemsContainer } from '../DropdownMenuItemsContainer';
-import { DropdownMenuSearchInput } from '../DropdownMenuSearchInput';
-import { DropdownMenuSeparator } from '../DropdownMenuSeparator';
-import { StyledDropdownMenuSubheader } from '../StyledDropdownMenuSubheader';
 
 const meta: Meta<typeof Dropdown> = {
   title: 'UI/Layout/Dropdown/Dropdown',
@@ -87,8 +88,8 @@ export const Empty: Story = {
       </DropdownContent>
     ),
   },
-  play: async () => {
-    const canvas = within(document.body);
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement.ownerDocument.body);
 
     const buttons = await canvas.findAllByRole('button');
     await userEvent.click(buttons[0]);
@@ -218,8 +219,8 @@ const optionsMock = [
 //   );
 // };
 
-const playInteraction: PlayFunction<any, any> = async () => {
-  const canvas = within(document.body);
+const playInteraction: PlayFunction<any, any> = async ({ canvasElement }) => {
+  const canvas = within(canvasElement.ownerDocument.body);
 
   const buttons = await canvas.findAllByRole('button');
   await userEvent.click(buttons[0]);
@@ -275,8 +276,8 @@ export const SearchWithLoadingMenu: Story = {
       </DropdownContent>
     ),
   },
-  play: async () => {
-    const canvas = within(document.body);
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement.ownerDocument.body);
 
     const buttons = await canvas.findAllByRole('button');
 
@@ -373,7 +374,7 @@ export const WithInput: Story = {
 // };
 
 // TEMP_DISABLED_TEST: Commented out unused function
-// const initializeModalState = ({ set }: { set: SetRecoilState }) => {
+// const initializeModalState = ({ set }: { set: (atom: any, value: any) => void }) => {
 //   set(
 //     isModalOpenedComponentState.atomFamily({
 //       instanceId: modalId,
@@ -398,7 +399,7 @@ export const WithInput: Story = {
 
 // TEMP_DISABLED_TEST: Temporarily commented out due to test failure
 // export const DropdownInsideModal: Story = {
-//   decorators: [I18nFrontDecorator, RootDecorator, ComponentDecorator],
+//   decorators: [RootDecorator, ComponentDecorator],
 //   parameters: {
 //     initializeState: initializeModalState,
 //     disableHotkeyInitialization: true,

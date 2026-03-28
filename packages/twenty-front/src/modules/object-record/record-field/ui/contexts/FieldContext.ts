@@ -1,8 +1,8 @@
 import { createContext, type MouseEvent } from 'react';
 
 import { type TriggerEventType } from 'twenty-ui/utilities';
-import { type FieldDefinition } from '../types/FieldDefinition';
-import { type FieldMetadata } from '../types/FieldMetadata';
+import { type FieldDefinition } from '@/object-record/record-field/ui/types/FieldDefinition';
+import { type FieldMetadata } from '@/object-record/record-field/ui/types/FieldMetadata';
 
 export type RecordUpdateHookParams = {
   variables: {
@@ -21,12 +21,12 @@ export type RecordUpdateHook = () => [
 ];
 
 export type GenericFieldContextType = {
+  fieldMetadataItemId?: string;
+  recordId: string;
   fieldDefinition: FieldDefinition<FieldMetadata>;
   useUpdateRecord?: RecordUpdateHook;
-  recordId: string;
   isLabelIdentifier: boolean;
   isLabelIdentifierCompact?: boolean;
-  labelIdentifierLink?: string;
   clearable?: boolean;
   maxWidth?: number;
   isCentered?: boolean;

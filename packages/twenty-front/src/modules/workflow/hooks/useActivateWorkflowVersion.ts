@@ -1,17 +1,25 @@
-import { useMutation } from '@apollo/client';
+import { useMutation } from '@apollo/client/react';
 
 import { triggerUpdateRecordOptimisticEffect } from '@/apollo/optimistic-effect/utils/triggerUpdateRecordOptimisticEffect';
 import { useApolloCoreClient } from '@/object-metadata/hooks/useApolloCoreClient';
 import { useObjectMetadataItem } from '@/object-metadata/hooks/useObjectMetadataItem';
-import { CoreObjectNameSingular } from '@/object-metadata/types/CoreObjectNameSingular';
+import { useObjectMetadataItems } from '@/object-metadata/hooks/useObjectMetadataItems';
+import { CoreObjectNameSingular } from 'twenty-shared/types';
+import { getRecordFromCache } from '@/object-record/cache/utils/getRecordFromCache';
 import { modifyRecordFromCache } from '@/object-record/cache/utils/modifyRecordFromCache';
+import { useObjectPermissions } from '@/object-record/hooks/useObjectPermissions';
+import { useUpsertRecordsInStore } from '@/object-record/record-store/hooks/useUpsertRecordsInStore';
 import { ACTIVATE_WORKFLOW_VERSION } from '@/workflow/graphql/mutations/activateWorkflowVersion';
-import { type WorkflowVersion } from '@/workflow/types/Workflow';
+import {
+  type Workflow,
+  type WorkflowStatus,
+  type WorkflowVersion,
+} from '@/workflow/types/Workflow';
 import { isDefined } from 'twenty-shared/utils';
 import {
   type ActivateWorkflowVersionMutation,
   type ActivateWorkflowVersionMutationVariables,
-} from '~/generated-metadata/graphql';
+} from '~/generated/graphql';
 
 export const useActivateWorkflowVersion = () => {
   const apolloCoreClient = useApolloCoreClient();
@@ -21,11 +29,19 @@ export const useActivateWorkflowVersion = () => {
   >(ACTIVATE_WORKFLOW_VERSION, {
     client: apolloCoreClient,
   });
+  const { upsertRecordsInStore } = useUpsertRecordsInStore();
 
   const { objectMetadataItem: objectMetadataItemWorkflowVersion } =
     useObjectMetadataItem({
       objectNameSingular: CoreObjectNameSingular.WorkflowVersion,
     });
+  const { objectMetadataItem: objectMetadataItemWorkflow } =
+    useObjectMetadataItem({
+      objectNameSingular: CoreObjectNameSingular.Workflow,
+    });
+  const { objectMetadataItems } = useObjectMetadataItems();
+
+  const { objectPermissionsByObjectMetadataId } = useObjectPermissions();
 
   const activateWorkflowVersion = async ({
     workflowVersionId,
@@ -48,14 +64,18 @@ export const useActivateWorkflowVersion = () => {
           },
         });
 
-        const cacheSnapshot = apolloCoreClient.cache.extract();
-        const allWorkflowVersions: Array<WorkflowVersion> = Object.values(
-          cacheSnapshot,
+        const cacheSnapshot = apolloCoreClient.cache.extract() as Record<
+          string,
+          Record<string, unknown>
+        >;
+
+        const allWorkflowVersions = (
+          Object.values(cacheSnapshot) as Array<Record<string, unknown>>
         ).filter(
           (item) =>
             item.__typename === 'WorkflowVersion' &&
             item.workflowId === workflowId,
-        );
+        ) as Array<WorkflowVersion>;
 
         const previousActiveWorkflowVersions = allWorkflowVersions.filter(
           (version) =>
@@ -75,7 +95,9 @@ export const useActivateWorkflowVersion = () => {
               ...newlyActiveWorkflowVersion,
               status: 'ACTIVE',
             },
-            objectMetadataItems: [objectMetadataItemWorkflowVersion],
+            objectMetadataItems: objectMetadataItems,
+            objectPermissionsByObjectMetadataId,
+            upsertRecordsInStore,
           });
         }
 
@@ -100,7 +122,42 @@ export const useActivateWorkflowVersion = () => {
               ...workflowVersion,
               status: 'ARCHIVED',
             },
-            objectMetadataItems: [objectMetadataItemWorkflowVersion],
+            objectMetadataItems,
+            objectPermissionsByObjectMetadataId,
+            upsertRecordsInStore,
+          });
+        }
+
+        const cachedWorkflow = getRecordFromCache<Workflow>({
+          objectMetadataItem: objectMetadataItemWorkflow,
+          cache: apolloCoreClient.cache,
+          objectMetadataItems,
+          objectPermissionsByObjectMetadataId,
+          recordId: workflowId,
+        });
+
+        const newStatuses = new Set(
+          [...(cachedWorkflow?.statuses ?? []), 'ACTIVE'].filter(
+            (status) => status !== 'DEACTIVATED',
+          ),
+        );
+
+        if (isDefined(cachedWorkflow)) {
+          modifyRecordFromCache({
+            cache: apolloCoreClient.cache,
+            recordId: workflowId,
+            objectMetadataItem: objectMetadataItemWorkflow,
+            fieldModifiers: {
+              statuses: () => Array.from(newStatuses),
+            },
+          });
+          upsertRecordsInStore({
+            partialRecords: [
+              {
+                ...cachedWorkflow,
+                statuses: Array.from(newStatuses) as WorkflowStatus[],
+              },
+            ],
           });
         }
       },

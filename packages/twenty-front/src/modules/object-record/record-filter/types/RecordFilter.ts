@@ -1,12 +1,21 @@
-import { type FilterableAndTSVectorFieldType } from '@/object-record/record-filter/types/FilterableFieldType';
 import { type FILTER_OPERANDS_MAP } from '@/object-record/record-filter/utils/getRecordFilterOperands';
 import { type CompositeFieldSubFieldName } from '@/settings/data-model/types/CompositeFieldSubFieldName';
-import { type ViewFilterOperand } from 'twenty-shared/types';
+import {
+  type FilterableAndTSVectorFieldType,
+  type ViewFilterOperand,
+} from 'twenty-shared/types';
+
+// RLS-specific: references a workspace member field for dynamic "Me" comparisons
+export type RLSDynamicValue = {
+  workspaceMemberFieldMetadataId: string;
+  workspaceMemberSubFieldName?: string | null;
+};
 
 export type RecordFilter = {
   id: string;
   fieldMetadataId: string;
   value: string;
+  /** @deprecated We shouldn't implement new features with this field and instead try to create utils to obtain the displayValue at runtime */
   displayValue: string;
   type: FilterableAndTSVectorFieldType;
   recordFilterGroupId?: string;
@@ -15,6 +24,8 @@ export type RecordFilter = {
   positionInRecordFilterGroup?: number | null;
   label: string;
   subFieldName?: CompositeFieldSubFieldName | null | undefined;
+  // RLS-specific: when set, filter compares against current user's field value
+  rlsDynamicValue?: RLSDynamicValue | null;
 };
 
 export type RecordFilterToRecordInputOperand<

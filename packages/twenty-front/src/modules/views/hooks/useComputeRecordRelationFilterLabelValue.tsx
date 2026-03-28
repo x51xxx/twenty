@@ -4,20 +4,32 @@ import { getFieldMetadataItemByIdOrThrow } from '@/object-metadata/utils/getFiel
 import { MAX_RECORDS_TO_DISPLAY } from '@/object-record/object-filter-dropdown/components/ObjectFilterDropdownRecordSelect';
 import { type RecordFilter } from '@/object-record/record-filter/types/RecordFilter';
 import { useRecordsForSelect } from '@/object-record/select/hooks/useRecordsForSelect';
-import { getRecordFilterLabelValue } from '@/views/utils/getRecordFilterLabelValue';
-import { arrayOfUuidOrVariableSchema } from '@/views/view-filter-value/validation-schemas/arrayOfUuidsOrVariablesSchema';
-import { jsonRelationFilterValueSchema } from '@/views/view-filter-value/validation-schemas/jsonRelationFilterValueSchema';
+import { useGetRecordFilterChipLabelValue } from '@/views/hooks/useGetRecordFilterChipLabelValue';
+
 import { t } from '@lingui/core/macro';
-import { isDefined } from 'twenty-shared/utils';
+import {
+  arrayOfUuidOrVariableSchema,
+  isDefined,
+  jsonRelationFilterValueSchema,
+} from 'twenty-shared/utils';
+import { allowRequestsToTwentyIconsState } from '@/client-config/states/allowRequestsToTwentyIcons';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 
 type ObjectFilterDropdownRecordSelectProps = {
   recordFilter: RecordFilter;
 };
 
+// TODO: refactor this with new useGetRecordFilterDisplayValue
 export const useComputeRecordRelationFilterLabelValue = ({
   recordFilter,
 }: ObjectFilterDropdownRecordSelectProps) => {
+  const allowRequestsToTwentyIcons = useAtomStateValue(
+    allowRequestsToTwentyIconsState,
+  );
+
   const { objectMetadataItems } = useObjectMetadataItems();
+
+  const { getRecordFilterChipLabelValue } = useGetRecordFilterChipLabelValue();
 
   if (!isDefined(recordFilter.fieldMetadataId)) {
     throw new Error('fieldMetadataItemUsedInFilterDropdown is not defined');
@@ -63,10 +75,11 @@ export const useComputeRecordRelationFilterLabelValue = ({
     selectedIds: selectedRecordIds,
     objectNameSingular: relationObjectMetadataNameSingular,
     limit: 10,
+    allowRequestsToTwentyIcons,
   });
 
   if (loading) {
-    return { labelValue: t`Loading...` };
+    return { labelValue: t`: Loading...` };
   }
 
   const labelValueItems = [
@@ -82,10 +95,14 @@ export const useComputeRecordRelationFilterLabelValue = ({
   return {
     labelValue:
       labelValueItems.length > 0
-        ? getRecordFilterLabelValue({
-            ...recordFilter,
-            displayValue: filterDisplayValue,
+        ? getRecordFilterChipLabelValue({
+            recordFilter: {
+              ...recordFilter,
+              displayValue: filterDisplayValue,
+            },
           })
-        : getRecordFilterLabelValue(recordFilter),
+        : getRecordFilterChipLabelValue({
+            recordFilter,
+          }),
   };
 };

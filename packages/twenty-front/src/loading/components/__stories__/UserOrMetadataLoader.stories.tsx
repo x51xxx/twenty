@@ -1,7 +1,7 @@
-import { getOperationName } from '@apollo/client/utilities';
-import { type Meta, type StoryObj } from '@storybook/react';
-import { expect, within } from '@storybook/test';
+import { getOperationName } from '~/utils/getOperationName';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { HttpResponse, graphql, http } from 'msw';
+import { expect, within } from 'storybook/test';
 
 import { GET_PUBLIC_WORKSPACE_DATA_BY_DOMAIN } from '@/auth/graphql/queries/getPublicWorkspaceDataByDomain';
 import { FIND_MANY_OBJECT_METADATA_ITEMS } from '@/object-metadata/graphql/queries';
@@ -79,7 +79,7 @@ export type Story = StoryObj<typeof RecordIndexPage>;
 
 export const Default: Story = {
   parameters: userMetadataLoaderMocks,
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // oxlint-disable-next-line @typescripttypescript/ban-ts-comment
   // @ts-ignore
   decorators: [PageDecorator],
   play: async ({ canvasElement }) => {

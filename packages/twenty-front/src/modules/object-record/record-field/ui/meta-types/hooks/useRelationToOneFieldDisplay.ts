@@ -2,7 +2,7 @@ import { isNonEmptyString } from '@sniptt/guards';
 import { useContext } from 'react';
 
 import { PreComputedChipGeneratorsContext } from '@/object-metadata/contexts/PreComputedChipGeneratorsContext';
-import { useRecordFieldValue } from '@/object-record/record-store/contexts/RecordFieldValueSelectorContext';
+
 import { type ObjectRecord } from '@/object-record/types/ObjectRecord';
 import { FIELD_EDIT_BUTTON_WIDTH } from '@/ui/field/display/constants/FieldEditButtonWidth';
 import { FieldMetadataType } from '~/generated-metadata/graphql';
@@ -11,6 +11,8 @@ import { generateDefaultRecordChipData } from '@/object-metadata/utils/generateD
 import { FieldContext } from '@/object-record/record-field/ui/contexts/FieldContext';
 import { assertFieldMetadata } from '@/object-record/record-field/ui/types/guards/assertFieldMetadata';
 import { isFieldRelation } from '@/object-record/record-field/ui/types/guards/isFieldRelation';
+import { getJoinColumnNameOrThrow } from '@/object-record/record-field/ui/utils/junction/getJoinColumnNameOrThrow';
+import { useRecordFieldValue } from '@/object-record/record-store/hooks/useRecordFieldValue';
 import { isDefined } from 'twenty-shared/utils';
 
 export const useRelationToOneFieldDisplay = () => {
@@ -37,6 +39,17 @@ export const useRelationToOneFieldDisplay = () => {
   const fieldValue = useRecordFieldValue<ObjectRecord | undefined>(
     recordId,
     fieldName,
+    fieldDefinition,
+  );
+
+  const joinColumnName = getJoinColumnNameOrThrow(
+    fieldDefinition.metadata.settings,
+  );
+
+  const foreignKeyFieldValue = useRecordFieldValue<string | null | undefined>(
+    recordId,
+    joinColumnName,
+    { type: FieldMetadataType.UUID, metadata: { fieldName: joinColumnName } },
   );
 
   const maxWidthForField =
@@ -67,6 +80,7 @@ export const useRelationToOneFieldDisplay = () => {
   return {
     fieldDefinition,
     fieldValue,
+    foreignKeyFieldValue,
     maxWidth: maxWidthForField,
     recordId,
     generateRecordChipData,

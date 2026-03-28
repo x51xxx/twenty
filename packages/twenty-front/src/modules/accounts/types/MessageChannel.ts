@@ -9,6 +9,11 @@ export enum MessageChannelContactAutoCreationPolicy {
   NONE = 'NONE',
 }
 
+export enum MessageFolderImportPolicy {
+  ALL_FOLDERS = 'ALL_FOLDERS',
+  SELECTED_FOLDERS = 'SELECTED_FOLDERS',
+}
+
 export enum MessageChannelSyncStatus {
   NOT_SYNCED = 'NOT_SYNCED',
   ONGOING = 'ONGOING',
@@ -18,8 +23,7 @@ export enum MessageChannelSyncStatus {
 }
 
 export enum MessageChannelSyncStage {
-  FULL_MESSAGE_LIST_FETCH_PENDING = 'FULL_MESSAGE_LIST_FETCH_PENDING', // WILL BE DEPRECATED
-  PARTIAL_MESSAGE_LIST_FETCH_PENDING = 'PARTIAL_MESSAGE_LIST_FETCH_PENDING', // DEPRECATED
+  PENDING_CONFIGURATION = 'PENDING_CONFIGURATION',
   MESSAGE_LIST_FETCH_PENDING = 'MESSAGE_LIST_FETCH_PENDING',
   MESSAGE_LIST_FETCH_SCHEDULED = 'MESSAGE_LIST_FETCH_SCHEDULED',
   MESSAGE_LIST_FETCH_ONGOING = 'MESSAGE_LIST_FETCH_ONGOING',
@@ -38,6 +42,7 @@ export type MessageChannel = {
   isSyncEnabled: boolean;
   messageFolders: MessageFolder[];
   visibility: MessageChannelVisibility;
+  messageFolderImportPolicy: MessageFolderImportPolicy;
   syncStatus: MessageChannelSyncStatus;
   syncStage: MessageChannelSyncStage;
   syncCursor: string;

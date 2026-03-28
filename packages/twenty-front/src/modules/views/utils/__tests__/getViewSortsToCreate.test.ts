@@ -1,12 +1,13 @@
+import { ViewSortDirection } from '~/generated-metadata/graphql';
+import { getViewSortsToCreate } from '@/views/utils/getViewSortsToCreate';
 import { type ViewSort } from '@/views/types/ViewSort';
-import { getViewSortsToCreate } from '../getViewSortsToCreate';
 
 describe('getViewSortsToCreate', () => {
   const baseSort: ViewSort = {
-    __typename: 'ViewSort',
     id: 'sort-1',
     fieldMetadataId: 'field-1',
-    direction: 'asc',
+    direction: ViewSortDirection.ASC,
+    viewId: 'view-1',
   };
 
   it('should return all sorts when current sorts array is empty', () => {

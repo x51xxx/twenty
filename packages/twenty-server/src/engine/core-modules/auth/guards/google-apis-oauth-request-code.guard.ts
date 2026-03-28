@@ -3,6 +3,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { Repository } from 'typeorm';
+import { FeatureFlagKey } from 'twenty-shared/types';
 
 import {
   AuthException,
@@ -11,10 +12,11 @@ import {
 import { GoogleAPIsOauthRequestCodeStrategy } from 'src/engine/core-modules/auth/strategies/google-apis-oauth-request-code.auth.strategy';
 import { TransientTokenService } from 'src/engine/core-modules/auth/token/services/transient-token.service';
 import { setRequestExtraParams } from 'src/engine/core-modules/auth/utils/google-apis-set-request-extra-params.util';
-import { DomainManagerService } from 'src/engine/core-modules/domain-manager/services/domain-manager.service';
+import { WorkspaceDomainsService } from 'src/engine/core-modules/domain/workspace-domains/services/workspace-domains.service';
+import { FeatureFlagService } from 'src/engine/core-modules/feature-flag/services/feature-flag.service';
 import { GuardRedirectService } from 'src/engine/core-modules/guard-redirect/services/guard-redirect.service';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
-import { Workspace } from 'src/engine/core-modules/workspace/workspace.entity';
+import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 
 @Injectable()
 export class GoogleAPIsOauthRequestCodeGuard extends AuthGuard('google-apis') {
@@ -22,9 +24,10 @@ export class GoogleAPIsOauthRequestCodeGuard extends AuthGuard('google-apis') {
     private readonly twentyConfigService: TwentyConfigService,
     private readonly transientTokenService: TransientTokenService,
     private readonly guardRedirectService: GuardRedirectService,
-    @InjectRepository(Workspace)
-    private readonly workspaceRepository: Repository<Workspace>,
-    private readonly domainManagerService: DomainManagerService,
+    @InjectRepository(WorkspaceEntity)
+    private readonly workspaceRepository: Repository<WorkspaceEntity>,
+    private readonly workspaceDomainsService: WorkspaceDomainsService,
+    private readonly featureFlagService: FeatureFlagService,
   ) {
     super({
       prompt: 'select_account',
@@ -32,7 +35,7 @@ export class GoogleAPIsOauthRequestCodeGuard extends AuthGuard('google-apis') {
   }
 
   async canActivate(context: ExecutionContext) {
-    let workspace: Workspace | null = null;
+    let workspace: WorkspaceEntity | null = null;
 
     try {
       const request = context.switchToHttp().getRequest();
@@ -51,6 +54,8 @@ export class GoogleAPIsOauthRequestCodeGuard extends AuthGuard('google-apis') {
         redirectLocation: request.query.redirectLocation,
         calendarVisibility: request.query.calendarVisibility,
         messageVisibility: request.query.messageVisibility,
+        skipMessageChannelConfiguration:
+          request.query.skipMessageChannelConfiguration,
         loginHint: request.query.loginHint,
         userId: userId,
         workspaceId: workspaceId,
@@ -66,14 +71,23 @@ export class GoogleAPIsOauthRequestCodeGuard extends AuthGuard('google-apis') {
         );
       }
 
-      new GoogleAPIsOauthRequestCodeStrategy(this.twentyConfigService);
+      const isDraftEmailEnabled =
+        await this.featureFlagService.isFeatureEnabled(
+          FeatureFlagKey.IS_DRAFT_EMAIL_ENABLED,
+          workspaceId,
+        );
+
+      new GoogleAPIsOauthRequestCodeStrategy(
+        this.twentyConfigService,
+        isDraftEmailEnabled,
+      );
 
       return (await super.canActivate(context)) as boolean;
     } catch (err) {
       this.guardRedirectService.dispatchErrorFromGuard(
         context,
         err,
-        this.domainManagerService.getSubdomainAndCustomDomainFromWorkspaceFallbackOnDefaultSubdomain(
+        this.workspaceDomainsService.getSubdomainAndCustomDomainFromWorkspaceFallbackOnDefaultSubdomain(
           workspace,
         ),
       );

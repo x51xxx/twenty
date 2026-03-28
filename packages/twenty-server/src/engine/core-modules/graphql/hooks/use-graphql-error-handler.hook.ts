@@ -4,7 +4,7 @@ import {
   type OnExecuteDoneHookResultOnNextHook,
   type Plugin,
 } from '@envelop/core';
-import { t } from '@lingui/core/macro';
+import { msg } from '@lingui/core/macro';
 import {
   GraphQLError,
   Kind,
@@ -12,6 +12,7 @@ import {
   print,
 } from 'graphql';
 import semver from 'semver';
+import { SOURCE_LOCALE } from 'twenty-shared/translations';
 import { isDefined } from 'twenty-shared/utils';
 
 import { type GraphQLContext } from 'src/engine/api/graphql/graphql-config/interfaces/graphql-context.interface';
@@ -23,6 +24,7 @@ import {
   convertGraphQLErrorToBaseGraphQLError,
   ErrorCode,
 } from 'src/engine/core-modules/graphql/utils/graphql-errors.util';
+import { type I18nService } from 'src/engine/core-modules/i18n/i18n.service';
 import { type MetricsService } from 'src/engine/core-modules/metrics/metrics.service';
 import { MetricsKeys } from 'src/engine/core-modules/metrics/types/metrics-keys.type';
 import { type TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
@@ -45,6 +47,8 @@ type GraphQLErrorHandlerHookOptions = {
    * The exception handler service to use.
    */
   exceptionHandlerService: ExceptionHandlerService;
+
+  i18nService: I18nService;
 
   twentyConfigService: TwentyConfigService;
   /**
@@ -75,6 +79,7 @@ export const useGraphQLErrorHandlerHook = <
   }
 
   return {
+    // TODO: define onSubscribe here to handle subscription errors too
     async onExecute({ args }) {
       const exceptionHandlerService = options.exceptionHandlerService;
       const rootOperation = args.document.definitions.find(
@@ -87,7 +92,15 @@ export const useGraphQLErrorHandlerHook = <
       }
 
       const operationType = rootOperation.operation;
-      const user = args.contextValue.req.user;
+      const rawUser = args.contextValue.req.user;
+      const user = rawUser
+        ? {
+            id: rawUser.id,
+            email: rawUser.email,
+            firstName: rawUser.firstName,
+            lastName: rawUser.lastName,
+          }
+        : undefined;
       const document = getDocumentString(args.document, print);
       const opName =
         args.operationName ||
@@ -201,6 +214,10 @@ export const useGraphQLErrorHandlerHook = <
             }
 
             // Step 3: Transform errors for GraphQL response (clean GraphQL errors)
+            const userLocale = args.contextValue.req.locale ?? SOURCE_LOCALE;
+            const i18n = options.i18nService.getI18nInstance(userLocale);
+            const defaultErrorMessage = msg`An error occurred.`;
+
             const transformedErrors = processedErrors.map((error) => {
               const graphqlError =
                 error instanceof BaseGraphQLError
@@ -208,12 +225,13 @@ export const useGraphQLErrorHandlerHook = <
                       ...error,
                       extensions: {
                         ...error.extensions,
-                        userFriendlyMessage:
+                        userFriendlyMessage: i18n._(
                           error.extensions.userFriendlyMessage ??
-                          t`An error occurred.`,
+                            defaultErrorMessage,
+                        ),
                       },
                     }
-                  : generateGraphQLErrorFromError(error);
+                  : generateGraphQLErrorFromError(error, i18n);
 
               if (error.eventId && eventIdKey) {
                 graphqlError.extensions = {
@@ -239,6 +257,9 @@ export const useGraphQLErrorHandlerHook = <
     onValidate: ({ context, validateFn, params: { documentAST, schema } }) => {
       const errors = validateFn(schema, documentAST);
 
+      const userLocale = context.req.locale ?? SOURCE_LOCALE;
+      const i18n = options.i18nService.getI18nInstance(userLocale);
+
       if (Array.isArray(errors) && errors.length > 0) {
         const headers = context.req.headers;
         const currentMetadataVersion = context.req.workspaceMetadataVersion;
@@ -253,21 +274,25 @@ export const useGraphQLErrorHandlerHook = <
 
         if (
           requestMetadataVersion &&
+          isDefined(currentMetadataVersion) &&
           requestMetadataVersion !== `${currentMetadataVersion}`
         ) {
           options.metricsService.incrementCounter({
             key: MetricsKeys.SchemaVersionMismatch,
           });
+
           throw new GraphQLError(SCHEMA_MISMATCH_ERROR, {
             extensions: {
-              userFriendlyMessage: t`Your workspace has been updated with a new data model. Please refresh the page.`,
+              userFriendlyMessage: i18n._(
+                msg`Your workspace has been updated with a new data model. Please refresh the page.`,
+              ),
             },
           });
         }
 
         if (
-          !frontEndAppVersion ||
-          !backendAppVersion ||
+          !isDefined(frontEndAppVersion) ||
+          !isDefined(backendAppVersion) ||
           !semver.valid(frontEndAppVersion) ||
           !semver.valid(backendAppVersion)
         ) {
@@ -288,7 +313,9 @@ export const useGraphQLErrorHandlerHook = <
           throw new GraphQLError(APP_VERSION_MISMATCH_ERROR, {
             extensions: {
               code: APP_VERSION_MISMATCH_CODE,
-              userFriendlyMessage: t`Your app version is out of date. Please refresh the page to continue.`,
+              userFriendlyMessage: i18n._(
+                msg`Your app version is out of date. Please refresh the page to continue.`,
+              ),
             },
           });
         }

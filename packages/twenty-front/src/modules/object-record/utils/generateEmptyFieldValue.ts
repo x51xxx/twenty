@@ -96,9 +96,6 @@ export const generateEmptyFieldValue = ({
       return null;
     }
     case FieldMetadataType.RICH_TEXT: {
-      return null;
-    }
-    case FieldMetadataType.RICH_TEXT_V2: {
       return {
         blocknote: null,
         markdown: null,
@@ -121,6 +118,9 @@ export const generateEmptyFieldValue = ({
       };
     }
     case FieldMetadataType.TS_VECTOR: {
+      return null;
+    }
+    case FieldMetadataType.FILES: {
       return null;
     }
     default: {

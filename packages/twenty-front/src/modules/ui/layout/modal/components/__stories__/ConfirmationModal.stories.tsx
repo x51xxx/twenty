@@ -1,25 +1,27 @@
-import { type Meta, type StoryObj } from '@storybook/react';
-import { expect, fn, userEvent, waitFor, within } from '@storybook/test';
+import {
+  type Decorator,
+  type Meta,
+  type StoryObj,
+} from '@storybook/react-vite';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
+import { ConfirmationModal } from '@/ui/layout/modal/components/ConfirmationModal';
+import { isModalOpenedComponentState } from '@/ui/layout/modal/states/isModalOpenedComponentState';
 import { focusStackState } from '@/ui/utilities/focus/states/focusStackState';
 import { FocusComponentType } from '@/ui/utilities/focus/types/FocusComponentType';
-import { type SetRecoilState } from 'recoil';
+import { jotaiStore } from '@/ui/utilities/state/jotai/jotaiStore';
 import { ComponentDecorator } from 'twenty-ui/testing';
-import { I18nFrontDecorator } from '~/testing/decorators/I18nFrontDecorator';
 import { RootDecorator } from '~/testing/decorators/RootDecorator';
 import { sleep } from '~/utils/sleep';
-import { isModalOpenedComponentState } from '../../states/isModalOpenedComponentState';
-import { ConfirmationModal } from '../ConfirmationModal';
 
-const initializeState = ({ set }: { set: SetRecoilState }) => {
-  set(
+const JotaiInitDecorator: Decorator = (Story) => {
+  jotaiStore.set(
     isModalOpenedComponentState.atomFamily({
       instanceId: 'confirmation-modal',
     }),
     true,
   );
-
-  set(focusStackState, [
+  jotaiStore.set(focusStackState.atom, [
     {
       focusId: 'confirmation-modal',
       componentInstance: {
@@ -32,14 +34,14 @@ const initializeState = ({ set }: { set: SetRecoilState }) => {
       },
     },
   ]);
+  return <Story />;
 };
 
 const meta: Meta<typeof ConfirmationModal> = {
   title: 'UI/Layout/Modal/ConfirmationModal',
   component: ConfirmationModal,
-  decorators: [RootDecorator, ComponentDecorator, I18nFrontDecorator],
+  decorators: [JotaiInitDecorator, RootDecorator, ComponentDecorator],
   parameters: {
-    initializeState,
     disableHotkeyInitialization: true,
   },
 };
@@ -52,10 +54,11 @@ const confirmMock = fn();
 
 export const Default: Story = {
   args: {
-    modalId: 'confirmation-modal',
+    modalInstanceId: 'confirmation-modal',
     title: 'Pariatur labore.',
     subtitle: 'Velit dolore aliquip laborum occaecat fugiat.',
     confirmButtonText: 'Delete',
+    onConfirmClick: fn(),
   },
 };
 
@@ -69,16 +72,16 @@ export const InputConfirmation: Story = {
 
 export const CloseOnEscape: Story = {
   args: {
-    modalId: 'confirmation-modal',
+    modalInstanceId: 'confirmation-modal',
     title: 'Escape Key Test',
     subtitle: 'This modal should close when pressing the Escape key.',
     confirmButtonText: 'Confirm',
     onClose: closeMock,
   },
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
 
-    await canvas.findByText('Escape Key Test');
+    await body.findByText('Escape Key Test');
 
     closeMock.mockClear();
 
@@ -92,18 +95,18 @@ export const CloseOnEscape: Story = {
 
 export const CloseOnClickOutside: Story = {
   args: {
-    modalId: 'confirmation-modal',
+    modalInstanceId: 'confirmation-modal',
     title: 'Click Outside Test',
     subtitle: 'This modal should close when clicking outside of it.',
     confirmButtonText: 'Confirm',
     onClose: closeMock,
   },
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
 
-    await canvas.findByText('Click Outside Test');
+    await body.findByText('Click Outside Test');
 
-    const backdrop = await canvas.findByTestId('modal-backdrop');
+    const backdrop = await body.findByTestId('modal-backdrop');
 
     // We need to wait for the outside click listener to be registered
     await sleep(100);
@@ -118,16 +121,16 @@ export const CloseOnClickOutside: Story = {
 
 export const ConfirmWithEnterKey: Story = {
   args: {
-    modalId: 'confirmation-modal',
+    modalInstanceId: 'confirmation-modal',
     title: 'Enter Key Test',
     subtitle: 'This modal should confirm when pressing the Enter key.',
     confirmButtonText: 'Confirm',
     onConfirmClick: confirmMock,
   },
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
 
-    await canvas.findByText('Enter Key Test');
+    await body.findByText('Enter Key Test');
 
     await userEvent.keyboard('{Enter}');
 
@@ -139,18 +142,18 @@ export const ConfirmWithEnterKey: Story = {
 
 export const CancelButtonClick: Story = {
   args: {
-    modalId: 'confirmation-modal',
+    modalInstanceId: 'confirmation-modal',
     title: 'Cancel Button Test',
     subtitle: 'Clicking the cancel button should close the modal',
     confirmButtonText: 'Confirm',
     onClose: closeMock,
   },
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
 
-    await canvas.findByText('Cancel Button Test');
+    await body.findByText('Cancel Button Test');
 
-    const cancelButton = await canvas.findByRole('button', {
+    const cancelButton = await body.findByRole('button', {
       name: /Cancel/,
     });
     await userEvent.click(cancelButton);
@@ -163,18 +166,18 @@ export const CancelButtonClick: Story = {
 
 export const ConfirmButtonClick: Story = {
   args: {
-    modalId: 'confirmation-modal',
+    modalInstanceId: 'confirmation-modal',
     title: 'Confirm Button Test',
     subtitle: 'Clicking the confirm button should trigger the confirm action',
     confirmButtonText: 'Confirm',
     onConfirmClick: confirmMock,
   },
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
 
-    await canvas.findByText('Confirm Button Test');
+    await body.findByText('Confirm Button Test');
 
-    const confirmButton = await canvas.findByRole('button', {
+    const confirmButton = await body.findByRole('button', {
       name: /Confirm/,
     });
 

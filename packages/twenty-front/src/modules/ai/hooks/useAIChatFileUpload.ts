@@ -1,42 +1,52 @@
-import { agentChatSelectedFilesComponentState } from '@/ai/states/agentChatSelectedFilesComponentState';
-import { agentChatUploadedFilesComponentState } from '@/ai/states/agentChatUploadedFilesComponentState';
-import { useApolloCoreClient } from '@/object-metadata/hooks/useApolloCoreClient';
+import { agentChatSelectedFilesState } from '@/ai/states/agentChatSelectedFilesState';
+import { agentChatUploadedFilesState } from '@/ai/states/agentChatUploadedFilesState';
 import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
-import { useRecoilComponentState } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentState';
+import { useAtomState } from '@/ui/utilities/state/jotai/hooks/useAtomState';
+import { useApolloClient, useMutation } from '@apollo/client/react';
 import { useLingui } from '@lingui/react/macro';
 import { isDefined } from 'twenty-shared/utils';
-import {
-  type File as FileDocument,
-  useCreateFileMutation,
-} from '~/generated-metadata/graphql';
 
-export const useAIChatFileUpload = ({ agentId }: { agentId: string }) => {
-  const coreClient = useApolloCoreClient();
-  const [createFile] = useCreateFileMutation({ client: coreClient });
+import { type AgentChatFileUIPart } from '@/ai/types/agent-chat-file-ui-part.type';
+import { UploadAiChatFileDocument } from '~/generated-metadata/graphql';
+
+export const useAIChatFileUpload = () => {
+  const apolloClient = useApolloClient();
+  const [uploadAiChatFile] = useMutation(UploadAiChatFileDocument, {
+    client: apolloClient,
+  });
   const { t } = useLingui();
   const { enqueueErrorSnackBar } = useSnackBar();
-  const [agentChatSelectedFiles, setAgentChatSelectedFiles] =
-    useRecoilComponentState(agentChatSelectedFilesComponentState, agentId);
-  const [agentChatUploadedFiles, setAgentChatUploadedFiles] =
-    useRecoilComponentState(agentChatUploadedFilesComponentState, agentId);
+  const [agentChatSelectedFiles, setAgentChatSelectedFiles] = useAtomState(
+    agentChatSelectedFilesState,
+  );
+  const [agentChatUploadedFiles, setAgentChatUploadedFiles] = useAtomState(
+    agentChatUploadedFilesState,
+  );
 
-  const sendFile = async (file: File) => {
+  const sendFile = async (file: File): Promise<AgentChatFileUIPart | null> => {
     try {
-      const result = await createFile({
+      const result = await uploadAiChatFile({
         variables: {
           file,
         },
       });
 
-      const uploadedFile = result?.data?.createFile;
+      const response = result?.data?.uploadAIChatFile;
 
-      if (!isDefined(uploadedFile)) {
+      if (!isDefined(response)) {
         throw new Error(t`Couldn't upload the file.`);
       }
+
       setAgentChatSelectedFiles(
         agentChatSelectedFiles.filter((f) => f.name !== file.name),
       );
-      return uploadedFile;
+      return {
+        filename: file.name,
+        mediaType: file.type,
+        url: response.url,
+        fileId: response.id,
+        type: 'file',
+      };
     } catch {
       const fileName = file.name;
       enqueueErrorSnackBar({
@@ -51,7 +61,7 @@ export const useAIChatFileUpload = ({ agentId }: { agentId: string }) => {
       files.map((file) => sendFile(file)),
     );
 
-    const successfulUploads = uploadResults.reduce<FileDocument[]>(
+    const successfulUploads = uploadResults.reduce<AgentChatFileUIPart[]>(
       (acc, result) => {
         if (result.status === 'fulfilled' && isDefined(result.value)) {
           acc.push(result.value);

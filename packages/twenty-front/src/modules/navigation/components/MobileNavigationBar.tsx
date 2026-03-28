@@ -1,39 +1,56 @@
-import { useCommandMenu } from '@/command-menu/hooks/useCommandMenu';
-import { useOpenRecordsSearchPageInCommandMenu } from '@/command-menu/hooks/useOpenRecordsSearchPageInCommandMenu';
-import { isCommandMenuOpenedState } from '@/command-menu/states/isCommandMenuOpenedState';
-import { useOpenSettingsMenu } from '@/navigation/hooks/useOpenSettings';
+import { useSwitchToNewAIChat } from '@/ai/hooks/useSwitchToNewAIChat';
+import { MAIN_CONTEXT_STORE_INSTANCE_ID } from '@/context-store/constants/MainContextStoreInstanceId';
+import { contextStoreCurrentObjectMetadataItemIdComponentState } from '@/context-store/states/contextStoreCurrentObjectMetadataItemIdComponentState';
+import { useDefaultHomePagePath } from '@/navigation/hooks/useDefaultHomePagePath';
+import { useIsSettingsPage } from '@/navigation/hooks/useIsSettingsPage';
+import { currentMobileNavigationDrawerState } from '@/navigation/states/currentMobileNavigationDrawerState';
+import { useFilteredObjectMetadataItems } from '@/object-metadata/hooks/useFilteredObjectMetadataItems';
+import { useOpenRecordsSearchPageInSidePanel } from '@/side-panel/hooks/useOpenRecordsSearchPageInSidePanel';
+import { useSidePanelMenu } from '@/side-panel/hooks/useSidePanelMenu';
+import { isSidePanelOpenedState } from '@/side-panel/states/isSidePanelOpenedState';
 import { isNavigationDrawerExpandedState } from '@/ui/navigation/states/isNavigationDrawerExpanded';
-import { useRecoilState } from 'recoil';
+import { useSetAtomComponentState } from '@/ui/utilities/state/jotai/hooks/useSetAtomComponentState';
+import { useAtomState } from '@/ui/utilities/state/jotai/hooks/useAtomState';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
+import { useIsFeatureEnabled } from '@/workspace/hooks/useIsFeatureEnabled';
+import { useNavigate } from 'react-router-dom';
 import {
   type IconComponent,
   IconList,
+  IconMessageCirclePlus,
   IconSearch,
-  IconSettings,
 } from 'twenty-ui/display';
 import { NavigationBar } from 'twenty-ui/navigation';
-import { useIsSettingsPage } from '../hooks/useIsSettingsPage';
-import { currentMobileNavigationDrawerState } from '../states/currentMobileNavigationDrawerState';
+import { FeatureFlagKey } from '~/generated-metadata/graphql';
 
-type NavigationBarItemName = 'main' | 'search' | 'tasks' | 'settings';
+type NavigationBarItemName = 'main' | 'search' | 'newAIChat';
 
 export const MobileNavigationBar = () => {
-  const [isCommandMenuOpened] = useRecoilState(isCommandMenuOpenedState);
-  const { closeCommandMenu } = useCommandMenu();
-  const { openRecordsSearchPage } = useOpenRecordsSearchPageInCommandMenu();
+  const navigate = useNavigate();
+  const { defaultHomePagePath } = useDefaultHomePagePath();
+  const isSidePanelOpened = useAtomStateValue(isSidePanelOpenedState);
+  const { closeSidePanelMenu } = useSidePanelMenu();
+  const { openRecordsSearchPage } = useOpenRecordsSearchPageInSidePanel();
   const isSettingsPage = useIsSettingsPage();
   const [isNavigationDrawerExpanded, setIsNavigationDrawerExpanded] =
-    useRecoilState(isNavigationDrawerExpandedState);
+    useAtomState(isNavigationDrawerExpandedState);
   const [currentMobileNavigationDrawer, setCurrentMobileNavigationDrawer] =
-    useRecoilState(currentMobileNavigationDrawerState);
-  const { openSettingsMenu } = useOpenSettingsMenu();
+    useAtomState(currentMobileNavigationDrawerState);
+  const { switchToNewChat } = useSwitchToNewAIChat();
+  const isAiEnabled = useIsFeatureEnabled(FeatureFlagKey.IS_AI_ENABLED);
+  const { alphaSortedActiveNonSystemObjectMetadataItems } =
+    useFilteredObjectMetadataItems();
+
+  const setContextStoreCurrentObjectMetadataItemId = useSetAtomComponentState(
+    contextStoreCurrentObjectMetadataItemIdComponentState,
+    MAIN_CONTEXT_STORE_INSTANCE_ID,
+  );
 
   const activeItemName = isNavigationDrawerExpanded
     ? currentMobileNavigationDrawer
-    : isCommandMenuOpened
+    : isSidePanelOpened
       ? 'search'
-      : isSettingsPage
-        ? 'settings'
-        : 'main';
+      : 'main';
 
   const items: {
     name: NavigationBarItemName;
@@ -44,26 +61,50 @@ export const MobileNavigationBar = () => {
       name: 'main',
       Icon: IconList,
       onClick: () => {
-        closeCommandMenu();
+        closeSidePanelMenu();
         setIsNavigationDrawerExpanded(
           (previousIsOpen) => activeItemName !== 'main' || !previousIsOpen,
         );
         setCurrentMobileNavigationDrawer('main');
+
+        if (isSettingsPage) {
+          navigate(defaultHomePagePath);
+        }
       },
     },
     {
       name: 'search',
       Icon: IconSearch,
-      onClick: openRecordsSearchPage,
-    },
-    {
-      name: 'settings',
-      Icon: IconSettings,
       onClick: () => {
-        closeCommandMenu();
-        openSettingsMenu();
+        setIsNavigationDrawerExpanded(false);
+        closeSidePanelMenu();
+
+        if (isSettingsPage) {
+          const firstObjectMetadataItem =
+            alphaSortedActiveNonSystemObjectMetadataItems[0];
+          if (firstObjectMetadataItem !== undefined) {
+            setContextStoreCurrentObjectMetadataItemId(
+              firstObjectMetadataItem.id,
+            );
+          }
+        }
+
+        openRecordsSearchPage();
       },
     },
+    ...(isAiEnabled
+      ? [
+          {
+            name: 'newAIChat' as const,
+            Icon: IconMessageCirclePlus,
+            onClick: () => {
+              setIsNavigationDrawerExpanded(false);
+              closeSidePanelMenu();
+              switchToNewChat();
+            },
+          },
+        ]
+      : []),
   ];
 
   return <NavigationBar activeItemName={activeItemName} items={items} />;

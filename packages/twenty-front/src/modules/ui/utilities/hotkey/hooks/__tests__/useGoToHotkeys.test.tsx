@@ -1,15 +1,14 @@
 import { act, fireEvent, renderHook } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
-import { RecoilRoot } from 'recoil';
 
-import { useGoToHotkeys } from '../useGoToHotkeys';
+import { useGoToHotkeys } from '@/ui/utilities/hotkey/hooks/useGoToHotkeys';
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <MemoryRouter
     initialEntries={['/one', '/two', { pathname: '/three' }]}
     initialIndex={1}
   >
-    <RecoilRoot>{children}</RecoilRoot>
+    {children}
   </MemoryRouter>
 );
 const renderHookConfig = {

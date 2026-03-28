@@ -1,13 +1,21 @@
-import { type JSONSchema7 } from 'json-schema';
-import { type ZodType } from 'zod';
+import { type FlexibleSchema } from '@ai-sdk/provider-utils';
+import { type PermissionFlagType } from 'twenty-shared/constants';
+
+import { type CodeExecutionStreamEmitter } from 'src/engine/core-modules/tool-provider/interfaces/tool-provider.interface';
 
 import { type ToolInput } from 'src/engine/core-modules/tool/types/tool-input.type';
 import { type ToolOutput } from 'src/engine/core-modules/tool/types/tool-output.type';
-import { type PermissionFlagType } from 'src/engine/metadata-modules/permissions/constants/permission-flag-type.constants';
+
+export type ToolExecutionContext = {
+  workspaceId: string;
+  userId?: string;
+  userWorkspaceId?: string;
+  onCodeExecutionUpdate?: CodeExecutionStreamEmitter;
+};
 
 export type Tool = {
   description: string;
-  parameters: JSONSchema7 | ZodType;
-  execute(input: ToolInput): Promise<ToolOutput>;
+  inputSchema: FlexibleSchema<unknown>;
+  execute(input: ToolInput, context: ToolExecutionContext): Promise<ToolOutput>;
   flag?: PermissionFlagType;
 };

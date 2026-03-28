@@ -1,34 +1,41 @@
+import { Logger } from '@nestjs/common';
+
+import { FieldMetadataType } from 'twenty-shared/types';
 import { isDefined } from 'twenty-shared/utils';
 
+import { isQueryTimingEnabled } from 'src/engine/core-modules/graphql/storage/query-timing-context.storage';
 import { RelationType } from 'src/engine/metadata-modules/field-metadata/interfaces/relation-type.interface';
 
-import { computeMorphRelationFieldName } from 'src/engine/metadata-modules/field-metadata/utils/compute-morph-relation-field-name.util';
-import { isFieldMetadataTypeMorphRelation } from 'src/engine/metadata-modules/field-metadata/utils/is-field-metadata-type-morph-relation.util';
-import { isFieldMetadataTypeRelation } from 'src/engine/metadata-modules/field-metadata/utils/is-field-metadata-type-relation.util';
-import { type ObjectMetadataItemWithFieldMaps } from 'src/engine/metadata-modules/types/object-metadata-item-with-field-maps';
+import { type FlatEntityMaps } from 'src/engine/metadata-modules/flat-entity/types/flat-entity-maps.type';
+import { findFlatEntityByIdInFlatEntityMaps } from 'src/engine/metadata-modules/flat-entity/utils/find-flat-entity-by-id-in-flat-entity-maps.util';
+import { findFlatEntityByIdInFlatEntityMapsOrThrow } from 'src/engine/metadata-modules/flat-entity/utils/find-flat-entity-by-id-in-flat-entity-maps-or-throw.util';
+import { type FlatFieldMetadata } from 'src/engine/metadata-modules/flat-field-metadata/types/flat-field-metadata.type';
+import { isFlatFieldMetadataOfType } from 'src/engine/metadata-modules/flat-field-metadata/utils/is-flat-field-metadata-of-type.util';
+import { type FlatObjectMetadata } from 'src/engine/metadata-modules/flat-object-metadata/types/flat-object-metadata.type';
+
+const logger = new Logger('buildColumnsToSelect');
 
 export const buildColumnsToSelect = ({
   select,
   relations,
-  objectMetadataItemWithFieldMaps,
-  objectMetadataMaps,
+  flatObjectMetadata,
+  flatObjectMetadataMaps,
+  flatFieldMetadataMaps,
 }: {
   select: Record<string, unknown>;
   relations: Record<string, unknown>;
-  objectMetadataItemWithFieldMaps: ObjectMetadataItemWithFieldMaps;
-  objectMetadataMaps: {
-    byId: Partial<
-      Record<
-        string,
-        Pick<ObjectMetadataItemWithFieldMaps, 'nameSingular' | 'namePlural'>
-      >
-    >;
-  };
+  flatObjectMetadata: FlatObjectMetadata;
+  flatObjectMetadataMaps: FlatEntityMaps<FlatObjectMetadata>;
+  flatFieldMetadataMaps: FlatEntityMaps<FlatFieldMetadata>;
 }) => {
+  const timingEnabled = isQueryTimingEnabled();
+  const startTime = timingEnabled ? performance.now() : 0;
+
   const requiredRelationColumns = getRequiredRelationColumns(
     relations,
-    objectMetadataItemWithFieldMaps,
-    objectMetadataMaps,
+    flatObjectMetadata,
+    flatObjectMetadataMaps,
+    flatFieldMetadataMaps,
   );
 
   const fieldsToSelect: Record<string, boolean> = Object.entries(select)
@@ -41,25 +48,34 @@ export const buildColumnsToSelect = ({
     fieldsToSelect[columnName] = true;
   }
 
-  return { ...fieldsToSelect, id: true };
+  const result = { ...fieldsToSelect, id: true };
+
+  if (timingEnabled) {
+    const durationMs = (performance.now() - startTime).toFixed(2);
+
+    logger.log(
+      `${flatObjectMetadata.nameSingular} — ${durationMs}ms (${Object.keys(select).length} select, ${flatObjectMetadata.fieldIds.length} fields)`,
+    );
+  }
+
+  return result;
 };
 
 const getRequiredRelationColumns = (
   relations: Record<string, unknown>,
-  objectMetadataItem: Pick<ObjectMetadataItemWithFieldMaps, 'fieldsById'>,
-  objectMetadataMaps: {
-    byId: Partial<
-      Record<
-        string,
-        Pick<ObjectMetadataItemWithFieldMaps, 'nameSingular' | 'namePlural'>
-      >
-    >;
-  },
+  flatObjectMetadata: FlatObjectMetadata,
+  flatObjectMetadataMaps: FlatEntityMaps<FlatObjectMetadata>,
+  flatFieldMetadataMaps: FlatEntityMaps<FlatFieldMetadata>,
 ): string[] => {
   const requiredColumns: string[] = [];
 
-  for (const fieldMetadata of Object.values(objectMetadataItem.fieldsById)) {
-    if (isFieldMetadataTypeRelation(fieldMetadata)) {
+  for (const fieldId of flatObjectMetadata.fieldIds) {
+    const fieldMetadata = findFlatEntityByIdInFlatEntityMapsOrThrow({
+      flatEntityId: fieldId,
+      flatEntityMaps: flatFieldMetadataMaps,
+    });
+
+    if (isFlatFieldMetadataOfType(fieldMetadata, FieldMetadataType.RELATION)) {
       const relationValue = relations[fieldMetadata.name];
 
       if (
@@ -73,9 +89,15 @@ const getRequiredRelationColumns = (
       requiredColumns.push(fieldMetadata.settings.joinColumnName);
     }
 
-    if (isFieldMetadataTypeMorphRelation(fieldMetadata)) {
-      const targetObjectMetadata =
-        objectMetadataMaps.byId[fieldMetadata.relationTargetObjectMetadataId];
+    if (
+      isFlatFieldMetadataOfType(fieldMetadata, FieldMetadataType.MORPH_RELATION)
+    ) {
+      const targetObjectMetadata = fieldMetadata.relationTargetObjectMetadataId
+        ? findFlatEntityByIdInFlatEntityMaps({
+            flatEntityId: fieldMetadata.relationTargetObjectMetadataId,
+            flatEntityMaps: flatObjectMetadataMaps,
+          })
+        : undefined;
 
       if (
         !fieldMetadata.settings?.relationType ||
@@ -84,13 +106,7 @@ const getRequiredRelationColumns = (
         continue;
       }
 
-      const morphRelationFieldName = computeMorphRelationFieldName({
-        fieldName: fieldMetadata.name,
-        relationDirection: fieldMetadata.settings.relationType,
-        targetObjectMetadata,
-      });
-
-      const relationValue = relations[morphRelationFieldName];
+      const relationValue = relations[fieldMetadata.name];
 
       if (
         !isDefined(relationValue) ||

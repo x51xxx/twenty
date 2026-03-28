@@ -1,8 +1,14 @@
-import { type ParsedMail } from 'mailparser';
+import { type Email as ParsedMail } from 'postal-mime';
 
-import { extractTextWithoutReplyQuotations } from 'src/modules/messaging/message-import-manager/drivers/imap/utils/extract-message-text.util';
+import { ImapMessageTextExtractorService } from 'src/modules/messaging/message-import-manager/drivers/imap/services/imap-message-text-extractor.service';
 
-describe('extractTextWithoutReplyQuotations', () => {
+describe('ImapMessageTextExtractorService', () => {
+  let service: ImapMessageTextExtractorService;
+
+  beforeEach(() => {
+    service = new ImapMessageTextExtractorService();
+  });
+
   it('should extract text from plain text emails with lot of reply quotations', () => {
     const parsed: ParsedMail = {
       text: `Hi John,
@@ -91,12 +97,10 @@ Developer Support
 >>> -John
 `,
       attachments: [],
-      headers: new Map(),
-      headerLines: [],
-      html: false,
+      headers: [],
     };
 
-    const result = extractTextWithoutReplyQuotations(parsed);
+    const result = service.extractTextWithoutReplyQuotations(parsed);
 
     expect(result).toBe(`Hi John,
 
@@ -127,12 +131,10 @@ Developer Support`);
         
       `,
       attachments: [],
-      headers: new Map(),
-      headerLines: [],
-      html: false,
+      headers: [],
     };
 
-    const result = extractTextWithoutReplyQuotations(parsed);
+    const result = service.extractTextWithoutReplyQuotations(parsed);
 
     expect(result).toBe('just a follow up');
   });
@@ -150,11 +152,10 @@ Developer Support`);
         </blockquote>
       </div>`,
       attachments: [],
-      headers: new Map(),
-      headerLines: [],
+      headers: [],
     };
 
-    const result = extractTextWithoutReplyQuotations(parsed);
+    const result = service.extractTextWithoutReplyQuotations(parsed);
 
     expect(result).toBe('just a follow up');
   });
@@ -162,12 +163,10 @@ Developer Support`);
   it('should return empty string when no text or html content', () => {
     const parsed: ParsedMail = {
       attachments: [],
-      headers: new Map(),
-      headerLines: [],
-      html: false,
+      headers: [],
     };
 
-    const result = extractTextWithoutReplyQuotations(parsed);
+    const result = service.extractTextWithoutReplyQuotations(parsed);
 
     expect(result).toBe('');
   });
@@ -175,8 +174,7 @@ Developer Support`);
   it('should preserve new lines in html email', () => {
     const parsed: ParsedMail = {
       attachments: [],
-      headers: new Map(),
-      headerLines: [],
+      headers: [],
       html: `<html><head><style>
   html, body {
     font-size: 14.5px;
@@ -295,7 +293,7 @@ Developer Support`);
   </style></head><body><div id="inbox-html-wrapper"><div id="isPasted" fr-original-style="" style="user-select: inherit; scrollbar-color: var(--scrollbar-active-color) #0000; box-sizing: border-box;">Hi Sarah,</div><div fr-original-style="" style="user-select: inherit; scrollbar-color: var(--scrollbar-active-color) #0000; box-sizing: border-box;"><br fr-original-style="" style="user-select: inherit; scrollbar-color: var(--scrollbar-active-color) #0000; box-sizing: border-box;"></div><div fr-original-style="" style="user-select: inherit; scrollbar-color: var(--scrollbar-active-color) #0000; box-sizing: border-box;">I wanted to quickly follow up regarding the Q3 marketing campaign results. &nbsp;</div><div fr-original-style="" style="user-select: inherit; scrollbar-color: var(--scrollbar-active-color) #0000; box-sizing: border-box;">We’ve seen a 14% increase in engagement compared to last quarter, but conversions are still slightly below target. &nbsp;</div><div fr-original-style="" style="user-select: inherit; scrollbar-color: var(--scrollbar-active-color) #0000; box-sizing: border-box;"><br fr-original-style="" style="user-select: inherit; scrollbar-color: var(--scrollbar-active-color) #0000; box-sizing: border-box;"></div><div fr-original-style="" style="user-select: inherit; scrollbar-color: var(--scrollbar-active-color) #0000; box-sizing: border-box;">Let’s schedule a short call early next week to discuss adjustments before the Q4 push. &nbsp;</div><div fr-original-style="" style="user-select: inherit; scrollbar-color: var(--scrollbar-active-color) #0000; box-sizing: border-box;">Would Monday 10 AM work for you?</div><div fr-original-style="" style="user-select: inherit; scrollbar-color: var(--scrollbar-active-color) #0000; box-sizing: border-box;"><br fr-original-style="" style="user-select: inherit; scrollbar-color: var(--scrollbar-active-color) #0000; box-sizing: border-box;"></div><div fr-original-style="" style="user-select: inherit; scrollbar-color: var(--scrollbar-active-color) #0000; box-sizing: border-box;">Best regards, &nbsp;</div><div fr-original-style="" style="user-select: inherit; scrollbar-color: var(--scrollbar-active-color) #0000; box-sizing: border-box;">John</div><div fr-original-style="" style="user-select: inherit; scrollbar-color: var(--scrollbar-active-color) #0000; box-sizing: border-box;"><br fr-original-style="" style="user-select: inherit; scrollbar-color: var(--scrollbar-active-color) #0000; box-sizing: border-box;"></div><img class="flm-open" width="0" height="0" style="border: 0px; width: 0px; height: 0px; max-width: 100vw;" data-open-tracking-src="{{track-read-receipt}}"></div></body></html>`,
     };
 
-    const result = extractTextWithoutReplyQuotations(parsed);
+    const result = service.extractTextWithoutReplyQuotations(parsed);
 
     expect(result).toEqual(`Hi Sarah,
 
@@ -317,11 +315,10 @@ John`);
       text: 'Plain text content\n\nOn 2023-01-01, user@example.com wrote:\n> Reply',
       html: '<html><body><p>HTML content</p></body></html>',
       attachments: [],
-      headers: new Map(),
-      headerLines: [],
+      headers: [],
     };
 
-    const result = extractTextWithoutReplyQuotations(parsed);
+    const result = service.extractTextWithoutReplyQuotations(parsed);
 
     expect(result).toBe('Plain text content');
   });

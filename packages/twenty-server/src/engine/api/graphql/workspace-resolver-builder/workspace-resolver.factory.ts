@@ -6,21 +6,16 @@ import { isDefined } from 'twenty-shared/utils';
 import { DeleteManyResolverFactory } from 'src/engine/api/graphql/workspace-resolver-builder/factories/delete-many-resolver.factory';
 import { DestroyManyResolverFactory } from 'src/engine/api/graphql/workspace-resolver-builder/factories/destroy-many-resolver.factory';
 import { DestroyOneResolverFactory } from 'src/engine/api/graphql/workspace-resolver-builder/factories/destroy-one-resolver.factory';
+import { GroupByResolverFactory } from 'src/engine/api/graphql/workspace-resolver-builder/factories/group-by-resolver.factory';
 import { MergeManyResolverFactory } from 'src/engine/api/graphql/workspace-resolver-builder/factories/merge-many-resolver.factory';
 import { RestoreManyResolverFactory } from 'src/engine/api/graphql/workspace-resolver-builder/factories/restore-many-resolver.factory';
 import { RestoreOneResolverFactory } from 'src/engine/api/graphql/workspace-resolver-builder/factories/restore-one-resolver.factory';
 import { UpdateManyResolverFactory } from 'src/engine/api/graphql/workspace-resolver-builder/factories/update-many-resolver.factory';
 import { WorkspaceResolverBuilderService } from 'src/engine/api/graphql/workspace-resolver-builder/workspace-resolver-builder.service';
-import {
-  AuthException,
-  AuthExceptionCode,
-} from 'src/engine/core-modules/auth/auth.exception';
-import { type AuthContext } from 'src/engine/core-modules/auth/types/auth-context.type';
-import { FeatureFlagService } from 'src/engine/core-modules/feature-flag/services/feature-flag.service';
-import { type ObjectMetadataMaps } from 'src/engine/metadata-modules/types/object-metadata-maps';
+import { type FlatEntityMaps } from 'src/engine/metadata-modules/flat-entity/types/flat-entity-maps.type';
+import { type FlatFieldMetadata } from 'src/engine/metadata-modules/flat-field-metadata/types/flat-field-metadata.type';
+import { type FlatObjectMetadata } from 'src/engine/metadata-modules/flat-object-metadata/types/flat-object-metadata.type';
 import { getResolverName } from 'src/engine/utils/get-resolver-name.util';
-import { standardObjectMetadataDefinitions } from 'src/engine/workspace-manager/workspace-sync-metadata/standard-objects';
-import { shouldExcludeFromWorkspaceApi } from 'src/engine/workspace-manager/workspace-sync-metadata/utils/should-exclude-from-workspace-api.util';
 
 import { CreateManyResolverFactory } from './factories/create-many-resolver.factory';
 import { CreateOneResolverFactory } from './factories/create-one-resolver.factory';
@@ -54,13 +49,14 @@ export class WorkspaceResolverFactory {
     private readonly restoreManyResolverFactory: RestoreManyResolverFactory,
     private readonly destroyManyResolverFactory: DestroyManyResolverFactory,
     private readonly mergeManyResolverFactory: MergeManyResolverFactory,
+    private readonly groupByResolverFactory: GroupByResolverFactory,
     private readonly workspaceResolverBuilderService: WorkspaceResolverBuilderService,
-    private readonly featureFlagService: FeatureFlagService,
   ) {}
 
   async create(
-    authContext: AuthContext,
-    objectMetadataMaps: ObjectMetadataMaps,
+    flatObjectMetadataMaps: FlatEntityMaps<FlatObjectMetadata>,
+    flatFieldMetadataMaps: FlatEntityMaps<FlatFieldMetadata>,
+    objectIdByNameSingular: Record<string, string>,
     workspaceResolverBuilderMethods: WorkspaceResolverBuilderMethods,
   ): Promise<IResolvers> {
     const factories = new Map<
@@ -81,45 +77,24 @@ export class WorkspaceResolverFactory {
       ['restoreOne', this.restoreOneResolverFactory],
       ['updateMany', this.updateManyResolverFactory],
       ['updateOne', this.updateOneResolverFactory],
+      ['groupBy', this.groupByResolverFactory],
     ]);
     const resolvers: IResolvers = {
       Query: {},
       Mutation: {},
     };
 
-    const workspaceId = authContext.workspace?.id;
-
-    if (!workspaceId) {
-      throw new AuthException(
-        'Unauthenticated',
-        AuthExceptionCode.UNAUTHENTICATED,
-      );
-    }
-
-    const workspaceFeatureFlagsMap =
-      await this.featureFlagService.getWorkspaceFeatureFlagsMap(workspaceId);
-
-    for (const objectMetadata of Object.values(objectMetadataMaps.byId).filter(
-      isDefined,
-    )) {
-      if (
-        shouldExcludeFromWorkspaceApi(
-          objectMetadata,
-          standardObjectMetadataDefinitions,
-          workspaceFeatureFlagsMap,
-        )
-      ) {
-        continue;
-      }
-
+    for (const flatObjectMetadata of Object.values(
+      flatObjectMetadataMaps.byUniversalIdentifier,
+    ).filter(isDefined)) {
       // Generate query resolvers
       for (const methodName of workspaceResolverBuilderMethods.queries) {
-        const resolverName = getResolverName(objectMetadata, methodName);
+        const resolverName = getResolverName(flatObjectMetadata, methodName);
         const resolverFactory = factories.get(methodName);
 
         if (!resolverFactory) {
           this.logger.error(`Unknown query resolver type: ${methodName}`, {
-            objectMetadata,
+            flatObjectMetadata,
             methodName,
             resolverName,
           });
@@ -129,27 +104,28 @@ export class WorkspaceResolverFactory {
 
         if (
           this.workspaceResolverBuilderService.shouldBuildResolver(
-            objectMetadata,
+            flatObjectMetadata,
             methodName,
           )
         ) {
           // @ts-expect-error legacy noImplicitAny
           resolvers.Query[resolverName] = resolverFactory.create({
-            authContext,
-            objectMetadataMaps,
-            objectMetadataItemWithFieldMaps: objectMetadata,
+            flatObjectMetadata,
+            flatObjectMetadataMaps,
+            flatFieldMetadataMaps,
+            objectIdByNameSingular,
           });
         }
       }
 
       // Generate mutation resolvers
       for (const methodName of workspaceResolverBuilderMethods.mutations) {
-        const resolverName = getResolverName(objectMetadata, methodName);
+        const resolverName = getResolverName(flatObjectMetadata, methodName);
         const resolverFactory = factories.get(methodName);
 
         if (!resolverFactory) {
           this.logger.error(`Unknown mutation resolver type: ${methodName}`, {
-            objectMetadata,
+            flatObjectMetadata,
             methodName,
             resolverName,
           });
@@ -159,15 +135,16 @@ export class WorkspaceResolverFactory {
 
         if (
           this.workspaceResolverBuilderService.shouldBuildResolver(
-            objectMetadata,
+            flatObjectMetadata,
             methodName,
           )
         ) {
           // @ts-expect-error legacy noImplicitAny
           resolvers.Mutation[resolverName] = resolverFactory.create({
-            authContext,
-            objectMetadataMaps,
-            objectMetadataItemWithFieldMaps: objectMetadata,
+            flatObjectMetadata,
+            flatObjectMetadataMaps,
+            flatFieldMetadataMaps,
+            objectIdByNameSingular,
           });
         }
       }

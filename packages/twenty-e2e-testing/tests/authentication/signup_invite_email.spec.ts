@@ -34,7 +34,7 @@ test('Sign up with invite link via email', async ({
   });
 
   await test.step('Create new account', async () => {
-    await loginPage.clickLoginWithEmail();
+    await loginPage.clickLoginWithEmailIfVisible();
     await loginPage.typeEmail(email);
     await loginPage.clickContinueButton();
     await loginPage.typePassword(process.env.DEFAULT_PASSWORD);
@@ -42,19 +42,17 @@ test('Sign up with invite link via email', async ({
     await loginPage.typeFirstName(firstName);
     await loginPage.typeLastName(lastName);
     await loginPage.clickContinueButton();
-    await loginPage.noSyncWithGoogle();
   });
 
   await test.step('Delete account from workspace', async () => {
+    await expect(page.getByRole('button', { name: 'Settings' })).toBeVisible();
     await leftMenu.goToSettings();
     await settingsPage.goToProfileSection();
     await profileSection.deleteAccount();
+    await expect(page.getByText('Account Deletion')).toBeVisible();
     await confirmationModal.typePlaceholderToInput();
+    await confirmationModal.clickConfirmButton();
 
-    await Promise.all([
-      page.waitForURL('/welcome'),
-
-      confirmationModal.clickConfirmButton(),
-    ]);
+    await page.waitForURL('**/welcome');
   });
 });

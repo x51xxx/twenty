@@ -1,17 +1,17 @@
 import { type WorkflowUpdateRecordAction } from '@/workflow/types/Workflow';
-import { type Meta, type StoryObj } from '@storybook/react';
-import { expect, fn, userEvent, within } from '@storybook/test';
+import { WorkflowEditActionUpdateRecord } from '@/workflow/workflow-steps/workflow-actions/components/WorkflowEditActionUpdateRecord';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { ComponentDecorator, RouterDecorator } from 'twenty-ui/testing';
-import { I18nFrontDecorator } from '~/testing/decorators/I18nFrontDecorator';
 import { ObjectMetadataItemsDecorator } from '~/testing/decorators/ObjectMetadataItemsDecorator';
 import { SnackBarDecorator } from '~/testing/decorators/SnackBarDecorator';
 import { WorkflowStepActionDrawerDecorator } from '~/testing/decorators/WorkflowStepActionDrawerDecorator';
 import { WorkflowStepDecorator } from '~/testing/decorators/WorkflowStepDecorator';
 import { WorkspaceDecorator } from '~/testing/decorators/WorkspaceDecorator';
+import { getRecordFromRecordNode } from '@/object-record/cache/utils/getRecordFromRecordNode';
 import { graphqlMocks } from '~/testing/graphqlMocks';
-import { allMockPersonRecords } from '~/testing/mock-data/people';
+import { mockedPersonRecords } from '~/testing/mock-data/generated/data/people/mock-people-data';
 import { getWorkflowNodeIdMock } from '~/testing/mock-data/workflow';
-import { WorkflowEditActionUpdateRecord } from '../WorkflowEditActionUpdateRecord';
 
 const DEFAULT_ACTION = {
   id: getWorkflowNodeIdMock(),
@@ -22,18 +22,7 @@ const DEFAULT_ACTION = {
       objectName: 'person',
       objectRecordId: '',
       objectRecord: {},
-      fieldsToUpdate: [
-        'updatedAt',
-        'averageEstimatedNumberOfAtomsInTheUniverse',
-        'comments',
-        'createdAt',
-        'deletedAt',
-        'name',
-        'participants',
-        'percentageOfCompletion',
-        'score',
-        'shortNotes',
-      ],
+      fieldsToUpdate: ['city', 'emails', 'jobTitle', 'name', 'phones'],
     },
     outputSchema: {},
     errorHandlingOptions: {
@@ -65,7 +54,6 @@ const meta: Meta<typeof WorkflowEditActionUpdateRecord> = {
     SnackBarDecorator,
     RouterDecorator,
     WorkspaceDecorator,
-    I18nFrontDecorator,
   ],
 };
 
@@ -90,15 +78,6 @@ export const DisabledWithEmptyValues: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    const titleText = await canvas.findByText('Update Record');
-
-    expect(window.getComputedStyle(titleText).cursor).toBe('default');
-
-    await userEvent.click(titleText);
-
-    const titleInput = canvas.queryByDisplayValue('Update Record');
-    expect(titleInput).not.toBeInTheDocument();
-
     const objectSelectCurrentValue = await canvas.findByText('People');
 
     await userEvent.click(objectSelectCurrentValue);
@@ -111,16 +90,14 @@ export const DisabledWithEmptyValues: Story = {
     }
 
     const openRecordSelectButton = within(
-      await canvas.findByTestId(
-        'workflow-edit-action-record-update-object-record-id',
-      ),
+      await canvas.findByTestId('workflow-update-record-object-record-id'),
     ).queryByRole('button');
 
     expect(openRecordSelectButton).not.toBeInTheDocument();
 
     const firstSelectedUpdatableField = await within(
       await canvas.findByTestId('workflow-fields-multi-select'),
-    ).findByText('Creation date');
+    ).findByText('City');
 
     await userEvent.click(firstSelectedUpdatableField);
 
@@ -133,7 +110,11 @@ export const DisabledWithEmptyValues: Story = {
   },
 };
 
-const peopleMock = allMockPersonRecords[0];
+const flatPersonRecords = mockedPersonRecords.map((record) =>
+  getRecordFromRecordNode({ recordNode: record }),
+);
+
+const peopleMock = flatPersonRecords[0];
 
 export const DisabledWithDefaultStaticValues: Story = {
   args: {
@@ -154,15 +135,6 @@ export const DisabledWithDefaultStaticValues: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    const titleText = await canvas.findByText('Update Record');
-
-    expect(window.getComputedStyle(titleText).cursor).toBe('default');
-
-    await userEvent.click(titleText);
-
-    const titleInput = canvas.queryByDisplayValue('Update Record');
-    expect(titleInput).not.toBeInTheDocument();
-
     const objectSelectCurrentValue = await canvas.findByText('People');
 
     await userEvent.click(objectSelectCurrentValue);
@@ -179,16 +151,14 @@ export const DisabledWithDefaultStaticValues: Story = {
     expect(selectedRecord).toBeVisible();
 
     const openRecordSelectButton = within(
-      await canvas.findByTestId(
-        'workflow-edit-action-record-update-object-record-id',
-      ),
+      await canvas.findByTestId('workflow-update-record-object-record-id'),
     ).queryByRole('button');
 
     expect(openRecordSelectButton).not.toBeInTheDocument();
 
     const firstSelectedUpdatableField = await within(
       await canvas.findByTestId('workflow-fields-multi-select'),
-    ).findByText('Creation date');
+    ).findByText('City');
 
     await userEvent.click(firstSelectedUpdatableField);
 
@@ -220,15 +190,6 @@ export const DisabledWithDefaultVariableValues: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    const titleText = await canvas.findByText('Update Record');
-
-    expect(window.getComputedStyle(titleText).cursor).toBe('default');
-
-    await userEvent.click(titleText);
-
-    const titleInput = canvas.queryByDisplayValue('Update Record');
-    expect(titleInput).not.toBeInTheDocument();
-
     const objectSelectCurrentValue = await canvas.findByText('People');
 
     await userEvent.click(objectSelectCurrentValue);
@@ -241,16 +202,14 @@ export const DisabledWithDefaultVariableValues: Story = {
     }
 
     const openRecordSelectButton = within(
-      await canvas.findByTestId(
-        'workflow-edit-action-record-update-object-record-id',
-      ),
+      await canvas.findByTestId('workflow-update-record-object-record-id'),
     ).queryByRole('button');
 
     expect(openRecordSelectButton).not.toBeInTheDocument();
 
     const firstSelectedUpdatableField = await within(
       await canvas.findByTestId('workflow-fields-multi-select'),
-    ).findByText('Creation date');
+    ).findByText('City');
 
     await userEvent.click(firstSelectedUpdatableField);
 

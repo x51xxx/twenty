@@ -1,19 +1,50 @@
 import { z } from 'zod';
 
-import { type FieldMetadataItem } from '@/object-metadata/types/FieldMetadataItem';
 import { metadataLabelSchema } from '@/object-metadata/validation-schemas/metadataLabelSchema';
-import { themeColorSchema } from 'twenty-ui/theme';
+import { themeColorSchema } from 'twenty-ui/utilities';
 import { FieldMetadataType, RelationType } from '~/generated-metadata/graphql';
 import { camelCaseStringSchema } from '~/utils/validation-schemas/camelCaseStringSchema';
 
 export const fieldMetadataItemSchema = (existingLabels?: string[]) => {
+  const relationObjectSchema = z.object({
+    __typename: z.literal('Relation').optional(),
+    type: z.enum(RelationType),
+    sourceFieldMetadata: z.object({
+      __typename: z.literal('Field').optional(),
+      id: z.uuid(),
+      name: z.string().trim().min(1),
+    }),
+    sourceObjectMetadata: z.object({
+      __typename: z.literal('Object').optional(),
+      id: z.uuid(),
+      namePlural: z.string().trim().min(1),
+      nameSingular: z.string().trim().min(1),
+    }),
+    targetFieldMetadata: z.object({
+      __typename: z.literal('Field').optional(),
+      id: z.uuid(),
+      name: z.string().trim().min(1),
+    }),
+    targetObjectMetadata: z.object({
+      __typename: z.literal('Object').optional(),
+      id: z.uuid(),
+      namePlural: z.string().trim().min(1),
+      nameSingular: z.string().trim().min(1),
+    }),
+  });
+
   return z.object({
     __typename: z.literal('Field').optional(),
-    createdAt: z.string().datetime(),
+    createdAt: z.iso.datetime(),
     defaultValue: z.any().optional(),
     description: z.string().trim().nullable().optional(),
-    icon: z.string().startsWith('Icon').trim().nullable(),
-    id: z.string().uuid(),
+    icon: z
+      .union([z.string().startsWith('Icon').trim(), z.literal('')])
+      .nullable()
+      .optional(),
+    id: z.uuid(),
+    universalIdentifier: z.string(),
+    applicationId: z.uuid(),
     isActive: z.boolean(),
     isCustom: z.boolean(),
     isNullable: z.boolean(),
@@ -22,12 +53,14 @@ export const fieldMetadataItemSchema = (existingLabels?: string[]) => {
     isUIReadOnly: z.boolean(),
     label: metadataLabelSchema(existingLabels),
     isLabelSyncedWithName: z.boolean(),
+    morphId: z.string().nullable().optional(),
+    morphRelations: z.array(relationObjectSchema).nullable().optional(),
     name: camelCaseStringSchema,
     options: z
       .array(
         z.object({
           color: themeColorSchema,
-          id: z.string().uuid(),
+          id: z.uuid(),
           label: z.string().trim().min(1),
           position: z.number(),
           value: z.string().trim().min(1),
@@ -36,36 +69,8 @@ export const fieldMetadataItemSchema = (existingLabels?: string[]) => {
       .nullable()
       .optional(),
     settings: z.any().optional(),
-    relation: z
-      .object({
-        __typename: z.literal('Relation').optional(),
-        type: z.nativeEnum(RelationType),
-        sourceFieldMetadata: z.object({
-          __typename: z.literal('Field').optional(),
-          id: z.string().uuid(),
-          name: z.string().trim().min(1),
-        }),
-        sourceObjectMetadata: z.object({
-          __typename: z.literal('Object').optional(),
-          id: z.string().uuid(),
-          namePlural: z.string().trim().min(1),
-          nameSingular: z.string().trim().min(1),
-        }),
-        targetFieldMetadata: z.object({
-          __typename: z.literal('Field').optional(),
-          id: z.string().uuid(),
-          name: z.string().trim().min(1),
-        }),
-        targetObjectMetadata: z.object({
-          __typename: z.literal('Object').optional(),
-          id: z.string().uuid(),
-          namePlural: z.string().trim().min(1),
-          nameSingular: z.string().trim().min(1),
-        }),
-      })
-      .nullable()
-      .optional(),
-    type: z.nativeEnum(FieldMetadataType),
-    updatedAt: z.string().datetime(),
-  }) satisfies z.ZodType<FieldMetadataItem>;
+    relation: relationObjectSchema.nullable().optional(),
+    type: z.enum(FieldMetadataType),
+    updatedAt: z.iso.datetime(),
+  });
 };

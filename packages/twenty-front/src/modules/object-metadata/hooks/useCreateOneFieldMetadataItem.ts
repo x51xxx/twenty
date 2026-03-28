@@ -1,41 +1,80 @@
-import { useMutation } from '@apollo/client';
-
+import { useMutation } from '@apollo/client/react';
 import {
   type CreateFieldInput,
-  type CreateOneFieldMetadataItemMutation,
-  type CreateOneFieldMetadataItemMutationVariables,
+  CreateOneFieldMetadataItemDocument,
 } from '~/generated-metadata/graphql';
 
-import { CREATE_ONE_FIELD_METADATA_ITEM } from '../graphql/mutations';
-
-import { useRefreshObjectMetadataItems } from '@/object-metadata/hooks/useRefreshObjectMetadataItems';
-import { useRefreshCachedViews } from '@/views/hooks/useRefreshViews';
+import { useMetadataErrorHandler } from '@/metadata-error-handler/hooks/useMetadataErrorHandler';
+import { useUpdateMetadataStoreDraft } from '@/metadata-store/hooks/useUpdateMetadataStoreDraft';
+import { type FlatFieldMetadataItem } from '@/metadata-store/types/FlatFieldMetadataItem';
+import { type MetadataRequestResult } from '@/object-metadata/types/MetadataRequestResult.type';
+import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { t } from '@lingui/core/macro';
+import { isDefined } from 'twenty-shared/utils';
+import { CrudOperationType } from 'twenty-shared/types';
 
 export const useCreateOneFieldMetadataItem = () => {
-  const { refreshObjectMetadataItems } =
-    useRefreshObjectMetadataItems('network-only');
+  const [createOneFieldMetadataItemMutation] = useMutation(
+    CreateOneFieldMetadataItemDocument,
+  );
 
-  const [mutate] = useMutation<
-    CreateOneFieldMetadataItemMutation,
-    CreateOneFieldMetadataItemMutationVariables
-  >(CREATE_ONE_FIELD_METADATA_ITEM);
+  const { handleMetadataError } = useMetadataErrorHandler();
+  const { enqueueErrorSnackBar } = useSnackBar();
+  const { addToDraft, applyChanges } = useUpdateMetadataStoreDraft();
 
-  const { refreshCachedViews } = useRefreshCachedViews();
-
-  const createOneFieldMetadataItem = async (input: CreateFieldInput) => {
-    const result = await mutate({
-      variables: {
-        input: {
-          field: input,
+  const createOneFieldMetadataItem = async (
+    input: CreateFieldInput,
+  ): Promise<
+    MetadataRequestResult<
+      Awaited<ReturnType<typeof createOneFieldMetadataItemMutation>>
+    >
+  > => {
+    try {
+      const response = await createOneFieldMetadataItemMutation({
+        variables: {
+          input: {
+            field: input,
+          },
         },
-      },
-    });
+      });
 
-    await refreshObjectMetadataItems();
+      const createdField = response.data?.createOneField;
 
-    await refreshCachedViews();
+      if (isDefined(createdField)) {
+        const { __typename, object, ...fieldData } = createdField;
 
-    return result;
+        addToDraft({
+          key: 'fieldMetadataItems',
+          items: [
+            {
+              ...fieldData,
+              objectMetadataId: object?.id ?? input.objectMetadataId,
+            } as FlatFieldMetadataItem,
+          ],
+        });
+        applyChanges();
+      }
+
+      return {
+        status: 'successful',
+        response,
+      };
+    } catch (error) {
+      if (CombinedGraphQLErrors.is(error)) {
+        handleMetadataError(error, {
+          primaryMetadataName: 'fieldMetadata',
+          operationType: CrudOperationType.CREATE,
+        });
+      } else {
+        enqueueErrorSnackBar({ message: t`An error occurred.` });
+      }
+
+      return {
+        status: 'failed',
+        error,
+      };
+    }
   };
 
   return {

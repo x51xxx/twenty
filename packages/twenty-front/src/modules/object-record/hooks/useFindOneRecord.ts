@@ -1,29 +1,27 @@
-import { useQuery } from '@apollo/client';
+import { useQuery } from '@apollo/client/react';
 import { useMemo } from 'react';
 
 import { useApolloCoreClient } from '@/object-metadata/hooks/useApolloCoreClient';
 import { useObjectMetadataItem } from '@/object-metadata/hooks/useObjectMetadataItem';
 import { type ObjectMetadataItemIdentifier } from '@/object-metadata/types/ObjectMetadataItemIdentifier';
 import { getRecordFromRecordNode } from '@/object-record/cache/utils/getRecordFromRecordNode';
+import { useGenerateDepthRecordGqlFieldsFromObject } from '@/object-record/graphql/record-gql-fields/hooks/useGenerateDepthRecordGqlFieldsFromObject';
 import { type RecordGqlNode } from '@/object-record/graphql/types/RecordGqlNode';
-import { type RecordGqlOperationGqlRecordFields } from '@/object-record/graphql/types/RecordGqlOperationGqlRecordFields';
-import { generateDepthOneRecordGqlFields } from '@/object-record/graphql/utils/generateDepthOneRecordGqlFields';
 import { useFindOneRecordQuery } from '@/object-record/hooks/useFindOneRecordQuery';
 import { useObjectPermissionsForObject } from '@/object-record/hooks/useObjectPermissionsForObject';
 import { type ObjectRecord } from '@/object-record/types/ObjectRecord';
+import { type RecordGqlOperationGqlRecordFields } from 'twenty-shared/types';
 import { isDefined } from 'twenty-shared/utils';
 
 export const useFindOneRecord = <T extends ObjectRecord = ObjectRecord>({
   objectNameSingular,
   objectRecordId = '',
   recordGqlFields,
-  onCompleted,
   skip,
   withSoftDeleted = false,
 }: ObjectMetadataItemIdentifier & {
   objectRecordId: string | undefined;
   recordGqlFields?: RecordGqlOperationGqlRecordFields;
-  onCompleted?: (data: T) => void;
   skip?: boolean;
   withSoftDeleted?: boolean;
 }) => {
@@ -31,10 +29,15 @@ export const useFindOneRecord = <T extends ObjectRecord = ObjectRecord>({
     objectNameSingular,
   });
 
+  const { recordGqlFields: depthOneRecordGqlFields } =
+    useGenerateDepthRecordGqlFieldsFromObject({
+      objectNameSingular,
+      depth: 1,
+    });
+
   const apolloCoreClient = useApolloCoreClient();
 
-  const computedRecordGqlFields =
-    recordGqlFields ?? generateDepthOneRecordGqlFields({ objectMetadataItem });
+  const computedRecordGqlFields = recordGqlFields ?? depthOneRecordGqlFields;
 
   const { findOneRecordQuery } = useFindOneRecordQuery({
     objectNameSingular,
@@ -48,21 +51,16 @@ export const useFindOneRecord = <T extends ObjectRecord = ObjectRecord>({
 
   const hasReadPermission = objectPermissions.canReadObjectRecords;
 
-  const { data, loading, error } = useQuery<{
+  const { data, loading, error, refetch } = useQuery<{
     [nameSingular: string]: RecordGqlNode;
   }>(findOneRecordQuery, {
-    skip: !objectMetadataItem || !objectRecordId || skip || !hasReadPermission,
+    skip:
+      !isDefined(objectMetadataItem) ||
+      !objectRecordId ||
+      skip ||
+      !hasReadPermission,
     variables: { objectRecordId },
     client: apolloCoreClient,
-    onCompleted: (data) => {
-      const recordWithoutConnection = getRecordFromRecordNode<T>({
-        recordNode: { ...data[objectNameSingular] },
-      });
-
-      if (isDefined(recordWithoutConnection)) {
-        onCompleted?.(recordWithoutConnection);
-      }
-    },
   });
 
   // TODO: Remove connection from record
@@ -80,5 +78,6 @@ export const useFindOneRecord = <T extends ObjectRecord = ObjectRecord>({
     record: recordWithoutConnection,
     loading,
     error,
+    refetch,
   };
 };

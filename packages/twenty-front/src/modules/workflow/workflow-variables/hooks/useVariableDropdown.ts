@@ -1,28 +1,27 @@
-import { useWorkflowCommandMenu } from '@/command-menu/hooks/useWorkflowCommandMenu';
-import { commandMenuNavigationStackState } from '@/command-menu/states/commandMenuNavigationStackState';
+import { useSidePanelWorkflowNavigation } from '@/side-panel/pages/workflow/hooks/useSidePanelWorkflowNavigation';
+import { sidePanelNavigationStackState } from '@/side-panel/states/sidePanelNavigationStackState';
 import { activeTabIdComponentState } from '@/ui/layout/tab-list/states/activeTabIdComponentState';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
-import { useSetRecoilComponentState } from '@/ui/utilities/state/component-state/hooks/useSetRecoilComponentState';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+import { useSetAtomComponentState } from '@/ui/utilities/state/jotai/hooks/useSetAtomComponentState';
 import { workflowVisualizerWorkflowIdComponentState } from '@/workflow/states/workflowVisualizerWorkflowIdComponentState';
 import { workflowDiagramComponentState } from '@/workflow/workflow-diagram/states/workflowDiagramComponentState';
 import { workflowSelectedNodeComponentState } from '@/workflow/workflow-diagram/states/workflowSelectedNodeComponentState';
+import { type LinkOutputSchema } from '@/workflow/workflow-variables/types/LinkOutputSchema';
+import { type FieldOutputSchemaV2 } from '@/workflow/workflow-variables/types/RecordOutputSchemaV2';
+import { type StepOutputSchemaV2 } from '@/workflow/workflow-variables/types/StepOutputSchemaV2';
 import { getVariableTemplateFromPath } from '@/workflow/workflow-variables/utils/getVariableTemplateFromPath';
+import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
 import { useState } from 'react';
-import { useSetRecoilState } from 'recoil';
 import { isDefined } from 'twenty-shared/utils';
+import { type BaseOutputSchemaV2 } from 'twenty-shared/workflow';
 import { useIcons } from 'twenty-ui/display';
-import {
-  type BaseOutputSchema,
-  type LinkOutputSchema,
-  type StepOutputSchema,
-} from '../types/StepOutputSchema';
-import { getCurrentSubStepFromPath } from '../utils/getCurrentSubStepFromPath';
-import { isBaseOutputSchema } from '../utils/isBaseOutputSchema';
-import { isLinkOutputSchema } from '../utils/isLinkOutputSchema';
-import { isRecordOutputSchema } from '../utils/isRecordOutputSchema';
+import { isBaseOutputSchemaV2 } from '@/workflow/workflow-variables/types/guards/isBaseOutputSchemaV2';
+import { isLinkOutputSchema } from '@/workflow/workflow-variables/types/guards/isLinkOutputSchema';
+import { isRecordOutputSchemaV2 } from '@/workflow/workflow-variables/types/guards/isRecordOutputSchemaV2';
+import { getCurrentSubStepFromPath } from '@/workflow/workflow-variables/utils/getCurrentSubStepFromPath';
 
 type UseVariableDropdownProps = {
-  step: StepOutputSchema;
+  step: StepOutputSchemaV2;
   onSelect: (value: string) => void;
   onBack: () => void;
 };
@@ -47,24 +46,24 @@ export const useVariableDropdown = ({
   const [currentPath, setCurrentPath] = useState<string[]>([]);
   const [searchInputValue, setSearchInputValue] = useState('');
 
-  const { openWorkflowEditStepInCommandMenu } = useWorkflowCommandMenu();
+  const { openWorkflowEditStepInSidePanel } = useSidePanelWorkflowNavigation();
 
-  const workflowVisualizerWorkflowId = useRecoilComponentValue(
+  const workflowVisualizerWorkflowId = useAtomComponentStateValue(
     workflowVisualizerWorkflowIdComponentState,
   );
 
-  const setWorkflowSelectedNode = useSetRecoilComponentState(
+  const setWorkflowSelectedNode = useSetAtomComponentState(
     workflowSelectedNodeComponentState,
   );
-  const setActiveTabId = useSetRecoilComponentState(
+  const setActiveTabId = useSetAtomComponentState(
     activeTabIdComponentState,
-    'workflow-serverless-function-tab-list-component-id',
+    'workflow-logic-function-tab-list-component-id',
   );
-  const setWorkflowDiagram = useSetRecoilComponentState(
+  const setWorkflowDiagram = useSetAtomComponentState(
     workflowDiagramComponentState,
   );
-  const setCommandMenuNavigationStack = useSetRecoilState(
-    commandMenuNavigationStackState,
+  const setSidePanelNavigationStack = useSetAtomState(
+    sidePanelNavigationStackState,
   );
 
   const getDisplayedSubStepFields = () => {
@@ -72,9 +71,9 @@ export const useVariableDropdown = ({
 
     if (isLinkOutputSchema(currentSubStep)) {
       return { link: currentSubStep.link };
-    } else if (isRecordOutputSchema(currentSubStep)) {
+    } else if (isRecordOutputSchemaV2(currentSubStep)) {
       return currentSubStep.fields;
-    } else if (isBaseOutputSchema(currentSubStep)) {
+    } else if (isBaseOutputSchemaV2(currentSubStep)) {
       return currentSubStep;
     }
   };
@@ -83,7 +82,9 @@ export const useVariableDropdown = ({
     const currentSubStep = getCurrentSubStepFromPath(step, currentPath);
 
     const handleSelectBaseOutputSchema = (
-      baseOutputSchema: BaseOutputSchema,
+      baseOutputSchema:
+        | BaseOutputSchemaV2
+        | Record<string, FieldOutputSchemaV2>,
     ) => {
       if (!baseOutputSchema[key]?.isLeaf) {
         setCurrentPath([...currentPath, key]);
@@ -121,12 +122,13 @@ export const useVariableDropdown = ({
         };
       });
 
-      setCommandMenuNavigationStack([]);
+      setSidePanelNavigationStack([]);
 
-      openWorkflowEditStepInCommandMenu(
+      openWorkflowEditStepInSidePanel(
         workflowVisualizerWorkflowId,
         step.name,
         getIcon(step.icon),
+        step.id,
       );
 
       if (isDefined(linkOutputSchema.link.tab)) {
@@ -136,9 +138,9 @@ export const useVariableDropdown = ({
 
     if (isLinkOutputSchema(currentSubStep)) {
       handleSelectLinkOutputSchema(currentSubStep);
-    } else if (isRecordOutputSchema(currentSubStep)) {
+    } else if (isRecordOutputSchemaV2(currentSubStep)) {
       handleSelectBaseOutputSchema(currentSubStep.fields);
-    } else if (isBaseOutputSchema(currentSubStep)) {
+    } else if (isBaseOutputSchemaV2(currentSubStep)) {
       handleSelectBaseOutputSchema(currentSubStep);
     }
   };

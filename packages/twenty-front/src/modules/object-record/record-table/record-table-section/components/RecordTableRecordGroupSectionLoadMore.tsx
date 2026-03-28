@@ -1,9 +1,10 @@
 import { useCurrentRecordGroupId } from '@/object-record/record-group/hooks/useCurrentRecordGroupId';
-import { useRecordIndexTableFetchMore } from '@/object-record/record-index/hooks/useRecordIndexTableFetchMore';
+import { useRecordIndexTableQuery } from '@/object-record/record-index/hooks/useRecordIndexTableQuery';
 import { recordIndexHasFetchedAllRecordsByGroupComponentState } from '@/object-record/record-index/states/recordIndexHasFetchedAllRecordsByGroupComponentState';
 import { useRecordTableContextOrThrow } from '@/object-record/record-table/contexts/RecordTableContext';
 import { RecordTableActionRow } from '@/object-record/record-table/record-table-row/components/RecordTableActionRow';
-import { useRecoilComponentFamilyValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentFamilyValue';
+import { useAtomComponentFamilyStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentFamilyStateValue';
+import { t } from '@lingui/core/macro';
 import { IconArrowDown } from 'twenty-ui/display';
 
 export const RecordTableRecordGroupSectionLoadMore = () => {
@@ -11,26 +12,26 @@ export const RecordTableRecordGroupSectionLoadMore = () => {
 
   const currentRecordGroupId = useCurrentRecordGroupId();
 
-  const { fetchMoreRecordsLazy } =
-    useRecordIndexTableFetchMore(objectNameSingular);
+  const { fetchMoreRecords } = useRecordIndexTableQuery(objectNameSingular);
 
-  const hasFetchedAllRecords = useRecoilComponentFamilyValue(
-    recordIndexHasFetchedAllRecordsByGroupComponentState,
-    currentRecordGroupId,
-  );
+  const recordIndexHasFetchedAllRecordsByGroup =
+    useAtomComponentFamilyStateValue(
+      recordIndexHasFetchedAllRecordsByGroupComponentState,
+      currentRecordGroupId,
+    );
 
   const handleLoadMore = () => {
-    fetchMoreRecordsLazy();
+    fetchMoreRecords();
   };
 
-  if (hasFetchedAllRecords) {
+  if (recordIndexHasFetchedAllRecordsByGroup) {
     return null;
   }
 
   return (
     <RecordTableActionRow
       LeftIcon={IconArrowDown}
-      text="Load more"
+      text={t`Load more`}
       onClick={handleLoadMore}
     />
   );

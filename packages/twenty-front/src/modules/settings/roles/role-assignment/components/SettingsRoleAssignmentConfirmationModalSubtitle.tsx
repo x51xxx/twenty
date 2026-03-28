@@ -1,38 +1,44 @@
-import { currentWorkspaceMembersState } from '@/auth/states/currentWorkspaceMembersStates';
+import { currentWorkspaceMembersState } from '@/auth/states/currentWorkspaceMembersState';
 import { SettingsCard } from '@/settings/components/SettingsCard';
-import { type SettingsRoleAssignmentConfirmationModalSelectedWorkspaceMember } from '@/settings/roles/role-assignment/types/SettingsRoleAssignmentConfirmationModalSelectedWorkspaceMember';
-import styled from '@emotion/styled';
+import { type SettingsRoleAssignmentConfirmationModalSelectedRoleTarget } from '@/settings/roles/role-assignment/types/SettingsRoleAssignmentConfirmationModalSelectedRoleTarget';
+
+import { styled } from '@linaria/react';
 import { t } from '@lingui/core/macro';
-import { useRecoilValue } from 'recoil';
 import { Avatar } from 'twenty-ui/display';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 const StyledSettingsCardContainer = styled.div`
-  margin-top: ${({ theme }) => theme.spacing(6)};
+  margin-top: ${themeCssVariables.spacing[6]};
 `;
 
 type SettingsRoleAssignmentConfirmationModalSubtitleProps = {
-  selectedWorkspaceMember: SettingsRoleAssignmentConfirmationModalSelectedWorkspaceMember;
+  selectedRoleTarget: SettingsRoleAssignmentConfirmationModalSelectedRoleTarget;
   onRoleClick: (roleId: string) => void;
 };
 
 export const SettingsRoleAssignmentConfirmationModalSubtitle = ({
-  selectedWorkspaceMember,
+  selectedRoleTarget,
   onRoleClick,
 }: SettingsRoleAssignmentConfirmationModalSubtitleProps) => {
-  const currentWorkspaceMembers = useRecoilValue(currentWorkspaceMembersState);
-
-  const enrichedSelectedWorkspaceMember = currentWorkspaceMembers.find(
-    (member) => member.id === selectedWorkspaceMember.id,
+  const currentWorkspaceMembers = useAtomStateValue(
+    currentWorkspaceMembersState,
   );
 
-  const workspaceMemberName = `${enrichedSelectedWorkspaceMember?.name.firstName} ${enrichedSelectedWorkspaceMember?.name.lastName}`;
+  const enrichedSelectedWorkspaceMember = currentWorkspaceMembers.find(
+    (member) => member.id === selectedRoleTarget.id,
+  );
+
+  const workspaceMemberName = enrichedSelectedWorkspaceMember
+    ? `${enrichedSelectedWorkspaceMember?.name.firstName} ${enrichedSelectedWorkspaceMember?.name.lastName}`
+    : selectedRoleTarget.name;
 
   return (
     <>
       {t`${workspaceMemberName} will be unassigned from the following role:`}
       <StyledSettingsCardContainer>
         <SettingsCard
-          title={selectedWorkspaceMember.role?.label || ''}
+          title={selectedRoleTarget.role?.label || ''}
           Icon={
             <Avatar
               avatarUrl={enrichedSelectedWorkspaceMember?.avatarUrl}
@@ -43,8 +49,7 @@ export const SettingsRoleAssignmentConfirmationModalSubtitle = ({
             />
           }
           onClick={() =>
-            selectedWorkspaceMember.role &&
-            onRoleClick(selectedWorkspaceMember.role.id)
+            selectedRoleTarget.role && onRoleClick(selectedRoleTarget.role.id)
           }
         />
       </StyledSettingsCardContainer>

@@ -5,7 +5,7 @@ import { moveArrayItem } from '~/utils/array/moveArrayItem';
 import { isUndefinedOrNull } from '~/utils/isUndefinedOrNull';
 
 import { isDefined } from 'twenty-shared/utils';
-import { type ViewField } from '../types/ViewField';
+import { type ViewField } from '@/views/types/ViewField';
 
 export const mapViewFieldsToColumnDefinitions = ({
   columnDefinitions,
@@ -39,7 +39,6 @@ export const mapViewFieldsToColumnDefinitions = ({
         fieldMetadataId: viewField.fieldMetadataId,
         label: correspondingColumnDefinition.label,
         metadata: correspondingColumnDefinition.metadata,
-        infoTooltipContent: correspondingColumnDefinition.infoTooltipContent,
         iconName: correspondingColumnDefinition.iconName,
         type: correspondingColumnDefinition.type,
         position: isLabelIdentifier ? 0 : viewField.position,

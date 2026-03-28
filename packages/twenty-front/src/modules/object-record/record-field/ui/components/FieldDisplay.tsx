@@ -4,56 +4,56 @@ import { ActorFieldDisplay } from '@/object-record/record-field/ui/meta-types/di
 import { ArrayFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/ArrayFieldDisplay';
 import { BooleanFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/BooleanFieldDisplay';
 import { EmailsFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/EmailsFieldDisplay';
+import { FilesFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/FilesFieldDisplay';
 import { ForbiddenFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/ForbiddenFieldDisplay';
 import { LinksFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/LinksFieldDisplay';
 import { PhonesFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/PhonesFieldDisplay';
 import { RatingFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/RatingFieldDisplay';
 import { RelationFromManyFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/RelationFromManyFieldDisplay';
 import { RichTextFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/RichTextFieldDisplay';
-import { RichTextV2FieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/RichTextV2FieldDisplay';
 import { isFieldIdentifierDisplay } from '@/object-record/record-field/ui/meta-types/display/utils/isFieldIdentifierDisplay';
 import { isFieldActor } from '@/object-record/record-field/ui/types/guards/isFieldActor';
 import { isFieldArray } from '@/object-record/record-field/ui/types/guards/isFieldArray';
 import { isFieldBoolean } from '@/object-record/record-field/ui/types/guards/isFieldBoolean';
 import { isFieldEmails } from '@/object-record/record-field/ui/types/guards/isFieldEmails';
+import { isFieldFiles } from '@/object-record/record-field/ui/types/guards/isFieldFiles';
 import { isFieldLinks } from '@/object-record/record-field/ui/types/guards/isFieldLinks';
 import { isFieldPhones } from '@/object-record/record-field/ui/types/guards/isFieldPhones';
 import { isFieldRating } from '@/object-record/record-field/ui/types/guards/isFieldRating';
-import { isFieldRelationFromManyObjects } from '@/object-record/record-field/ui/types/guards/isFieldRelationFromManyObjects';
-import { isFieldRelationToOneObject } from '@/object-record/record-field/ui/types/guards/isFieldRelationToOneObject';
 import { isFieldRichText } from '@/object-record/record-field/ui/types/guards/isFieldRichText';
-import { isFieldRichTextV2 } from '@/object-record/record-field/ui/types/guards/isFieldRichTextV2';
 
 import { MorphRelationManyToOneFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/MorphRelationManyToOneFieldDisplay';
 import { MorphRelationOneToManyFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/MorphRelationOneToManyFieldDisplay';
 import { isFieldMorphRelationManyToOne } from '@/object-record/record-field/ui/types/guards/isFieldMorphRelationManyToOne';
 import { isFieldMorphRelationOneToMany } from '@/object-record/record-field/ui/types/guards/isFieldMorphRelationOneToMany';
+import { isFieldRelationManyToOne } from '@/object-record/record-field/ui/types/guards/isFieldRelationManyToOne';
+import { isFieldRelationOneToMany } from '@/object-record/record-field/ui/types/guards/isFieldRelationOneToMany';
 import { isDefined } from 'twenty-shared/utils';
-import { FieldContext } from '../contexts/FieldContext';
-import { AddressFieldDisplay } from '../meta-types/display/components/AddressFieldDisplay';
-import { ChipFieldDisplay } from '../meta-types/display/components/ChipFieldDisplay';
-import { CurrencyFieldDisplay } from '../meta-types/display/components/CurrencyFieldDisplay';
-import { DateFieldDisplay } from '../meta-types/display/components/DateFieldDisplay';
-import { DateTimeFieldDisplay } from '../meta-types/display/components/DateTimeFieldDisplay';
-import { FullNameFieldDisplay } from '../meta-types/display/components/FullNameFieldDisplay';
-import { JsonFieldDisplay } from '../meta-types/display/components/JsonFieldDisplay';
-import { MultiSelectFieldDisplay } from '../meta-types/display/components/MultiSelectFieldDisplay';
-import { NumberFieldDisplay } from '../meta-types/display/components/NumberFieldDisplay';
-import { RelationToOneFieldDisplay } from '../meta-types/display/components/RelationToOneFieldDisplay';
-import { SelectFieldDisplay } from '../meta-types/display/components/SelectFieldDisplay';
-import { TextFieldDisplay } from '../meta-types/display/components/TextFieldDisplay';
-import { UuidFieldDisplay } from '../meta-types/display/components/UuidFieldDisplay';
-import { isFieldAddress } from '../types/guards/isFieldAddress';
-import { isFieldCurrency } from '../types/guards/isFieldCurrency';
-import { isFieldDate } from '../types/guards/isFieldDate';
-import { isFieldDateTime } from '../types/guards/isFieldDateTime';
-import { isFieldFullName } from '../types/guards/isFieldFullName';
-import { isFieldMultiSelect } from '../types/guards/isFieldMultiSelect';
-import { isFieldNumber } from '../types/guards/isFieldNumber';
-import { isFieldRawJson } from '../types/guards/isFieldRawJson';
-import { isFieldSelect } from '../types/guards/isFieldSelect';
-import { isFieldText } from '../types/guards/isFieldText';
-import { isFieldUuid } from '../types/guards/isFieldUuid';
+import { FieldContext } from '@/object-record/record-field/ui/contexts/FieldContext';
+import { AddressFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/AddressFieldDisplay';
+import { ChipFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/ChipFieldDisplay';
+import { CurrencyFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/CurrencyFieldDisplay';
+import { DateFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/DateFieldDisplay';
+import { DateTimeFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/DateTimeFieldDisplay';
+import { FullNameFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/FullNameFieldDisplay';
+import { JsonFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/JsonFieldDisplay';
+import { MultiSelectFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/MultiSelectFieldDisplay';
+import { NumberFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/NumberFieldDisplay';
+import { RelationToOneFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/RelationToOneFieldDisplay';
+import { SelectFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/SelectFieldDisplay';
+import { TextFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/TextFieldDisplay';
+import { UuidFieldDisplay } from '@/object-record/record-field/ui/meta-types/display/components/UuidFieldDisplay';
+import { isFieldAddress } from '@/object-record/record-field/ui/types/guards/isFieldAddress';
+import { isFieldCurrency } from '@/object-record/record-field/ui/types/guards/isFieldCurrency';
+import { isFieldDate } from '@/object-record/record-field/ui/types/guards/isFieldDate';
+import { isFieldDateTime } from '@/object-record/record-field/ui/types/guards/isFieldDateTime';
+import { isFieldFullName } from '@/object-record/record-field/ui/types/guards/isFieldFullName';
+import { isFieldMultiSelect } from '@/object-record/record-field/ui/types/guards/isFieldMultiSelect';
+import { isFieldNumber } from '@/object-record/record-field/ui/types/guards/isFieldNumber';
+import { isFieldRawJson } from '@/object-record/record-field/ui/types/guards/isFieldRawJson';
+import { isFieldSelect } from '@/object-record/record-field/ui/types/guards/isFieldSelect';
+import { isFieldText } from '@/object-record/record-field/ui/types/guards/isFieldText';
+import { isFieldUuid } from '@/object-record/record-field/ui/types/guards/isFieldUuid';
 
 export const FieldDisplay = () => {
   const {
@@ -74,9 +74,9 @@ export const FieldDisplay = () => {
 
   return isChipDisplay ? (
     <ChipFieldDisplay />
-  ) : isFieldRelationToOneObject(fieldDefinition) ? (
+  ) : isFieldRelationManyToOne(fieldDefinition) ? (
     <RelationToOneFieldDisplay />
-  ) : isFieldRelationFromManyObjects(fieldDefinition) ? (
+  ) : isFieldRelationOneToMany(fieldDefinition) ? (
     <RelationFromManyFieldDisplay />
   ) : isFieldMorphRelationManyToOne(fieldDefinition) ? (
     <MorphRelationManyToOneFieldDisplay />
@@ -112,12 +112,12 @@ export const FieldDisplay = () => {
     <RatingFieldDisplay readonly={isRecordFieldReadOnly} />
   ) : isFieldRichText(fieldDefinition) ? (
     <RichTextFieldDisplay />
-  ) : isFieldRichTextV2(fieldDefinition) ? (
-    <RichTextV2FieldDisplay />
   ) : isFieldActor(fieldDefinition) ? (
     <ActorFieldDisplay />
   ) : isFieldArray(fieldDefinition) ? (
     <ArrayFieldDisplay />
+  ) : isFieldFiles(fieldDefinition) ? (
+    <FilesFieldDisplay />
   ) : isFieldEmails(fieldDefinition) ? (
     <EmailsFieldDisplay />
   ) : isFieldPhones(fieldDefinition) ? (

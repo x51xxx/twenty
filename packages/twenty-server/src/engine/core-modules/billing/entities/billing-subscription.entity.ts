@@ -3,7 +3,7 @@
 import { Field, ObjectType, registerEnumType } from '@nestjs/graphql';
 
 import { IDField } from '@ptc-org/nestjs-query-graphql';
-import Stripe from 'stripe';
+import graphqlTypeJson from 'graphql-type-json';
 import {
   Column,
   CreateDateColumn,
@@ -13,18 +13,38 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
-  Relation,
+  type Relation,
   UpdateDateColumn,
 } from 'typeorm';
-import graphqlTypeJson from 'graphql-type-json';
+
+import type Stripe from 'stripe';
+
+// Serialized types for JSONB storage - uses Stripe's enum types but normalizes expandable fields
+// These avoid TypeORM's DeepPartialEntity issues with Stripe's expandable object types (e.g. Stripe.Account)
+export type AutomaticTaxJson = {
+  disabled_reason: Stripe.Subscription.AutomaticTax['disabled_reason'];
+  enabled: boolean;
+  liability: {
+    type: Stripe.Subscription.AutomaticTax.Liability.Type;
+    account?: string; // Normalized: always string ID, never expanded Stripe.Account
+  } | null;
+};
+
+export type CancellationDetailsJson = {
+  comment: string | null;
+  feedback: Stripe.Subscription.CancellationDetails.Feedback | null;
+  reason: Stripe.Subscription.CancellationDetails.Reason | null;
+};
 
 import { UUIDScalarType } from 'src/engine/api/graphql/workspace-schema-builder/graphql-types/scalars';
-import { BillingSubscriptionItemDTO } from 'src/engine/core-modules/billing/dtos/outputs/billing-subscription-item.output';
-import { BillingCustomer } from 'src/engine/core-modules/billing/entities/billing-customer.entity';
-import { BillingSubscriptionItem } from 'src/engine/core-modules/billing/entities/billing-subscription-item.entity';
+import { BillingSubscriptionSchedulePhaseDTO } from 'src/engine/core-modules/billing/dtos/billing-subscription-schedule-phase.dto';
+import { BillingSubscriptionItemDTO } from 'src/engine/core-modules/billing/dtos/billing-subscription-item.dto';
+import { BillingCustomerEntity } from 'src/engine/core-modules/billing/entities/billing-customer.entity';
+import { BillingSubscriptionItemEntity } from 'src/engine/core-modules/billing/entities/billing-subscription-item.entity';
 import { BillingSubscriptionCollectionMethod } from 'src/engine/core-modules/billing/enums/billing-subscription-collection-method.enum';
 import { SubscriptionInterval } from 'src/engine/core-modules/billing/enums/billing-subscription-interval.enum';
 import { SubscriptionStatus } from 'src/engine/core-modules/billing/enums/billing-subscription-status.enum';
+import { WorkspaceRelatedEntity } from 'src/engine/workspace-manager/types/workspace-related-entity';
 
 registerEnumType(SubscriptionStatus, { name: 'SubscriptionStatus' });
 registerEnumType(SubscriptionInterval, { name: 'SubscriptionInterval' });
@@ -34,8 +54,8 @@ registerEnumType(SubscriptionInterval, { name: 'SubscriptionInterval' });
   unique: true,
   where: `status IN ('trialing', 'active', 'past_due')`,
 })
-@ObjectType()
-export class BillingSubscription {
+@ObjectType('BillingSubscription')
+export class BillingSubscriptionEntity extends WorkspaceRelatedEntity {
   @IDField(() => UUIDScalarType)
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -48,9 +68,6 @@ export class BillingSubscription {
 
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
-
-  @Column({ nullable: false, type: 'uuid' })
-  workspaceId: string;
 
   @Column({ nullable: false })
   stripeCustomerId: string;
@@ -72,17 +89,17 @@ export class BillingSubscription {
     enum: Object.values(SubscriptionInterval),
     nullable: true,
   })
-  interval: Stripe.Price.Recurring.Interval;
+  interval: SubscriptionInterval;
 
   @Field(() => [BillingSubscriptionItemDTO], { nullable: true })
   @OneToMany(
-    () => BillingSubscriptionItem,
+    () => BillingSubscriptionItemEntity,
     (billingSubscriptionItem) => billingSubscriptionItem.billingSubscription,
   )
-  billingSubscriptionItems: Relation<BillingSubscriptionItem[]>;
+  billingSubscriptionItems: Relation<BillingSubscriptionItemEntity[]>;
 
   @ManyToOne(
-    () => BillingCustomer,
+    () => BillingCustomerEntity,
     (billingCustomer) => billingCustomer.billingSubscriptions,
     {
       nullable: false,
@@ -94,7 +111,7 @@ export class BillingSubscription {
     referencedColumnName: 'stripeCustomerId',
     name: 'stripeCustomerId',
   })
-  billingCustomer: Relation<BillingCustomer>;
+  billingCustomer: Relation<BillingCustomerEntity>;
 
   @Column({ nullable: false, default: false })
   cancelAtPeriodEnd: boolean;
@@ -121,6 +138,10 @@ export class BillingSubscription {
   @Column({ nullable: false, type: 'jsonb', default: {} })
   metadata: Stripe.Metadata;
 
+  @Field(() => [BillingSubscriptionSchedulePhaseDTO])
+  @Column({ nullable: false, type: 'jsonb', default: [] })
+  phases: Array<BillingSubscriptionSchedulePhaseDTO>;
+
   @Column({ nullable: true, type: 'timestamptz' })
   cancelAt: Date | null;
 
@@ -131,10 +152,10 @@ export class BillingSubscription {
   canceledAt: Date | null;
 
   @Column({ nullable: true, type: 'jsonb' })
-  automaticTax: Stripe.Subscription.AutomaticTax | null;
+  automaticTax: AutomaticTaxJson | null;
 
   @Column({ nullable: true, type: 'jsonb' })
-  cancellationDetails: Stripe.Subscription.CancellationDetails | null;
+  cancellationDetails: CancellationDetailsJson | null;
 
   @Column({
     nullable: false,

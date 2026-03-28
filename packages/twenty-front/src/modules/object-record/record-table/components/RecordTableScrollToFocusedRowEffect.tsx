@@ -1,54 +1,57 @@
 import { recordIndexAllRecordIdsComponentSelector } from '@/object-record/record-index/states/selectors/recordIndexAllRecordIdsComponentSelector';
+import { RECORD_TABLE_ROW_HEIGHT } from '@/object-record/record-table/constants/RecordTableRowHeight';
 import { useRecordTableContextOrThrow } from '@/object-record/record-table/contexts/RecordTableContext';
+import { getRecordTableCellId } from '@/object-record/record-table/utils/getRecordTableCellId';
 import { focusedRecordTableRowIndexComponentState } from '@/object-record/record-table/states/focusedRecordTableRowIndexComponentState';
 import { isRecordTableRowFocusActiveComponentState } from '@/object-record/record-table/states/isRecordTableRowFocusActiveComponentState';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentSelectorValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentSelectorValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 import { useEffect } from 'react';
 import { isDefined } from 'twenty-shared/utils';
 
 export const RecordTableScrollToFocusedRowEffect = () => {
   const { recordTableId } = useRecordTableContextOrThrow();
 
-  const focusedRowIndex = useRecoilComponentValue(
+  const focusedRecordTableRowIndex = useAtomComponentStateValue(
     focusedRecordTableRowIndexComponentState,
     recordTableId,
   );
 
-  const isRowFocusActive = useRecoilComponentValue(
+  const isRecordTableRowFocusActive = useAtomComponentStateValue(
     isRecordTableRowFocusActiveComponentState,
     recordTableId,
   );
 
-  const allRecordIds = useRecoilComponentValue(
+  const allRecordIds = useAtomComponentSelectorValue(
     recordIndexAllRecordIdsComponentSelector,
     recordTableId,
   );
 
   useEffect(() => {
     if (
-      !isRowFocusActive ||
-      !isDefined(focusedRowIndex) ||
+      !isRecordTableRowFocusActive ||
+      !isDefined(focusedRecordTableRowIndex) ||
       !allRecordIds?.length
     ) {
       return;
     }
 
-    const recordId = allRecordIds[focusedRowIndex];
+    const recordId = allRecordIds[focusedRecordTableRowIndex];
 
     if (!recordId) {
       return;
     }
 
     const focusElement = document.getElementById(
-      `record-table-cell-0-${focusedRowIndex}`,
+      getRecordTableCellId(recordTableId, 0, focusedRecordTableRowIndex),
     );
 
     if (!focusElement) {
       return;
     }
 
-    focusElement.style.scrollMarginBottom = '32px';
-    focusElement.style.scrollMarginTop = '32px';
+    focusElement.style.scrollMarginBottom = `${RECORD_TABLE_ROW_HEIGHT}px`;
+    focusElement.style.scrollMarginTop = `${RECORD_TABLE_ROW_HEIGHT}px`;
 
     focusElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
@@ -57,7 +60,12 @@ export const RecordTableScrollToFocusedRowEffect = () => {
         focusElement.style.scrollMarginBottom = '';
       }
     };
-  }, [focusedRowIndex, isRowFocusActive, allRecordIds]);
+  }, [
+    recordTableId,
+    focusedRecordTableRowIndex,
+    isRecordTableRowFocusActive,
+    allRecordIds,
+  ]);
 
   return null;
 };

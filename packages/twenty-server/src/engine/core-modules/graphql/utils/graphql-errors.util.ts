@@ -1,3 +1,4 @@
+import { type MessageDescriptor } from '@lingui/core';
 import {
   type ASTNode,
   GraphQLError,
@@ -12,7 +13,7 @@ declare module 'graphql' {
   export interface GraphQLErrorExtensions {
     exception?: {
       code?: string;
-      stacktrace?: ReadonlyArray<string>;
+      stackTrace?: ReadonlyArray<string>;
     };
   }
 }
@@ -30,15 +31,17 @@ export enum ErrorCode {
   CONFLICT = 'CONFLICT',
   TIMEOUT = 'TIMEOUT',
   INTERNAL_SERVER_ERROR = 'INTERNAL_SERVER_ERROR',
+  METADATA_VALIDATION_FAILED = 'METADATA_VALIDATION_FAILED',
+  APPLICATION_INSTALLATION_FAILED = 'APPLICATION_INSTALLATION_FAILED',
 }
 
 type RestrictedGraphQLErrorExtensions = {
-  userFriendlyMessage?: string;
+  userFriendlyMessage?: MessageDescriptor;
   subCode?: string;
 };
 
 export class BaseGraphQLError extends GraphQLError {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   public extensions: Record<string, any>;
   override readonly name!: string;
   readonly locations: ReadonlyArray<SourceLocation> | undefined;
@@ -48,12 +51,12 @@ export class BaseGraphQLError extends GraphQLError {
   readonly nodes: ReadonlyArray<ASTNode> | undefined;
   public originalError: Error | undefined;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   [key: string]: any;
   constructor(
     exceptionOrMessage: string | CustomException,
     code?: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line @typescripttypescript/no-explicit-any
     extensions?: Record<string, any>,
   ) {
     if (exceptionOrMessage instanceof CustomException) {
@@ -121,8 +124,8 @@ export class SyntaxError extends BaseGraphQLError {
 }
 
 export class ValidationError extends BaseGraphQLError {
-  constructor(message: string) {
-    super(message, ErrorCode.GRAPHQL_VALIDATION_FAILED);
+  constructor(message: string, extensions?: BaseGraphQLError['extensions']) {
+    super(message, ErrorCode.GRAPHQL_VALIDATION_FAILED, extensions);
 
     Object.defineProperty(this, 'name', { value: 'ValidationError' });
   }
@@ -173,11 +176,14 @@ export class ForbiddenError extends BaseGraphQLError {
 export class UserInputError extends BaseGraphQLError {
   constructor(exception: CustomException);
 
-  constructor(message: string, extensions?: RestrictedGraphQLErrorExtensions);
+  constructor(
+    message: string,
+    extensions?: RestrictedGraphQLErrorExtensions & { isExpected?: boolean },
+  );
 
   constructor(
     messageOrException: string | CustomException,
-    extensions?: RestrictedGraphQLErrorExtensions,
+    extensions?: RestrictedGraphQLErrorExtensions & { isExpected?: boolean },
   ) {
     super(messageOrException, ErrorCode.BAD_USER_INPUT, extensions);
     Object.defineProperty(this, 'name', { value: 'UserInputError' });

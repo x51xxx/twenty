@@ -1,13 +1,12 @@
 import { type ViewFilter } from '@/views/types/ViewFilter';
+import { areViewFiltersEqual } from '@/views/utils/areViewFiltersEqual';
 import { ViewFilterOperand } from 'twenty-shared/types';
-import { areViewFiltersEqual } from '../areViewFiltersEqual';
 
 describe('areViewFiltersEqual', () => {
   const baseFilter: ViewFilter = {
-    __typename: 'ViewFilter',
     id: 'filter-1',
     fieldMetadataId: 'field-1',
-    operand: ViewFilterOperand.Contains,
+    operand: ViewFilterOperand.CONTAINS,
     value: 'test',
     displayValue: 'test',
     viewFilterGroupId: 'group-1',
@@ -19,13 +18,6 @@ describe('areViewFiltersEqual', () => {
     const filterB = { ...baseFilter };
 
     expect(areViewFiltersEqual(filterA, filterB)).toBe(true);
-  });
-
-  it('should return false when displayValue is different', () => {
-    const filterA = { ...baseFilter };
-    const filterB = { ...baseFilter, displayValue: 'different' };
-
-    expect(areViewFiltersEqual(filterA, filterB)).toBe(false);
   });
 
   it('should return false when fieldMetadataId is different', () => {
@@ -46,7 +38,7 @@ describe('areViewFiltersEqual', () => {
     const filterA = { ...baseFilter };
     const filterB = {
       ...baseFilter,
-      operand: ViewFilterOperand.DoesNotContain,
+      operand: ViewFilterOperand.DOES_NOT_CONTAIN,
     };
 
     expect(areViewFiltersEqual(filterA, filterB)).toBe(false);

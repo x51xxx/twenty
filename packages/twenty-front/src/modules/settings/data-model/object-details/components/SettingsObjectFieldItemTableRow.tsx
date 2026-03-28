@@ -1,37 +1,33 @@
+import { useDeleteOneFieldMetadataItem } from '@/object-metadata/hooks/useDeleteOneFieldMetadataItem';
 import { useFieldMetadataItem } from '@/object-metadata/hooks/useFieldMetadataItem';
 import { useGetRelationMetadata } from '@/object-metadata/hooks/useGetRelationMetadata';
-import { useUpdateOneObjectMetadataItem } from '@/object-metadata/hooks/useUpdateOneObjectMetadataItem';
-import { CoreObjectNameSingular } from '@/object-metadata/types/CoreObjectNameSingular';
-import { type FieldMetadataItem } from '@/object-metadata/types/FieldMetadataItem';
 import { isLabelIdentifierField } from '@/object-metadata/utils/isLabelIdentifierField';
-import { useDeleteRecordFromCache } from '@/object-record/cache/hooks/useDeleteRecordFromCache';
-import { prefetchViewsState } from '@/prefetch/states/prefetchViewsState';
-import { SettingsObjectFieldActiveActionDropdown } from '@/settings/data-model/object-details/components/SettingsObjectFieldActiveActionDropdown';
+import { isObjectMetadataReadOnly } from '@/object-record/read-only/utils/isObjectMetadataReadOnly';
+import { SettingsItemTypeTag } from '@/settings/components/SettingsItemTypeTag';
+import { RELATION_TYPES } from '@/settings/data-model/constants/RelationTypes';
 import { SettingsObjectFieldInactiveActionDropdown } from '@/settings/data-model/object-details/components/SettingsObjectFieldDisabledActionDropdown';
 import { settingsObjectFieldsFamilyState } from '@/settings/data-model/object-details/states/settingsObjectFieldsFamilyState';
 import { isFieldTypeSupportedInSettings } from '@/settings/data-model/utils/isFieldTypeSupportedInSettings';
-import { SettingsPath } from '@/types/SettingsPath';
 import { TableCell } from '@/ui/layout/table/components/TableCell';
 import { TableRow } from '@/ui/layout/table/components/TableRow';
-import { navigationMemorizedUrlState } from '@/ui/navigation/states/navigationMemorizedUrlState';
-import { type View } from '@/views/types/View';
-import { useFeatureFlagsMap } from '@/workspace/hooks/useFeatureFlagsMap';
-import { useTheme } from '@emotion/react';
-import styled from '@emotion/styled';
-import { useMemo } from 'react';
-import { useRecoilState, useRecoilValue } from 'recoil';
+import { useContext, useMemo } from 'react';
+import { styled } from '@linaria/react';
+import { useLingui } from '@lingui/react/macro';
+import { useSetAtomFamilyState } from '@/ui/utilities/state/jotai/hooks/useSetAtomFamilyState';
+import { FieldMetadataType, SettingsPath } from 'twenty-shared/types';
+import { getSettingsPath, isDefined } from 'twenty-shared/utils';
 import {
-  isDefined,
-  isLabelIdentifierFieldMetadataTypes,
-} from 'twenty-shared/utils';
-import { IconMinus, IconPlus, useIcons } from 'twenty-ui/display';
+  IconChevronRight,
+  IconMinus,
+  IconPlus,
+  useIcons,
+} from 'twenty-ui/display';
 import { LightIconButton } from 'twenty-ui/input';
 import { UndecoratedLink } from 'twenty-ui/navigation';
-import { FeatureFlagKey, RelationType } from '~/generated-metadata/graphql';
+import { ThemeContext, themeCssVariables } from 'twenty-ui/theme-constants';
+import { RelationType } from '~/generated-metadata/graphql';
 import { useNavigateSettings } from '~/hooks/useNavigateSettings';
 import { type SettingsObjectDetailTableItem } from '~/pages/settings/data-model/types/SettingsObjectDetailTableItem';
-import { getSettingsPath } from '~/utils/navigation/getSettingsPath';
-import { RELATION_TYPES } from '../../constants/RelationTypes';
 import { SettingsObjectFieldDataType } from './SettingsObjectFieldDataType';
 
 type SettingsObjectFieldItemTableRowProps = {
@@ -40,24 +36,42 @@ type SettingsObjectFieldItemTableRowProps = {
   mode: 'view' | 'new-field';
 };
 
-export const StyledObjectFieldTableRow = styled(TableRow)`
-  grid-auto-columns: 180px 148px 148px 36px;
-`;
+export const OBJECT_FIELD_TABLE_ROW_GRID_TEMPLATE_COLUMNS =
+  'minmax(0, 1fr) 148px 148px 36px';
 
-const StyledNameTableCell = styled(TableCell)`
-  color: ${({ theme }) => theme.font.color.primary};
-  gap: ${({ theme }) => theme.spacing(2)};
+const StyledNameContainer = styled.div`
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: ${themeCssVariables.spacing[1]};
+  min-width: 0;
 `;
 
 const StyledNameLabel = styled.div`
-  white-space: nowrap;
-  text-overflow: ellipsis;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
-const StyledIconTableCell = styled(TableCell)`
-  justify-content: center;
-  padding-right: ${({ theme }) => theme.spacing(1)};
+const StyledInactiveLabel = styled.span`
+  color: ${themeCssVariables.font.color.extraLight};
+  flex: 0 999 auto;
+  font-size: ${themeCssVariables.font.size.sm};
+  min-width: 48px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &::before {
+    content: '·';
+    margin-right: ${themeCssVariables.spacing[1]};
+  }
+`;
+
+const StyledIconChevronRightContainer = styled.span`
+  align-items: center;
+  color: ${themeCssVariables.font.color.tertiary};
+  display: flex;
 `;
 
 export const SettingsObjectFieldItemTableRow = ({
@@ -65,20 +79,17 @@ export const SettingsObjectFieldItemTableRow = ({
   mode,
   status,
 }: SettingsObjectFieldItemTableRowProps) => {
-  const { fieldMetadataItem, identifierType, objectMetadataItem } =
+  const { theme } = useContext(ThemeContext);
+  const { t } = useLingui();
+  const { fieldMetadataItem, objectMetadataItem } =
     settingsObjectDetailTableItem;
 
-  const isRemoteObjectField = objectMetadataItem.isRemote;
-
-  const variant = objectMetadataItem.isCustom ? 'identifier' : 'field-type';
+  const readonly = isObjectMetadataReadOnly({
+    objectMetadataItem,
+  });
 
   const navigate = useNavigateSettings();
 
-  const [navigationMemorizedUrl, setNavigationMemorizedUrl] = useRecoilState(
-    navigationMemorizedUrlState,
-  );
-
-  const theme = useTheme();
   const { getIcon } = useIcons();
   const Icon = getIcon(fieldMetadataItem.icon);
 
@@ -103,89 +114,29 @@ export const SettingsObjectFieldItemTableRow = ({
 
   const canToggleField = !isLabelIdentifier;
 
-  const canBeSetAsLabelIdentifier =
-    objectMetadataItem.isCustom &&
-    !isLabelIdentifier &&
-    isLabelIdentifierFieldMetadataTypes(fieldMetadataItem.type);
-
   const linkToNavigate = getSettingsPath(SettingsPath.ObjectFieldEdit, {
     objectNamePlural: objectMetadataItem.namePlural,
     fieldName: fieldMetadataItem.name,
   });
 
-  const {
-    activateMetadataField,
-    deactivateMetadataField,
-    deleteMetadataField,
-  } = useFieldMetadataItem();
-
-  const prefetchViews = useRecoilValue(prefetchViewsState);
-  const deleteViewFromCache = useDeleteRecordFromCache({
-    objectNameSingular: CoreObjectNameSingular.View,
-  });
-
-  const featureFlagMap = useFeatureFlagsMap();
-  const isCoreViewEnabled = featureFlagMap[FeatureFlagKey.IS_CORE_VIEW_ENABLED];
-
-  const handleDisableField = async (
-    activeFieldMetadatItem: FieldMetadataItem,
-  ) => {
-    await deactivateMetadataField(
-      activeFieldMetadatItem.id,
-      objectMetadataItem.id,
-    );
-
-    // TODO: Add optimistic rendering for core views
-    const deletedViewIds = isCoreViewEnabled
-      ? []
-      : (prefetchViews as View[])
-          .map((view) => {
-            // TODO: replace with viewGroups.fieldMetadataId
-            if (view.kanbanFieldMetadataId === activeFieldMetadatItem.id) {
-              deleteViewFromCache(view);
-              return view.id;
-            }
-
-            return null;
-          })
-          .filter(isDefined);
-
-    const [baseUrl, queryParams] = navigationMemorizedUrl.includes('?')
-      ? navigationMemorizedUrl.split('?')
-      : [navigationMemorizedUrl, ''];
-
-    const params = new URLSearchParams(queryParams);
-    const currentViewId = params.get('view');
-
-    if (isDefined(currentViewId) && deletedViewIds.includes(currentViewId)) {
-      params.delete('view');
-      const updatedUrl = params.toString()
-        ? `${baseUrl}?${params.toString()}`
-        : baseUrl;
-      setNavigationMemorizedUrl(updatedUrl);
-    }
-  };
-
-  const { updateOneObjectMetadataItem } = useUpdateOneObjectMetadataItem();
-
-  const handleSetLabelIdentifierField = (
-    activeFieldMetadatItem: FieldMetadataItem,
-  ) =>
-    updateOneObjectMetadataItem({
-      idToUpdate: objectMetadataItem.id,
-      updatePayload: {
-        labelIdentifierFieldMetadataId: activeFieldMetadatItem.id,
-      },
+  // oxlint-disable-next-line twenty/no-navigate-prefer-link
+  const navigateToFieldEdit = () =>
+    navigate(SettingsPath.ObjectFieldEdit, {
+      objectNamePlural: objectMetadataItem.namePlural,
+      fieldName: fieldMetadataItem.name,
     });
 
-  const [, setActiveSettingsObjectFields] = useRecoilState(
-    settingsObjectFieldsFamilyState({
-      objectMetadataItemId: objectMetadataItem.id,
-    }),
+  const { activateMetadataField } = useFieldMetadataItem();
+
+  const { deleteOneFieldMetadataItem } = useDeleteOneFieldMetadataItem();
+
+  const setSettingsObjectFields = useSetAtomFamilyState(
+    settingsObjectFieldsFamilyState,
+    { objectMetadataItemId: objectMetadataItem.id },
   );
 
   const handleToggleField = () => {
-    setActiveSettingsObjectFields((previousFields) => {
+    setSettingsObjectFields((previousFields) => {
       const newFields = isDefined(previousFields)
         ? previousFields?.map((field) =>
             field.id === fieldMetadataItem.id
@@ -198,63 +149,66 @@ export const SettingsObjectFieldItemTableRow = ({
     });
   };
 
-  const typeLabel =
-    variant === 'field-type'
-      ? isRemoteObjectField
-        ? 'Remote'
-        : fieldMetadataItem.isCustom
-          ? 'Custom'
-          : 'Standard'
-      : variant === 'identifier'
-        ? isDefined(identifierType)
-          ? identifierType === 'label'
-            ? 'Record text'
-            : 'Record image'
-          : ''
-        : '';
-
   if (!isFieldTypeSupported) return null;
 
   const isRelatedObjectLinkable =
     isDefined(relationObjectMetadataItem?.namePlural) &&
     !relationObjectMetadataItem.isSystem;
 
+  const morphRelationCount = fieldMetadataItem.morphRelations?.length;
+  const morphRelationLabel =
+    fieldMetadataItem.type === FieldMetadataType.MORPH_RELATION
+      ? t`${morphRelationCount} Objects`
+      : undefined;
+
+  const label = morphRelationLabel
+    ? morphRelationLabel
+    : relationType === RelationType.MANY_TO_ONE
+      ? relationObjectMetadataItem?.labelSingular
+      : relationObjectMetadataItem?.labelPlural;
+
   return (
-    <StyledObjectFieldTableRow
-      onClick={
-        mode === 'view'
-          ? () =>
-              navigate(SettingsPath.ObjectFieldEdit, {
-                objectNamePlural: objectMetadataItem.namePlural,
-                fieldName: fieldMetadataItem.name,
-              })
-          : undefined
-      }
+    <TableRow
+      gridTemplateColumns={OBJECT_FIELD_TABLE_ROW_GRID_TEMPLATE_COLUMNS}
+      onClick={mode === 'view' ? navigateToFieldEdit : undefined}
     >
       <UndecoratedLink to={linkToNavigate}>
-        <StyledNameTableCell>
-          {!!Icon && (
+        <TableCell
+          color={themeCssVariables.font.color.primary}
+          gap={themeCssVariables.spacing[2]}
+        >
+          {isDefined(Icon) && (
             <Icon
-              style={{ minWidth: theme.icon.size.md }}
+              style={{
+                minWidth: theme.icon.size.md,
+              }}
               size={theme.icon.size.md}
               stroke={theme.icon.stroke.sm}
             />
           )}
-          <StyledNameLabel title={fieldMetadataItem.label}>
-            {fieldMetadataItem.label}
-          </StyledNameLabel>
-        </StyledNameTableCell>
+          <StyledNameContainer>
+            <StyledNameLabel title={fieldMetadataItem.label}>
+              {fieldMetadataItem.label}
+            </StyledNameLabel>
+            {!fieldMetadataItem.isActive && (
+              <StyledInactiveLabel>{t`Deactivated`}</StyledInactiveLabel>
+            )}
+          </StyledNameContainer>
+        </TableCell>
       </UndecoratedLink>
 
-      <TableCell>{typeLabel}</TableCell>
+      <TableCell>
+        <SettingsItemTypeTag
+          item={{
+            applicationId: fieldMetadataItem.applicationId,
+            isCustom: fieldMetadataItem.isCustom ?? undefined,
+          }}
+        />
+      </TableCell>
       <TableCell>
         <SettingsObjectFieldDataType
           Icon={RelationIcon}
-          label={
-            relationType === RelationType.MANY_TO_ONE
-              ? relationObjectMetadataItem?.labelSingular
-              : relationObjectMetadataItem?.labelPlural
-          }
+          label={label}
           labelDetail={
             fieldMetadataItem.settings?.type === 'percentage' ? '%' : undefined
           }
@@ -273,29 +227,20 @@ export const SettingsObjectFieldItemTableRow = ({
           }}
         />
       </TableCell>
-      <StyledIconTableCell>
+      <TableCell
+        align="center"
+        padding={`0 ${themeCssVariables.spacing[1]} 0 ${themeCssVariables.spacing[2]}`}
+      >
         {status === 'active' ? (
           mode === 'view' ? (
-            <SettingsObjectFieldActiveActionDropdown
-              isCustomField={fieldMetadataItem.isCustom === true}
-              fieldMetadataItemId={fieldMetadataItem.id}
-              onEdit={() =>
-                navigate(SettingsPath.ObjectFieldEdit, {
-                  objectNamePlural: objectMetadataItem.namePlural,
-                  fieldName: fieldMetadataItem.name,
-                })
-              }
-              onSetAsLabelIdentifier={
-                canBeSetAsLabelIdentifier
-                  ? () => handleSetLabelIdentifierField(fieldMetadataItem)
-                  : undefined
-              }
-              onDeactivate={
-                isLabelIdentifier
-                  ? undefined
-                  : () => handleDisableField(fieldMetadataItem)
-              }
-            />
+            <UndecoratedLink to={linkToNavigate}>
+              <StyledIconChevronRightContainer>
+                <IconChevronRight
+                  size={theme.icon.size.md}
+                  stroke={theme.icon.stroke.sm}
+                />
+              </StyledIconChevronRightContainer>
+            </UndecoratedLink>
           ) : (
             canToggleField && (
               <LightIconButton
@@ -308,17 +253,17 @@ export const SettingsObjectFieldItemTableRow = ({
         ) : mode === 'view' ? (
           <SettingsObjectFieldInactiveActionDropdown
             isCustomField={fieldMetadataItem.isCustom === true}
+            readonly={readonly}
             fieldMetadataItemId={fieldMetadataItem.id}
-            onEdit={() =>
-              navigate(SettingsPath.ObjectFieldEdit, {
-                objectNamePlural: objectMetadataItem.namePlural,
-                fieldName: fieldMetadataItem.name,
-              })
-            }
+            onEdit={navigateToFieldEdit}
             onActivate={() =>
               activateMetadataField(fieldMetadataItem.id, objectMetadataItem.id)
             }
-            onDelete={() => deleteMetadataField(fieldMetadataItem)}
+            onDelete={() =>
+              deleteOneFieldMetadataItem({
+                idToDelete: fieldMetadataItem.id,
+              })
+            }
           />
         ) : (
           <LightIconButton
@@ -327,7 +272,7 @@ export const SettingsObjectFieldItemTableRow = ({
             onClick={handleToggleField}
           />
         )}
-      </StyledIconTableCell>
-    </StyledObjectFieldTableRow>
+      </TableCell>
+    </TableRow>
   );
 };

@@ -1,8 +1,8 @@
-import { type Meta, type StoryObj } from '@storybook/react';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-import { expect, userEvent, within } from '@storybook/test';
-import { TextArea, type TextAreaProps } from '../TextArea';
+import { TextArea, type TextAreaProps } from '@/ui/input/components/TextArea';
+import { expect, userEvent, within } from 'storybook/test';
 import { ComponentDecorator } from 'twenty-ui/testing';
 
 type RenderProps = TextAreaProps;
@@ -14,7 +14,7 @@ const Render = (args: RenderProps) => {
     setValue(text);
   };
 
-  // eslint-disable-next-line react/jsx-props-no-spreading
+  // oxlint-disable-next-line react/jsx-props-no-spreading
   return <TextArea {...args} value={value} onChange={handleChange} />;
 };
 
@@ -41,8 +41,8 @@ export const Disabled: Story = {
 
 export const WithLabel: Story = {
   args: { label: 'My Textarea' },
-  play: async () => {
-    const canvas = within(document.body);
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
 
     const label = await canvas.findByText('My Textarea');
 

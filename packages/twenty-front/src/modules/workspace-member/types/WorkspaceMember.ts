@@ -1,7 +1,8 @@
 import {
   type WorkspaceMemberDateFormatEnum,
+  type WorkspaceMemberNumberFormatEnum,
   type WorkspaceMemberTimeFormatEnum,
-} from '~/generated/graphql';
+} from '~/generated-metadata/graphql';
 
 export type ColorScheme = 'Dark' | 'Light' | 'System';
 
@@ -23,6 +24,7 @@ export type WorkspaceMember = {
   timeZone?: string | null;
   dateFormat?: WorkspaceMemberDateFormatEnum | null;
   timeFormat?: WorkspaceMemberTimeFormatEnum | null;
+  numberFormat?: WorkspaceMemberNumberFormatEnum | null;
   calendarStartDay?: number | null;
 };
 
@@ -30,5 +32,6 @@ export type WorkspaceInvitation = {
   __typename: 'WorkspaceInvitation';
   id: string;
   email: string;
+  roleId?: string | null;
   expiresAt: string;
 };

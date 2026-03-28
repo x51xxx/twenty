@@ -2,54 +2,101 @@
 
 import type Stripe from 'stripe';
 
+import { transformStripeSubscriptionScheduleEventToDatabaseSubscriptionPhase } from 'src/engine/core-modules/billing-webhook/utils/transform-stripe-subscription-schedule-event-to-database-subscription-phase.util';
+import {
+  type AutomaticTaxJson,
+  type CancellationDetailsJson,
+} from 'src/engine/core-modules/billing/entities/billing-subscription.entity';
 import { BillingSubscriptionCollectionMethod } from 'src/engine/core-modules/billing/enums/billing-subscription-collection-method.enum';
+import { type SubscriptionInterval } from 'src/engine/core-modules/billing/enums/billing-subscription-interval.enum';
 import { SubscriptionStatus } from 'src/engine/core-modules/billing/enums/billing-subscription-status.enum';
+import { type SubscriptionWithSchedule } from 'src/engine/core-modules/billing/types/billing-subscription-with-schedule.type';
+
+// Converts Stripe AutomaticTax to serialized JSON for JSONB storage
+// Normalizes expandable fields (e.g., liability.account) to string IDs
+const toAutomaticTaxJson = (
+  value: Stripe.Subscription.AutomaticTax | null | undefined,
+): AutomaticTaxJson | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  return {
+    disabled_reason: value.disabled_reason,
+    enabled: value.enabled,
+    liability: value.liability
+      ? {
+          type: value.liability.type,
+          account:
+            typeof value.liability.account === 'string'
+              ? value.liability.account
+              : value.liability.account?.id,
+        }
+      : null,
+  };
+};
+
+// Converts Stripe CancellationDetails to serialized JSON for JSONB storage
+const toCancellationDetailsJson = (
+  value: Stripe.Subscription.CancellationDetails | null | undefined,
+): CancellationDetailsJson | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  return {
+    comment: value.comment,
+    feedback: value.feedback,
+    reason: value.reason,
+  };
+};
 
 export const transformStripeSubscriptionEventToDatabaseSubscription = (
   workspaceId: string,
-  data:
-    | Stripe.CustomerSubscriptionUpdatedEvent.Data
-    | Stripe.CustomerSubscriptionCreatedEvent.Data
-    | Stripe.CustomerSubscriptionDeletedEvent.Data,
+  subscription: SubscriptionWithSchedule,
 ) => {
+  // In Stripe SDK v19+, current_period_start/end moved from Subscription to SubscriptionItem
+  const firstItem = subscription.items.data[0];
+
   return {
     workspaceId,
-    stripeCustomerId: String(data.object.customer),
-    stripeSubscriptionId: data.object.id,
-    status: getSubscriptionStatus(data.object.status),
-    interval: data.object.items.data[0].plan.interval,
-    cancelAtPeriodEnd: data.object.cancel_at_period_end,
-    currency: data.object.currency.toUpperCase(),
-    currentPeriodEnd: getDateFromTimestamp(data.object.current_period_end),
-    currentPeriodStart: getDateFromTimestamp(data.object.current_period_start),
-    metadata: data.object.metadata,
+    stripeCustomerId: String(subscription.customer),
+    stripeSubscriptionId: subscription.id,
+    status: getSubscriptionStatus(subscription.status),
+    interval: firstItem.plan.interval as SubscriptionInterval,
+    phases: subscription.schedule
+      ? transformStripeSubscriptionScheduleEventToDatabaseSubscriptionPhase(
+          subscription.schedule,
+        )
+      : [],
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    currency: subscription.currency.toUpperCase(),
+    currentPeriodEnd: getDateFromTimestamp(firstItem.current_period_end),
+    currentPeriodStart: getDateFromTimestamp(firstItem.current_period_start),
+    metadata: subscription.metadata,
     collectionMethod:
       // @ts-expect-error legacy noImplicitAny
       BillingSubscriptionCollectionMethod[
-        data.object.collection_method.toUpperCase()
+        subscription.collection_method.toUpperCase()
       ],
-    automaticTax:
-      data.object.automatic_tax === null
-        ? undefined
-        : data.object.automatic_tax,
-    cancellationDetails:
-      data.object.cancellation_details === null
-        ? undefined
-        : data.object.cancellation_details,
-    endedAt: data.object.ended_at
-      ? getDateFromTimestamp(data.object.ended_at)
+    automaticTax: toAutomaticTaxJson(subscription.automatic_tax),
+    cancellationDetails: toCancellationDetailsJson(
+      subscription.cancellation_details,
+    ),
+    endedAt: subscription.ended_at
+      ? getDateFromTimestamp(subscription.ended_at)
       : undefined,
-    trialStart: data.object.trial_start
-      ? getDateFromTimestamp(data.object.trial_start)
+    trialStart: subscription.trial_start
+      ? getDateFromTimestamp(subscription.trial_start)
       : undefined,
-    trialEnd: data.object.trial_end
-      ? getDateFromTimestamp(data.object.trial_end)
+    trialEnd: subscription.trial_end
+      ? getDateFromTimestamp(subscription.trial_end)
       : undefined,
-    cancelAt: data.object.cancel_at
-      ? getDateFromTimestamp(data.object.cancel_at)
+    cancelAt: subscription.cancel_at
+      ? getDateFromTimestamp(subscription.cancel_at)
       : undefined,
-    canceledAt: data.object.canceled_at
-      ? getDateFromTimestamp(data.object.canceled_at)
+    canceledAt: subscription.canceled_at
+      ? getDateFromTimestamp(subscription.canceled_at)
       : undefined,
   };
 };

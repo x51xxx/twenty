@@ -1,26 +1,31 @@
 {
   "editor.formatOnSave": false,
-  "files.eol": "auto",
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
   "[typescript]": {
-    "editor.formatOnSave": false,
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.codeActionsOnSave": {
-      "source.fixAll.eslint": "explicit",
+      "source.fixAll.oxc": "explicit",
       "source.addMissingImports": "always",
       "source.organizeImports": "always"
     }
   },
   "[javascript]": {
-    "editor.formatOnSave": false,
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.codeActionsOnSave": {
-      "source.fixAll.eslint": "explicit",
+      "source.fixAll.oxc": "explicit",
       "source.addMissingImports": "always",
       "source.organizeImports": "always"
     }
   },
   "[typescriptreact]": {
-    "editor.formatOnSave": false,
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.codeActionsOnSave": {
-      "source.fixAll.eslint": "explicit",
+      "source.fixAll.oxc": "explicit",
       "source.addMissingImports": "always",
       "source.organizeImports": "always"
     }
@@ -29,6 +34,7 @@
     "editor.formatOnSave": true
   },
   "javascript.format.enable": false,
+  "javascript.preferences.importModuleSpecifier": "non-relative",
   "typescript.format.enable": false,
   "cSpell.enableFiletypes": [
     "!javascript",
@@ -45,10 +51,11 @@
   "search.exclude": {
     "**/.yarn": true
   },
-  "eslint.debug": true,
+  "oxc.lint.enable": true,
   "files.associations": {
     ".cursorrules": "markdown"
   },
   "jestrunner.codeLensSelector": "**/*.{test,spec,integration-spec}.{js,jsx,ts,tsx}",
-  "typescript.tsdk": "node_modules/typescript/lib"
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.experimental.useTsgo": false
 }

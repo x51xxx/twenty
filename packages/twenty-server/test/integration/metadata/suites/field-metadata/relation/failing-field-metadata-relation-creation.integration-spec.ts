@@ -1,9 +1,15 @@
 import { faker } from '@faker-js/faker';
+import { expectOneNotInternalServerErrorSnapshot } from 'test/integration/graphql/utils/expect-one-not-internal-server-error-snapshot.util';
 import { createOneFieldMetadata } from 'test/integration/metadata/suites/field-metadata/utils/create-one-field-metadata.util';
 import { createOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/create-one-object-metadata.util';
 import { deleteOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/delete-one-object-metadata.util';
 import { getMockCreateObjectInput } from 'test/integration/metadata/suites/object-metadata/utils/generate-mock-create-object-metadata-input';
-import { type EachTestingContext } from 'twenty-shared/testing';
+import { updateOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/update-one-object-metadata.util';
+import { extractRecordIdsAndDatesAsExpectAny } from 'test/utils/extract-record-ids-and-dates-as-expect-any';
+import {
+  eachTestingContextFilter,
+  type EachTestingContext,
+} from 'twenty-shared/testing';
 import { FieldMetadataType } from 'twenty-shared/types';
 
 import { RelationType } from 'src/engine/metadata-modules/field-metadata/interfaces/relation-type.interface';
@@ -148,6 +154,56 @@ describe('Field metadata relation creation should fail', () => {
           },
         },
       },
+      {
+        title:
+          '(relationCreationPayload) when targetObjectMetadataId is not a valid uuid format',
+        context: {
+          input: {
+            relationCreationPayload: {
+              targetObjectMetadataId: 'not-a-valid-uuid',
+            },
+          },
+        },
+      },
+      {
+        title: 'when source field name conflicts with existing field name',
+        context: ({ collisionFieldName }) => ({
+          input: {
+            name: collisionFieldName,
+            relationCreationPayload: {
+              targetFieldLabel: 'Unique Target Label',
+            },
+          },
+        }),
+      },
+      {
+        title:
+          'when self-relation source field join column would conflict with target field name',
+        context: {
+          input: {
+            name: 'parent',
+            relationCreationPayload: {
+              targetObjectMetadataId:
+                globalTestContext.objectMetadataIds.sourceObjectId,
+              targetFieldLabel: 'Parent Id',
+            },
+          },
+        },
+      },
+      {
+        title:
+          'when self-relation target join column would conflict with source field name',
+        context: {
+          input: {
+            name: 'childrenId',
+            relationCreationPayload: {
+              targetObjectMetadataId:
+                globalTestContext.objectMetadataIds.sourceObjectId,
+              targetFieldLabel: 'Children',
+            },
+          },
+        },
+      },
     ];
 
   beforeAll(async () => {
@@ -232,6 +288,15 @@ describe('Field metadata relation creation should fail', () => {
     for (const objectMetadataId of Object.values(
       globalTestContext.objectMetadataIds,
     )) {
+      await updateOneObjectMetadata({
+        expectToFail: false,
+        input: {
+          idToUpdate: objectMetadataId,
+          updatePayload: {
+            isActive: false,
+          },
+        },
+      });
       await deleteOneObjectMetadata({
         input: {
           idToDelete: objectMetadataId,
@@ -240,7 +305,7 @@ describe('Field metadata relation creation should fail', () => {
     }
   });
 
-  it.each(failingLabelsCreationTestsUseCase)(
+  it.each(eachTestingContextFilter(failingLabelsCreationTestsUseCase))(
     'relation ONE_TO_MANY $title',
     async ({ context }) => {
       const computedRelationCreationPayload =
@@ -273,11 +338,13 @@ describe('Field metadata relation creation should fail', () => {
       });
 
       expect(errors).toBeDefined();
-      expect(errors).toMatchSnapshot();
+      expect(errors).toMatchSnapshot(
+        extractRecordIdsAndDatesAsExpectAny(errors),
+      );
     },
   );
 
-  it.each(failingLabelsCreationTestsUseCase)(
+  it.each(eachTestingContextFilter(failingLabelsCreationTestsUseCase))(
     'relation MANY_TO_ONE $title',
     async ({ context }) => {
       const computedRelationCreationPayload =
@@ -309,8 +376,125 @@ describe('Field metadata relation creation should fail', () => {
         },
       });
 
-      expect(errors).toBeDefined();
-      expect(errors).toMatchSnapshot();
+      expectOneNotInternalServerErrorSnapshot({
+        errors,
+      });
     },
   );
+
+  it('should fail when creating MANY_TO_ONE self-relation with same field name and label', async () => {
+    const { errors } = await createOneFieldMetadata({
+      expectToFail: true,
+      input: {
+        objectMetadataId: globalTestContext.objectMetadataIds.sourceObjectId,
+        name: 'manager',
+        label: 'Manager',
+        isLabelSyncedWithName: false,
+        type: FieldMetadataType.RELATION,
+        relationCreationPayload: {
+          targetFieldLabel: 'Manager',
+          type: RelationType.MANY_TO_ONE,
+          targetObjectMetadataId:
+            globalTestContext.objectMetadataIds.sourceObjectId,
+          targetFieldIcon: 'IconUser',
+        },
+      },
+    });
+
+    expectOneNotInternalServerErrorSnapshot({
+      errors,
+    });
+  });
+
+  it('should fail when creating ONE_TO_MANY self-relation with same field name and label', async () => {
+    const { errors } = await createOneFieldMetadata({
+      expectToFail: true,
+      input: {
+        objectMetadataId: globalTestContext.objectMetadataIds.sourceObjectId,
+        name: 'manager',
+        label: 'Manager',
+        isLabelSyncedWithName: false,
+        type: FieldMetadataType.RELATION,
+        relationCreationPayload: {
+          targetFieldLabel: 'Manager',
+          type: RelationType.ONE_TO_MANY,
+          targetObjectMetadataId:
+            globalTestContext.objectMetadataIds.sourceObjectId,
+          targetFieldIcon: 'IconUser',
+        },
+      },
+    });
+
+    expectOneNotInternalServerErrorSnapshot({
+      errors,
+    });
+  });
+
+  it('should fail when creating a relation field with name that conflicts with existing field name', async () => {
+    const { errors } = await createOneFieldMetadata({
+      expectToFail: true,
+      input: {
+        objectMetadataId: globalTestContext.objectMetadataIds.sourceObjectId,
+        name: globalTestContext.collisionFieldName,
+        label: 'Duplicate Field',
+        isLabelSyncedWithName: false,
+        type: FieldMetadataType.RELATION,
+        relationCreationPayload: {
+          targetFieldLabel: 'Related Object',
+          type: RelationType.MANY_TO_ONE,
+          targetObjectMetadataId:
+            globalTestContext.objectMetadataIds.targetObjectId,
+          targetFieldIcon: 'IconLink',
+        },
+      },
+    });
+
+    expectOneNotInternalServerErrorSnapshot({
+      errors,
+    });
+  });
+
+  it('should fail when creating a relation field with name that conflicts with existing join column name', async () => {
+    const relationFieldName = 'company';
+
+    await createOneFieldMetadata({
+      expectToFail: false,
+      input: {
+        objectMetadataId: globalTestContext.objectMetadataIds.sourceObjectId,
+        name: relationFieldName,
+        label: 'Company',
+        isLabelSyncedWithName: false,
+        type: FieldMetadataType.RELATION,
+        relationCreationPayload: {
+          targetFieldLabel: 'company',
+          type: RelationType.MANY_TO_ONE,
+          targetObjectMetadataId:
+            globalTestContext.objectMetadataIds.targetObjectId,
+          targetFieldIcon: 'IconBuilding',
+        },
+      },
+    });
+
+    const { errors } = await createOneFieldMetadata({
+      expectToFail: true,
+      input: {
+        objectMetadataId: globalTestContext.objectMetadataIds.sourceObjectId,
+        name: `${relationFieldName}Id`,
+        label: 'Company Id Field',
+        isLabelSyncedWithName: false,
+        type: FieldMetadataType.RELATION,
+        relationCreationPayload: {
+          targetFieldLabel: 'Related',
+          type: RelationType.MANY_TO_ONE,
+          targetObjectMetadataId:
+            globalTestContext.objectMetadataIds.targetObjectId,
+          targetFieldIcon: 'IconLink',
+        },
+      },
+    });
+
+    expectOneNotInternalServerErrorSnapshot({
+      errors,
+    });
+  });
 });

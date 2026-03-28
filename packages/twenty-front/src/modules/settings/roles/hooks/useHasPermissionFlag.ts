@@ -1,12 +1,14 @@
 import { currentUserWorkspaceState } from '@/auth/states/currentUserWorkspaceState';
+import {
+  WorkspaceActivationStatus,
+  PermissionFlagType,
+} from '~/generated-metadata/graphql';
 import { currentWorkspaceState } from '@/auth/states/currentWorkspaceState';
-import { useRecoilValue } from 'recoil';
-import { WorkspaceActivationStatus } from 'twenty-shared/workspace';
-import { PermissionFlagType } from '~/generated/graphql';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 
 export const useHasPermissionFlag = (permissionFlag?: PermissionFlagType) => {
-  const currentWorkspace = useRecoilValue(currentWorkspaceState);
-  const currentUserWorkspace = useRecoilValue(currentUserWorkspaceState);
+  const currentWorkspace = useAtomStateValue(currentWorkspaceState);
+  const currentUserWorkspace = useAtomStateValue(currentUserWorkspaceState);
 
   if (!permissionFlag) {
     return true;
@@ -20,11 +22,6 @@ export const useHasPermissionFlag = (permissionFlag?: PermissionFlagType) => {
     return true;
   }
 
-  const currentUserWorkspaceSetting = currentUserWorkspace?.permissionFlags;
-
-  if (!currentUserWorkspaceSetting) {
-    return false;
-  }
-
-  return currentUserWorkspaceSetting.includes(permissionFlag);
+  const userFlags = currentUserWorkspace?.permissionFlags ?? [];
+  return userFlags.includes(permissionFlag);
 };

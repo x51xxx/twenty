@@ -1,4 +1,4 @@
-import { type Meta } from '@storybook/react';
+import { type Meta } from '@storybook/react-vite';
 
 import { mockRsiValues } from '@/spreadsheet-import/__mocks__/mockRsiValues';
 import { ReactSpreadsheetImportContextProvider } from '@/spreadsheet-import/components/ReactSpreadsheetImportContextProvider';
@@ -7,9 +7,9 @@ import { UploadStep } from '@/spreadsheet-import/steps/components/UploadStep/Upl
 import { SpreadsheetImportStepType } from '@/spreadsheet-import/steps/types/SpreadsheetImportStepType';
 import { DialogComponentInstanceContext } from '@/ui/feedback/dialog-manager/contexts/DialogComponentInstanceContext';
 import { isModalOpenedComponentState } from '@/ui/layout/modal/states/isModalOpenedComponentState';
-import { RecoilRoot } from 'recoil';
+import { jotaiStore } from '@/ui/utilities/state/jotai/jotaiStore';
+import { Provider as JotaiProvider } from 'jotai';
 import { ContextStoreDecorator } from '~/testing/decorators/ContextStoreDecorator';
-import { I18nFrontDecorator } from '~/testing/decorators/I18nFrontDecorator';
 import { ObjectMetadataItemsDecorator } from '~/testing/decorators/ObjectMetadataItemsDecorator';
 import { SnackBarDecorator } from '~/testing/decorators/SnackBarDecorator';
 
@@ -22,22 +22,20 @@ const meta: Meta<typeof UploadStep> = {
   decorators: [
     ObjectMetadataItemsDecorator,
     ContextStoreDecorator,
-    (Story) => (
-      <RecoilRoot
-        initializeState={({ set }) => {
-          set(
-            isModalOpenedComponentState.atomFamily({
-              instanceId: 'upload-step',
-            }),
-            true,
-          );
-        }}
-      >
-        <Story />
-      </RecoilRoot>
-    ),
+    (Story) => {
+      jotaiStore.set(
+        isModalOpenedComponentState.atomFamily({
+          instanceId: 'upload-step',
+        }),
+        true,
+      );
+      return (
+        <JotaiProvider store={jotaiStore}>
+          <Story />
+        </JotaiProvider>
+      );
+    },
     SnackBarDecorator,
-    I18nFrontDecorator,
   ],
 };
 
@@ -48,7 +46,10 @@ export const Default = () => (
     value={{ instanceId: 'dialog-manager' }}
   >
     <ReactSpreadsheetImportContextProvider values={mockRsiValues}>
-      <SpreadSheetImportModalWrapper modalId="upload-step" onClose={() => null}>
+      <SpreadSheetImportModalWrapper
+        modalInstanceId="upload-step"
+        onClose={() => null}
+      >
         <UploadStep
           setUploadedFile={() => null}
           setCurrentStepState={() => null}

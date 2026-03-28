@@ -1,4 +1,4 @@
-import { splitWorkflowTriggerEventName } from '../splitWorkflowTriggerEventName';
+import { splitWorkflowTriggerEventName } from '@/workflow/utils/splitWorkflowTriggerEventName';
 
 describe('splitWorkflowTriggerEventName', () => {
   it('should split a basic event name into objectType and event', () => {
@@ -97,6 +97,17 @@ describe('splitWorkflowTriggerEventName', () => {
     expect(result).toEqual({
       objectType: 'company',
       event: '',
+    });
+  });
+
+  it('should split event name with upserted event', () => {
+    const eventName = 'company.upserted';
+
+    const result = splitWorkflowTriggerEventName(eventName);
+
+    expect(result).toEqual({
+      objectType: 'company',
+      event: 'upserted',
     });
   });
 });

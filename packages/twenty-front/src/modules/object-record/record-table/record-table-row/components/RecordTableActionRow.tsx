@@ -1,66 +1,97 @@
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 
-import { TABLE_Z_INDEX } from '@/object-record/record-table/constants/TableZIndex';
+import { useRecordIndexContextOrThrow } from '@/object-record/record-index/contexts/RecordIndexContext';
+import { RECORD_TABLE_COLUMN_CHECKBOX_WIDTH } from '@/object-record/record-table/constants/RecordTableColumnCheckboxWidth';
+import { RECORD_TABLE_COLUMN_DRAG_AND_DROP_WIDTH } from '@/object-record/record-table/constants/RecordTableColumnDragAndDropWidth';
+import { RECORD_TABLE_COLUMN_MIN_WIDTH } from '@/object-record/record-table/constants/RecordTableColumnMinWidth';
+import { RECORD_TABLE_LABEL_IDENTIFIER_COLUMN_WIDTH_ON_MOBILE } from '@/object-record/record-table/constants/RecordTableLabelIdentifierColumnWidthOnMobile';
+import { RECORD_TABLE_ROW_HEIGHT } from '@/object-record/record-table/constants/RecordTableRowHeight';
 import { useRecordTableContextOrThrow } from '@/object-record/record-table/contexts/RecordTableContext';
-import { RecordTableTd } from '@/object-record/record-table/record-table-cell/components/RecordTableTd';
-import { useTheme } from '@emotion/react';
+import { RecordTableDragAndDropPlaceholderCell } from '@/object-record/record-table/record-table-cell/components/RecordTableDragAndDropPlaceholderCell';
+import { RecordTableAddButtonPlaceholderCell } from '@/object-record/record-table/record-table-row/components/RecordTableAddButtonPlaceholderCell';
+import { RecordTableGroupSectionLastDynamicFillingCell } from '@/object-record/record-table/record-table-row/components/RecordTableGroupSectionLastDynamicFillingCell';
+import { useContext } from 'react';
+import {
+  filterOutByProperty,
+  findByProperty,
+  sumByProperty,
+} from 'twenty-shared/utils';
 import { type IconComponent } from 'twenty-ui/display';
+import { ThemeContext, themeCssVariables } from 'twenty-ui/theme-constants';
+import { useIsMobile } from 'twenty-ui/utilities';
 
-const StyledRecordTableDraggableTr = styled.tr`
-  cursor: pointer;
-  transition: background-color ${({ theme }) => theme.animation.duration.fast}
-    ease-in-out;
-  border: none;
-  background: ${({ theme }) => theme.background.primary};
-  position: relative;
-  z-index: ${TABLE_Z_INDEX.base};
-
-  &:hover {
-    td:not(:first-of-type) {
-      background-color: ${({ theme }) => theme.background.transparent.light};
-    }
-  }
-
-  td {
-    border-bottom: 1px solid ${({ theme }) => theme.border.color.light};
-    background-color: ${({ theme }) => theme.background.primary};
-    transition: background-color ${({ theme }) => theme.animation.duration.fast}
-      ease-in-out;
-
-    &:first-of-type {
-      border-bottom: 1px solid ${({ theme }) => theme.background.primary};
-    }
-  }
+const StyledFieldPlaceholderCell = styled.div<{ widthOfFields: number }>`
+  height: ${RECORD_TABLE_ROW_HEIGHT}px;
+  min-width: ${({ widthOfFields }) => widthOfFields}px;
+  width: ${({ widthOfFields }) => widthOfFields}px;
 `;
 
-const StyledIconContainer = styled(RecordTableTd)`
+const StyledRecordTableDraggableTr = styled.div`
+  align-items: center;
+
+  background: ${themeCssVariables.background.primary};
+  border: none;
+
+  cursor: pointer;
+  display: flex;
+  flex-direction: row;
+
+  &:hover {
+    div:not(:first-of-type) {
+      background-color: ${themeCssVariables.background.secondary};
+    }
+  }
+
+  div:not(:first-of-type) {
+    border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  }
+
+  width: 100%;
+`;
+
+const StyledIconContainer = styled.div`
   align-items: center;
   background-color: transparent;
   border-right: none;
-  color: ${({ theme }) => theme.font.color.secondary};
+  color: ${themeCssVariables.font.color.secondary};
   display: flex;
-  height: 32px;
+  height: ${RECORD_TABLE_ROW_HEIGHT}px;
   justify-content: center;
+  left: ${RECORD_TABLE_COLUMN_DRAG_AND_DROP_WIDTH}px;
+
+  position: sticky;
+  width: ${RECORD_TABLE_COLUMN_CHECKBOX_WIDTH}px;
 `;
 
-const StyledRecordTableTdTextContainer = styled(RecordTableTd)`
-  background-color: transparent;
+const StyledActionTextContainer = styled.div<{ width: number }>`
+  align-items: center;
+
   border-right: none;
-  height: 32px;
+  display: flex;
+
+  height: ${RECORD_TABLE_ROW_HEIGHT}px;
+  justify-content: start;
+
+  left: ${`${RECORD_TABLE_COLUMN_DRAG_AND_DROP_WIDTH + RECORD_TABLE_COLUMN_CHECKBOX_WIDTH}px`};
+  position: sticky;
+  width: ${({ width }) => width}px;
 `;
 
 const StyledText = styled.span`
-  color: ${({ theme }) => theme.font.color.tertiary};
-  margin-left: ${({ theme }) => theme.spacing(2)};
-  font-size: ${({ theme }) => theme.font.size.md};
-  text-align: center;
+  color: ${themeCssVariables.font.color.tertiary};
+  font-size: ${themeCssVariables.font.size.md};
+  margin-left: ${themeCssVariables.spacing[2]};
+  position: absolute;
+  text-align: left;
   vertical-align: middle;
+
+  white-space: nowrap;
 `;
 
 type RecordTableActionRowProps = {
   LeftIcon: IconComponent;
   text: string;
-  onClick?: (event?: React.MouseEvent<HTMLTableRowElement>) => void;
+  onClick?: (event?: React.MouseEvent<HTMLDivElement>) => void;
 };
 
 export const RecordTableActionRow = ({
@@ -68,13 +99,37 @@ export const RecordTableActionRow = ({
   text,
   onClick,
 }: RecordTableActionRowProps) => {
-  const theme = useTheme();
+  const { theme } = useContext(ThemeContext);
 
   const { visibleRecordFields } = useRecordTableContextOrThrow();
+  const { labelIdentifierFieldMetadataItem } = useRecordIndexContextOrThrow();
+
+  const visibleRecordFieldsWithoutLabelIdentifier = visibleRecordFields.filter(
+    filterOutByProperty(
+      'fieldMetadataItemId',
+      labelIdentifierFieldMetadataItem?.id,
+    ),
+  );
+
+  const isMobile = useIsMobile();
+
+  const labelIdentifierRecordField = visibleRecordFields.find(
+    findByProperty('fieldMetadataItemId', labelIdentifierFieldMetadataItem?.id),
+  );
+
+  const firstColumnWidth = isMobile
+    ? RECORD_TABLE_LABEL_IDENTIFIER_COLUMN_WIDTH_ON_MOBILE
+    : (labelIdentifierRecordField?.size ?? RECORD_TABLE_COLUMN_MIN_WIDTH);
+
+  const sumOfWidthOfVisibleRecordFieldsAfterLabelIdentifierField =
+    visibleRecordFieldsWithoutLabelIdentifier.reduce(sumByProperty('size'), 0);
+
+  const sumOfBorderWidthForFields =
+    visibleRecordFieldsWithoutLabelIdentifier.length;
 
   return (
     <StyledRecordTableDraggableTr onClick={onClick}>
-      <td aria-hidden />
+      <RecordTableDragAndDropPlaceholderCell />
       <StyledIconContainer>
         <LeftIcon
           stroke={theme.icon.stroke.sm}
@@ -82,12 +137,17 @@ export const RecordTableActionRow = ({
           color={theme.font.color.tertiary}
         />
       </StyledIconContainer>
-      <StyledRecordTableTdTextContainer className="disable-shadow">
+      <StyledActionTextContainer width={firstColumnWidth}>
         <StyledText>{text}</StyledText>
-      </StyledRecordTableTdTextContainer>
-      <td colSpan={visibleRecordFields.length - 1} aria-hidden />
-      <td aria-hidden />
-      <td aria-hidden />
+      </StyledActionTextContainer>
+      <StyledFieldPlaceholderCell
+        widthOfFields={
+          sumOfWidthOfVisibleRecordFieldsAfterLabelIdentifierField +
+          sumOfBorderWidthForFields
+        }
+      />
+      <RecordTableAddButtonPlaceholderCell />
+      <RecordTableGroupSectionLastDynamicFillingCell />
     </StyledRecordTableDraggableTr>
   );
 };

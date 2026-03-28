@@ -3,9 +3,11 @@ import { FormTextFieldInput } from '@/object-record/record-field/ui/form-types/c
 import { InputLabel } from '@/ui/input/components/InputLabel';
 import { type WorkflowFormActionField } from '@/workflow/workflow-steps/workflow-actions/form-action/types/WorkflowFormActionField';
 import { getDefaultFormFieldSettings } from '@/workflow/workflow-steps/workflow-actions/form-action/utils/getDefaultFormFieldSettings';
-import styled from '@emotion/styled';
+import { t } from '@lingui/core/macro';
+import { styled } from '@linaria/react';
 import camelCase from 'lodash.camelcase';
 import { FieldMetadataType } from 'twenty-shared/types';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 type WorkflowFormFieldSettingsNumberProps = {
   field: WorkflowFormActionField;
@@ -15,7 +17,7 @@ type WorkflowFormFieldSettingsNumberProps = {
 const StyledContainer = styled.div`
   display: flex;
   flex-direction: row;
-  gap: ${({ theme }) => theme.spacing(2)};
+  gap: ${themeCssVariables.spacing[2]};
 `;
 
 export const WorkflowFormFieldSettingsNumber = ({
@@ -25,7 +27,7 @@ export const WorkflowFormFieldSettingsNumber = ({
   return (
     <StyledContainer>
       <FormFieldInputContainer>
-        <InputLabel>Label</InputLabel>
+        <InputLabel>{t`Label`}</InputLabel>
         <FormTextFieldInput
           onChange={(newLabel: string) => {
             onChange({
@@ -41,7 +43,7 @@ export const WorkflowFormFieldSettingsNumber = ({
         />
       </FormFieldInputContainer>
       <FormFieldInputContainer>
-        <InputLabel>Placeholder</InputLabel>
+        <InputLabel>{t`Placeholder`}</InputLabel>
         <FormTextFieldInput
           onChange={(newPlaceholder: string) => {
             onChange({

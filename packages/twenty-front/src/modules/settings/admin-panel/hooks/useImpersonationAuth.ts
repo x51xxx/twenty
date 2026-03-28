@@ -1,17 +1,20 @@
+import { isAppEffectRedirectEnabledState } from '@/app/states/isAppEffectRedirectEnabledState';
 import { useAuth } from '@/auth/hooks/useAuth';
-import { isAppWaitingForFreshObjectMetadataState } from '@/object-metadata/states/isAppWaitingForFreshObjectMetadataState';
-import { useSetRecoilState } from 'recoil';
+import { useClearSseClient } from '@/sse-db-event/hooks/useClearSseClient';
+import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
 
 export const useImpersonationAuth = () => {
   const { getAuthTokensFromLoginToken } = useAuth();
-  const setIsAppWaitingForFreshObjectMetadata = useSetRecoilState(
-    isAppWaitingForFreshObjectMetadataState,
+  const { clearSseClient } = useClearSseClient();
+  const setIsAppEffectRedirectEnabled = useSetAtomState(
+    isAppEffectRedirectEnabledState,
   );
 
   const executeImpersonationAuth = async (loginToken: string) => {
-    setIsAppWaitingForFreshObjectMetadata(true);
+    setIsAppEffectRedirectEnabled(false);
+    clearSseClient();
     await getAuthTokensFromLoginToken(loginToken);
-    setIsAppWaitingForFreshObjectMetadata(false);
+    setIsAppEffectRedirectEnabled(true);
   };
 
   return { executeImpersonationAuth };

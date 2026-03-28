@@ -3,6 +3,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { Repository } from 'typeorm';
+import { FeatureFlagKey } from 'twenty-shared/types';
 
 import {
   AuthException,
@@ -11,10 +12,11 @@ import {
 import { GoogleAPIsOauthExchangeCodeForTokenStrategy } from 'src/engine/core-modules/auth/strategies/google-apis-oauth-exchange-code-for-token.auth.strategy';
 import { TransientTokenService } from 'src/engine/core-modules/auth/token/services/transient-token.service';
 import { setRequestExtraParams } from 'src/engine/core-modules/auth/utils/google-apis-set-request-extra-params.util';
-import { DomainManagerService } from 'src/engine/core-modules/domain-manager/services/domain-manager.service';
+import { WorkspaceDomainsService } from 'src/engine/core-modules/domain/workspace-domains/services/workspace-domains.service';
+import { FeatureFlagService } from 'src/engine/core-modules/feature-flag/services/feature-flag.service';
 import { GuardRedirectService } from 'src/engine/core-modules/guard-redirect/services/guard-redirect.service';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
-import { Workspace } from 'src/engine/core-modules/workspace/workspace.entity';
+import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 
 @Injectable()
 export class GoogleAPIsOauthExchangeCodeForTokenGuard extends AuthGuard(
@@ -24,9 +26,10 @@ export class GoogleAPIsOauthExchangeCodeForTokenGuard extends AuthGuard(
     private readonly guardRedirectService: GuardRedirectService,
     private readonly twentyConfigService: TwentyConfigService,
     private readonly transientTokenService: TransientTokenService,
-    private readonly domainManagerService: DomainManagerService,
-    @InjectRepository(Workspace)
-    private readonly workspaceRepository: Repository<Workspace>,
+    @InjectRepository(WorkspaceEntity)
+    private readonly workspaceRepository: Repository<WorkspaceEntity>,
+    private readonly workspaceDomainsService: WorkspaceDomainsService,
+    private readonly featureFlagService: FeatureFlagService,
   ) {
     super();
   }
@@ -46,13 +49,28 @@ export class GoogleAPIsOauthExchangeCodeForTokenGuard extends AuthGuard(
         );
       }
 
-      new GoogleAPIsOauthExchangeCodeForTokenStrategy(this.twentyConfigService);
+      const { workspaceId } =
+        await this.transientTokenService.verifyTransientToken(
+          state.transientToken,
+        );
+
+      const isDraftEmailEnabled =
+        await this.featureFlagService.isFeatureEnabled(
+          FeatureFlagKey.IS_DRAFT_EMAIL_ENABLED,
+          workspaceId,
+        );
+
+      new GoogleAPIsOauthExchangeCodeForTokenStrategy(
+        this.twentyConfigService,
+        isDraftEmailEnabled,
+      );
 
       setRequestExtraParams(request, {
         transientToken: state.transientToken,
         redirectLocation: state.redirectLocation,
         calendarVisibility: state.calendarVisibility,
         messageVisibility: state.messageVisibility,
+        skipMessageChannelConfiguration: state.skipMessageChannelConfiguration,
       });
 
       return (await super.canActivate(context)) as boolean;
@@ -66,7 +84,7 @@ export class GoogleAPIsOauthExchangeCodeForTokenGuard extends AuthGuard(
         );
 
         const redirectErrorUrl =
-          this.domainManagerService.computeRedirectErrorUrl(
+          this.workspaceDomainsService.computeWorkspaceRedirectErrorUrl(
             'We cannot connect to your Google account, please try again with more permissions, or a valid account',
             {
               subdomain: workspace.subdomain,
@@ -95,7 +113,7 @@ export class GoogleAPIsOauthExchangeCodeForTokenGuard extends AuthGuard(
 
   private async getWorkspaceFromTransientToken(
     transientToken: string,
-  ): Promise<Workspace> {
+  ): Promise<WorkspaceEntity> {
     const { workspaceId } =
       await this.transientTokenService.verifyTransientToken(transientToken);
 

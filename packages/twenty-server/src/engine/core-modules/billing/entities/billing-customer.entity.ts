@@ -7,19 +7,24 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   OneToMany,
   PrimaryGeneratedColumn,
-  Relation,
+  type Relation,
   UpdateDateColumn,
 } from 'typeorm';
 
 import { UUIDScalarType } from 'src/engine/api/graphql/workspace-schema-builder/graphql-types/scalars';
-import { BillingEntitlement } from 'src/engine/core-modules/billing/entities/billing-entitlement.entity';
-import { BillingSubscription } from 'src/engine/core-modules/billing/entities/billing-subscription.entity';
+import { BillingEntitlementEntity } from 'src/engine/core-modules/billing/entities/billing-entitlement.entity';
+import { BillingSubscriptionEntity } from 'src/engine/core-modules/billing/entities/billing-subscription.entity';
+import { WorkspaceRelatedEntity } from 'src/engine/workspace-manager/types/workspace-related-entity';
 
 @Entity({ name: 'billingCustomer', schema: 'core' })
-@ObjectType()
-export class BillingCustomer {
+@ObjectType('BillingCustomer')
+@Index('IDX_BILLING_CUSTOMER_WORKSPACE_ID_UNIQUE', ['workspaceId'], {
+  unique: true,
+})
+export class BillingCustomerEntity extends WorkspaceRelatedEntity {
   @IDField(() => UUIDScalarType)
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -33,21 +38,18 @@ export class BillingCustomer {
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 
-  @Column({ nullable: false, type: 'uuid', unique: true })
-  workspaceId: string;
-
   @Column({ nullable: false, unique: true })
   stripeCustomerId: string;
 
   @OneToMany(
-    () => BillingSubscription,
+    () => BillingSubscriptionEntity,
     (billingSubscription) => billingSubscription.billingCustomer,
   )
-  billingSubscriptions: Relation<BillingSubscription[]>;
+  billingSubscriptions: Relation<BillingSubscriptionEntity[]>;
 
   @OneToMany(
-    () => BillingEntitlement,
+    () => BillingEntitlementEntity,
     (billingEntitlement) => billingEntitlement.billingCustomer,
   )
-  billingEntitlements: Relation<BillingEntitlement[]>;
+  billingEntitlements: Relation<BillingEntitlementEntity[]>;
 }

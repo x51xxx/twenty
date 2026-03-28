@@ -1,8 +1,8 @@
 import { StepStatus, type WorkflowRunStepInfos } from 'twenty-shared/workflow';
 
-import { canExecuteStep } from 'src/modules/workflow/workflow-executor/utils/can-execute-step.util';
-import { type WorkflowAction } from 'src/modules/workflow/workflow-executor/workflow-actions/types/workflow-action.type';
 import { WorkflowRunStatus } from 'src/modules/workflow/common/standard-objects/workflow-run.workspace-entity';
+import { shouldExecuteStep } from 'src/modules/workflow/workflow-executor/utils/should-execute-step.util';
+import { type WorkflowAction } from 'src/modules/workflow/workflow-executor/workflow-actions/types/workflow-action.type';
 
 export const workflowShouldKeepRunning = ({
   stepInfos,
@@ -17,22 +17,32 @@ export const workflowShouldKeepRunning = ({
     ),
   );
 
-  const successStepWithNotStartedExecutableChildren = steps.some(
+  const completedStepWithNotStartedExecutableChildren = steps.some(
     (step) =>
-      stepInfos[step.id]?.status === StepStatus.SUCCESS &&
-      (step.nextStepIds ?? []).some(
-        (nextStepId) =>
+      (stepInfos[step.id]?.status === StepStatus.SUCCESS ||
+        stepInfos[step.id]?.status === StepStatus.FAILED_SAFELY) &&
+      (step.nextStepIds ?? []).some((nextStepId) => {
+        const nextStep = steps.find(
+          (candidateStep) => candidateStep.id === nextStepId,
+        );
+
+        if (!nextStep) {
+          return false;
+        }
+
+        return (
           stepInfos[nextStepId]?.status === StepStatus.NOT_STARTED &&
-          canExecuteStep({
-            stepId: nextStepId,
+          shouldExecuteStep({
+            step: nextStep,
             steps,
             stepInfos,
             workflowRunStatus: WorkflowRunStatus.RUNNING,
-          }),
-      ),
+          })
+        );
+      }),
   );
 
   return (
-    runningOrPendingStepExists || successStepWithNotStartedExecutableChildren
+    runningOrPendingStepExists || completedStepWithNotStartedExecutableChildren
   );
 };

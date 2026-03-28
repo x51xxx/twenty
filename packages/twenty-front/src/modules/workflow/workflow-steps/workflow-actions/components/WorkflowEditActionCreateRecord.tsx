@@ -1,3 +1,4 @@
+import { t } from '@lingui/core/macro';
 import { useFilteredObjectMetadataItems } from '@/object-metadata/hooks/useFilteredObjectMetadataItems';
 import { useObjectMetadataItems } from '@/object-metadata/hooks/useObjectMetadataItems';
 import { formatFieldMetadataItemAsFieldDefinition } from '@/object-metadata/utils/formatFieldMetadataItemAsFieldDefinition';
@@ -5,21 +6,29 @@ import { FormFieldInput } from '@/object-record/record-field/ui/components/FormF
 import { isFieldRelation } from '@/object-record/record-field/ui/types/guards/isFieldRelation';
 import { Select } from '@/ui/input/components/Select';
 import { GenericDropdownContentWidth } from '@/ui/layout/dropdown/constants/GenericDropdownContentWidth';
-import { useViewOrDefaultViewFromPrefetchedViews } from '@/views/hooks/useViewOrDefaultViewFromPrefetchedViews';
+import { useViewOrDefaultView } from '@/views/hooks/useViewOrDefaultView';
 import { type WorkflowCreateRecordAction } from '@/workflow/types/Workflow';
 import { WorkflowStepBody } from '@/workflow/workflow-steps/components/WorkflowStepBody';
-import { WorkflowStepHeader } from '@/workflow/workflow-steps/components/WorkflowStepHeader';
-import { useWorkflowActionHeader } from '@/workflow/workflow-steps/workflow-actions/hooks/useWorkflowActionHeader';
+import { WorkflowStepFooter } from '@/workflow/workflow-steps/components/WorkflowStepFooter';
 import { shouldDisplayFormField } from '@/workflow/workflow-steps/workflow-actions/utils/shouldDisplayFormField';
 import { WorkflowVariablePicker } from '@/workflow/workflow-variables/components/WorkflowVariablePicker';
-import { useTheme } from '@emotion/react';
 import { useEffect, useState } from 'react';
 import { isDefined } from 'twenty-shared/utils';
+import { canObjectBeManagedByWorkflow } from 'twenty-shared/workflow';
 import { HorizontalSeparator, useIcons } from 'twenty-ui/display';
 import { type SelectOption } from 'twenty-ui/input';
 import { type JsonValue } from 'type-fest';
 import { useDebouncedCallback } from 'use-debounce';
 import { RelationType } from '~/generated-metadata/graphql';
+
+type RelationManyToOneField = {
+  id: string;
+};
+
+type CreateRecordFormData = {
+  objectName: string;
+  [field: string]: RelationManyToOneField | JsonValue;
+};
 
 type WorkflowEditActionCreateRecordProps = {
   action: WorkflowCreateRecordAction;
@@ -31,15 +40,6 @@ type WorkflowEditActionCreateRecordProps = {
         readonly?: false;
         onActionUpdate: (action: WorkflowCreateRecordAction) => void;
       };
-};
-
-type RelationManyToOneField = {
-  id: string;
-};
-
-type CreateRecordFormData = {
-  objectName: string;
-  [field: string]: RelationManyToOneField | JsonValue;
 };
 
 const sortByViewFieldPosition = (
@@ -65,26 +65,31 @@ export const WorkflowEditActionCreateRecord = ({
   action,
   actionOptions,
 }: WorkflowEditActionCreateRecordProps) => {
-  const theme = useTheme();
-
   const { getIcon } = useIcons();
 
   const { activeNonSystemObjectMetadataItems } =
     useFilteredObjectMetadataItems();
 
   const availableMetadata: Array<SelectOption<string>> =
-    activeNonSystemObjectMetadataItems.map((item) => ({
-      Icon: getIcon(item.icon),
-      label: item.labelPlural,
-      value: item.nameSingular,
-    }));
+    activeNonSystemObjectMetadataItems
+      .filter((objectMetadataItem) =>
+        canObjectBeManagedByWorkflow({
+          nameSingular: objectMetadataItem.nameSingular,
+          isSystem: objectMetadataItem.isSystem,
+        }),
+      )
+      .map((item) => ({
+        Icon: getIcon(item.icon),
+        label: item.labelPlural,
+        value: item.nameSingular,
+      }));
 
   const [formData, setFormData] = useState<CreateRecordFormData>({
     objectName: action.settings.input.objectName,
     ...action.settings.input.objectRecord,
   });
 
-  const isFormDisabled = actionOptions.readonly;
+  const isFormDisabled = actionOptions.readonly === true;
 
   const objectNameSingular = formData.objectName;
 
@@ -94,7 +99,7 @@ export const WorkflowEditActionCreateRecord = ({
     (item) => item.nameSingular === objectNameSingular,
   );
 
-  const { view: indexView } = useViewOrDefaultViewFromPrefetchedViews({
+  const { view: indexView } = useViewOrDefaultView({
     objectMetadataItemId: objectMetadataItem?.id ?? '',
   });
 
@@ -102,7 +107,10 @@ export const WorkflowEditActionCreateRecord = ({
 
   const inlineFieldMetadataItems = objectMetadataItem?.fields
     .filter((fieldMetadataItem) =>
-      shouldDisplayFormField({ fieldMetadataItem, actionType: action.type }),
+      shouldDisplayFormField({
+        fieldMetadataItem,
+        actionType: 'CREATE_RECORD',
+      }),
     )
     .map((fieldMetadataItem) => {
       const viewField = viewFields.find(
@@ -186,39 +194,16 @@ export const WorkflowEditActionCreateRecord = ({
     };
   }, [saveAction]);
 
-  const { headerTitle, headerIcon, headerIconColor, headerType } =
-    useWorkflowActionHeader({
-      action,
-      defaultTitle: 'Create Record',
-    });
-
   return (
     <>
-      <WorkflowStepHeader
-        onTitleChange={(newName: string) => {
-          if (actionOptions.readonly === true) {
-            return;
-          }
-
-          actionOptions.onActionUpdate({
-            ...action,
-            name: newName,
-          });
-        }}
-        Icon={getIcon(headerIcon)}
-        iconColor={headerIconColor}
-        initialTitle={headerTitle}
-        headerType={headerType}
-        disabled={isFormDisabled}
-      />
       <WorkflowStepBody>
         <Select
-          dropdownId="workflow-edit-action-record-create-object-name"
-          label="Object"
+          dropdownId="workflow-create-record-object-name"
+          label={t`Object`}
           fullWidth
           disabled={isFormDisabled}
           value={formData.objectName}
-          emptyOption={{ label: 'Select an option', value: '' }}
+          emptyOption={{ label: t`Select an option`, value: '' }}
           options={availableMetadata}
           onChange={(updatedObjectName) => {
             const newFormData: CreateRecordFormData = {
@@ -230,7 +215,7 @@ export const WorkflowEditActionCreateRecord = ({
             saveAction(newFormData);
           }}
           withSearchInput
-          dropdownOffset={{ y: parseInt(theme.spacing(1), 10) }}
+          dropdownOffset={{ y: 4 }}
           dropdownWidth={GenericDropdownContentWidth.ExtraLarge}
         />
 
@@ -263,6 +248,7 @@ export const WorkflowEditActionCreateRecord = ({
           );
         })}
       </WorkflowStepBody>
+      {!actionOptions.readonly && <WorkflowStepFooter stepId={action.id} />}
     </>
   );
 };

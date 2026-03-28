@@ -1,6 +1,11 @@
+import { isDefined } from 'twenty-shared/utils';
+
 import { COMPANY_DATA_SEED_IDS } from 'src/engine/workspace-manager/dev-seeder/data/constants/company-data-seeds.constant';
 import { PERSON_DATA_SEED_IDS } from 'src/engine/workspace-manager/dev-seeder/data/constants/person-data-seeds.constant';
-import { WORKSPACE_MEMBER_DATA_SEED_IDS } from 'src/engine/workspace-manager/dev-seeder/data/constants/workspace-member-data-seeds.constant';
+import {
+  WORKSPACE_MEMBER_DATA_SEED_IDS,
+  WORKSPACE_MEMBER_DATA_SEEDS,
+} from 'src/engine/workspace-manager/dev-seeder/data/constants/workspace-member-data-seeds.constant';
 
 type OpportunityDataSeed = {
   id: string;
@@ -12,9 +17,13 @@ type OpportunityDataSeed = {
   position: number;
   pointOfContactId: string;
   companyId: string;
+  ownerId: string;
   createdBySource: string;
   createdByWorkspaceMemberId: string;
   createdByName: string;
+  updatedBySource: string;
+  updatedByWorkspaceMemberId: string;
+  updatedByName: string;
 };
 
 export const OPPORTUNITY_DATA_SEED_COLUMNS: (keyof OpportunityDataSeed)[] = [
@@ -27,9 +36,13 @@ export const OPPORTUNITY_DATA_SEED_COLUMNS: (keyof OpportunityDataSeed)[] = [
   'position',
   'pointOfContactId',
   'companyId',
+  'ownerId',
   'createdBySource',
   'createdByWorkspaceMemberId',
   'createdByName',
+  'updatedBySource',
+  'updatedByWorkspaceMemberId',
+  'updatedByName',
 ];
 
 const GENERATE_OPPORTUNITY_IDS = (): Record<string, string> => {
@@ -169,7 +182,17 @@ const GENERATE_OPPORTUNITY_SEEDS = (): OpportunityDataSeed[] => {
 
     CLOSE_DATE.setDate(CLOSE_DATE.getDate() + DAYS_AHEAD);
 
-    OPPORTUNITY_SEEDS.push({
+    const workspaceMemberId = Object.values(WORKSPACE_MEMBER_DATA_SEED_IDS)[
+      INDEX % 4
+    ];
+    const workspaceMember = WORKSPACE_MEMBER_DATA_SEEDS.find(
+      (workspaceMember) => workspaceMember.id === workspaceMemberId,
+    );
+    const workspaceMemberName = isDefined(workspaceMember)
+      ? `${workspaceMember?.nameFirstName} ${workspaceMember?.nameLastName}`
+      : 'Unkonwn';
+
+    const rawSeed: OpportunityDataSeed = {
       id: OPPORTUNITY_DATA_SEED_IDS[`ID_${INDEX}`],
       name: TEMPLATE.name,
       amountAmountMicros: TEMPLATE.amount * 1000000,
@@ -185,10 +208,24 @@ const GENERATE_OPPORTUNITY_SEEDS = (): OpportunityDataSeed[] => {
         COMPANY_DATA_SEED_IDS[
           `ID_${Math.ceil(INDEX / 2)}` as keyof typeof COMPANY_DATA_SEED_IDS
         ] || COMPANY_DATA_SEED_IDS.ID_1,
+      ownerId: WORKSPACE_MEMBER_DATA_SEED_IDS.TIM,
       createdBySource: 'MANUAL',
-      createdByWorkspaceMemberId: WORKSPACE_MEMBER_DATA_SEED_IDS.TIM,
-      createdByName: 'Tim Cook',
-    });
+      updatedBySource: 'MANUAL',
+      createdByWorkspaceMemberId: workspaceMemberId,
+      createdByName: workspaceMemberName,
+      updatedByWorkspaceMemberId: workspaceMemberId,
+      updatedByName: workspaceMemberName,
+    };
+
+    const opportunityDataSeedWithSQLColumnOrder: OpportunityDataSeed =
+      Object.fromEntries(
+        OPPORTUNITY_DATA_SEED_COLUMNS.map((column) => [
+          column,
+          rawSeed[column as keyof OpportunityDataSeed],
+        ]),
+      ) as OpportunityDataSeed;
+
+    OPPORTUNITY_SEEDS.push(opportunityDataSeedWithSQLColumnOrder);
   }
 
   return OPPORTUNITY_SEEDS;

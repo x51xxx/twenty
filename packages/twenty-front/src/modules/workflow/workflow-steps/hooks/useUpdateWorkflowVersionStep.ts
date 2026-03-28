@@ -1,20 +1,22 @@
 import { useApolloCoreClient } from '@/object-metadata/hooks/useApolloCoreClient';
 import { useObjectMetadataItem } from '@/object-metadata/hooks/useObjectMetadataItem';
 import { useObjectMetadataItems } from '@/object-metadata/hooks/useObjectMetadataItems';
-import { CoreObjectNameSingular } from '@/object-metadata/types/CoreObjectNameSingular';
+import { CoreObjectNameSingular } from 'twenty-shared/types';
 import { useGetRecordFromCache } from '@/object-record/cache/hooks/useGetRecordFromCache';
 import { updateRecordFromCache } from '@/object-record/cache/utils/updateRecordFromCache';
 import { useObjectPermissions } from '@/object-record/hooks/useObjectPermissions';
 import { UPDATE_WORKFLOW_VERSION_STEP } from '@/workflow/graphql/mutations/updateWorkflowVersionStep';
-import { type WorkflowVersion } from '@/workflow/types/Workflow';
-import { useMutation } from '@apollo/client';
+import {
+  type WorkflowVersion,
+  type WorkflowStep,
+} from '@/workflow/types/Workflow';
+import { useMutation } from '@apollo/client/react';
 import { isDefined } from 'twenty-shared/utils';
 import {
   type UpdateWorkflowVersionStepInput,
   type UpdateWorkflowVersionStepMutation,
   type UpdateWorkflowVersionStepMutationVariables,
-  type WorkflowAction,
-} from '~/generated-metadata/graphql';
+} from '~/generated/graphql';
 
 export const useUpdateWorkflowVersionStep = () => {
   const apolloCoreClient = useApolloCoreClient();
@@ -52,7 +54,7 @@ export const useUpdateWorkflowVersionStep = () => {
 
     const newCachedRecord = {
       ...cachedRecord,
-      steps: (cachedRecord.steps || []).map((step: WorkflowAction) => {
+      steps: (cachedRecord.steps || []).map((step: WorkflowStep) => {
         if (step.id === updatedStep.id) {
           return updatedStep;
         }

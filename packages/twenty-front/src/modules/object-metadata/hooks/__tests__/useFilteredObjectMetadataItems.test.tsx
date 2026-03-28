@@ -1,17 +1,17 @@
-import { MockedProvider } from '@apollo/client/testing';
+import { MockedProvider } from '@apollo/client/testing/react';
 import { act, renderHook } from '@testing-library/react';
+import { Provider as JotaiProvider } from 'jotai';
 import { type ReactNode } from 'react';
-import { RecoilRoot } from 'recoil';
-
 import {
   query,
   responseData,
   variables,
 } from '@/object-metadata/hooks/__mocks__/useFilteredObjectMetadataItems';
 import { useFilteredObjectMetadataItems } from '@/object-metadata/hooks/useFilteredObjectMetadataItems';
-import { objectMetadataItemsState } from '@/object-metadata/states/objectMetadataItemsState';
+import { jotaiStore } from '@/ui/utilities/state/jotai/jotaiStore';
+import { setTestObjectMetadataItemsInMetadataStore } from '~/testing/utils/setTestObjectMetadataItemsInMetadataStore';
 import { isDefined } from 'twenty-shared/utils';
-import { generatedMockObjectMetadataItems } from '~/testing/utils/generatedMockObjectMetadataItems';
+import { getTestEnrichedObjectMetadataItemsMock } from '~/testing/utils/getTestEnrichedObjectMetadataItemsMock';
 
 const mocks = [
   {
@@ -27,17 +27,18 @@ const mocks = [
   },
 ];
 
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <RecoilRoot
-    initializeState={({ set }) =>
-      set(objectMetadataItemsState, generatedMockObjectMetadataItems)
-    }
-  >
-    <MockedProvider mocks={mocks} addTypename={false}>
-      {children}
-    </MockedProvider>
-  </RecoilRoot>
-);
+const Wrapper = ({ children }: { children: ReactNode }) => {
+  setTestObjectMetadataItemsInMetadataStore(
+    jotaiStore,
+    getTestEnrichedObjectMetadataItemsMock(),
+  );
+
+  return (
+    <JotaiProvider store={jotaiStore}>
+      <MockedProvider mocks={mocks}>{children}</MockedProvider>
+    </JotaiProvider>
+  );
+};
 
 describe('useFilteredObjectMetadataItems', () => {
   it('should findActiveObjectMetadataItemByNamePlural', async () => {
@@ -66,7 +67,7 @@ describe('useFilteredObjectMetadataItems', () => {
   });
 
   it('should findObjectMetadataItemById', async () => {
-    const peopleObjectMetadata = generatedMockObjectMetadataItems.find(
+    const peopleObjectMetadata = getTestEnrichedObjectMetadataItemsMock().find(
       (item) => item.namePlural === 'people',
     );
 

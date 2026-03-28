@@ -1,28 +1,35 @@
+import { isNonEmptyString } from '@sniptt/guards';
 import {
-  addDays,
-  addMonths,
-  addWeeks,
-  addYears,
   endOfDay,
+  endOfHour,
+  endOfMinute,
   endOfMonth,
+  endOfQuarter,
+  endOfSecond,
   endOfWeek,
   endOfYear,
   isWithinInterval,
   startOfDay,
+  startOfHour,
+  startOfMinute,
   startOfMonth,
+  startOfQuarter,
+  startOfSecond,
   startOfWeek,
   startOfYear,
-  subDays,
-  subMonths,
-  subWeeks,
-  subYears,
 } from 'date-fns';
 import {
-  type VariableDateViewFilterValue,
-  type VariableDateViewFilterValueUnit,
-} from 'twenty-shared/types';
-import { safeParseRelativeDateFilterValue } from 'twenty-shared/utils';
+  addUnitToDateTime,
+  assertUnreachable,
+  getFirstDayOfTheWeekAsANumberForDateFNS,
+  isDefined,
+  type RelativeDateFilter,
+  safeParseRelativeDateFilterJSONStringified,
+  subUnitFromDateTime,
+} from 'twenty-shared/utils';
 
+// TODO: Merge this logic with resolveRelativeDateFilter in twenty-shared
+// But it is not urgent since we force all workflow filters to be in UTC
 export const parseAndEvaluateRelativeDateFilter = ({
   dateToCheck,
   relativeDateString,
@@ -31,7 +38,7 @@ export const parseAndEvaluateRelativeDateFilter = ({
   relativeDateString: string;
 }): boolean => {
   const relativeDateFilterValue =
-    safeParseRelativeDateFilterValue(relativeDateString);
+    safeParseRelativeDateFilterJSONStringified(relativeDateString);
 
   if (!relativeDateFilterValue) {
     return false;
@@ -48,7 +55,7 @@ export const evaluateRelativeDateFilter = ({
   relativeDateFilterValue,
 }: {
   dateToCheck: Date;
-  relativeDateFilterValue: VariableDateViewFilterValue;
+  relativeDateFilterValue: RelativeDateFilter;
 }): boolean => {
   const now = new Date();
 
@@ -66,16 +73,16 @@ export const evaluateRelativeDateFilter = ({
 
 const evaluateNextDirection = (
   dateToCheck: Date,
-  relativeDateFilterValue: VariableDateViewFilterValue,
+  relativeDateFilterValue: RelativeDateFilter,
   now: Date,
 ): boolean => {
-  if (relativeDateFilterValue.amount === undefined) {
+  if (!isDefined(relativeDateFilterValue.amount)) {
     return false;
   }
 
   const { amount, unit } = relativeDateFilterValue;
 
-  const endOfPeriod = addUnitToDate(now, amount, unit);
+  const endOfPeriod = addUnitToDateTime(now, amount, unit);
 
   if (!endOfPeriod) {
     return false;
@@ -89,16 +96,16 @@ const evaluateNextDirection = (
 
 function evaluatePastDirection(
   dateToCheck: Date,
-  relativeDateFilterValue: VariableDateViewFilterValue,
+  relativeDateFilterValue: RelativeDateFilter,
   now: Date,
 ): boolean {
-  if (relativeDateFilterValue.amount === undefined) {
+  if (!isDefined(relativeDateFilterValue.amount)) {
     return false;
   }
 
   const { amount, unit } = relativeDateFilterValue;
 
-  const startOfPeriod = subtractUnitFromDate(now, amount, unit);
+  const startOfPeriod = subUnitFromDateTime(now, amount, unit);
 
   if (!startOfPeriod) {
     return false;
@@ -112,12 +119,35 @@ function evaluatePastDirection(
 
 function evaluateThisDirection(
   dateToCheck: Date,
-  relativeDateValue: VariableDateViewFilterValue,
+  relativeDateValue: RelativeDateFilter,
   now: Date,
 ): boolean {
   const { unit } = relativeDateValue;
 
+  const firstDayOfTheWeekAsANumberForDateFNS = isNonEmptyString(
+    relativeDateValue.firstDayOfTheWeek,
+  )
+    ? getFirstDayOfTheWeekAsANumberForDateFNS(
+        relativeDateValue.firstDayOfTheWeek,
+      )
+    : 1;
+
   switch (unit) {
+    case 'SECOND':
+      return isWithinInterval(dateToCheck, {
+        start: startOfSecond(now),
+        end: endOfSecond(now),
+      });
+    case 'MINUTE':
+      return isWithinInterval(dateToCheck, {
+        start: startOfMinute(now),
+        end: endOfMinute(now),
+      });
+    case 'HOUR':
+      return isWithinInterval(dateToCheck, {
+        start: startOfHour(now),
+        end: endOfHour(now),
+      });
     case 'DAY':
       return isWithinInterval(dateToCheck, {
         start: startOfDay(now),
@@ -125,8 +155,12 @@ function evaluateThisDirection(
       });
     case 'WEEK':
       return isWithinInterval(dateToCheck, {
-        start: startOfWeek(now),
-        end: endOfWeek(now),
+        start: startOfWeek(now, {
+          weekStartsOn: firstDayOfTheWeekAsANumberForDateFNS,
+        }),
+        end: endOfWeek(now, {
+          weekStartsOn: firstDayOfTheWeekAsANumberForDateFNS,
+        }),
       });
     case 'MONTH':
       return isWithinInterval(dateToCheck, {
@@ -138,45 +172,12 @@ function evaluateThisDirection(
         start: startOfYear(now),
         end: endOfYear(now),
       });
+    case 'QUARTER':
+      return isWithinInterval(dateToCheck, {
+        start: startOfQuarter(now),
+        end: endOfQuarter(now),
+      });
     default:
-      return false;
-  }
-}
-
-function addUnitToDate(
-  date: Date,
-  amount: number,
-  unit: VariableDateViewFilterValueUnit,
-): Date | null {
-  switch (unit) {
-    case 'DAY':
-      return addDays(date, amount);
-    case 'WEEK':
-      return addWeeks(date, amount);
-    case 'MONTH':
-      return addMonths(date, amount);
-    case 'YEAR':
-      return addYears(date, amount);
-    default:
-      return null;
-  }
-}
-
-function subtractUnitFromDate(
-  date: Date,
-  amount: number,
-  unit: VariableDateViewFilterValueUnit,
-): Date | null {
-  switch (unit) {
-    case 'DAY':
-      return subDays(date, amount);
-    case 'WEEK':
-      return subWeeks(date, amount);
-    case 'MONTH':
-      return subMonths(date, amount);
-    case 'YEAR':
-      return subYears(date, amount);
-    default:
-      return null;
+      return assertUnreachable(unit);
   }
 }

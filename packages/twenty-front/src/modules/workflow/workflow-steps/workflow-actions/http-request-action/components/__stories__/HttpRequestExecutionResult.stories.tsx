@@ -1,8 +1,7 @@
-import { type Meta, type StoryObj } from '@storybook/react';
-import { expect, within } from '@storybook/test';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
+import { expect, within } from 'storybook/test';
 import { ComponentDecorator } from 'twenty-ui/testing';
 
-import { I18nFrontDecorator } from '~/testing/decorators/I18nFrontDecorator';
 import { SnackBarDecorator } from '~/testing/decorators/SnackBarDecorator';
 
 import { HttpRequestExecutionResult } from '@/workflow/workflow-steps/workflow-actions/http-request-action/components/HttpRequestExecutionResult';
@@ -11,7 +10,7 @@ import type { HttpRequestTestData } from '@/workflow/workflow-steps/workflow-act
 const meta: Meta<typeof HttpRequestExecutionResult> = {
   title: 'Modules/Workflow/Actions/HttpRequest/ExecutionResult',
   component: HttpRequestExecutionResult,
-  decorators: [ComponentDecorator, SnackBarDecorator, I18nFrontDecorator],
+  decorators: [ComponentDecorator, SnackBarDecorator],
   parameters: {
     layout: 'fullscreen',
   },
@@ -234,11 +233,12 @@ export const NetworkError: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     expect(await canvas.findByText('Request Failed')).toBeVisible();
-    expect(
-      await canvas.findByText(
-        'Network connection failed: timeout after 30 seconds',
-      ),
-    ).toBeVisible();
+    expect(await canvas.findByText('An error occurred')).toBeVisible();
+
+    const codeEditorValue = await canvas.findByTestId('code-editor-value');
+    expect(codeEditorValue).toHaveValue(
+      'Network connection failed: timeout after 30 seconds',
+    );
   },
 };
 
@@ -311,7 +311,6 @@ export const LargeResponse: Story = {
             pagination: {
               totalCount: 500,
               page: 1,
-              limit: 50,
               totalPages: 10,
             },
           },

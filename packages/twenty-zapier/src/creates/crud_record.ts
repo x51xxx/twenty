@@ -1,12 +1,18 @@
-import { Bundle, ZObject } from 'zapier-platform-core';
-import { findObjectNamesSingularKey } from '../triggers/find_object_names_singular';
-import { listRecordIdsKey } from '../triggers/list_record_ids';
-import { computeInputFields } from '../utils/computeInputFields';
-import { InputData } from '../utils/data.types';
-import handleQueryParams from '../utils/handleQueryParams';
-import requestDb, { requestSchema } from '../utils/requestDb';
-import { DatabaseEventAction } from '../utils/triggers/triggers.utils';
-import { capitalize } from 'twenty-shared/utils';
+import type { Bundle, ZObject } from 'zapier-platform-core';
+import { findObjectNamesSingularKey } from 'src/triggers/find_object_names_singular';
+import { listRecordIdsKey } from 'src/triggers/list_record_ids';
+import { computeInputFields } from 'src/utils/computeInputFields';
+import { type InputData } from 'src/utils/data.types';
+import handleQueryParams from 'src/utils/handleQueryParams';
+import requestDb, { requestSchema } from 'src/utils/requestDb';
+import { DatabaseEventAction } from 'src/utils/triggers/triggers.utils';
+import { isNonEmptyString } from '@sniptt/guards';
+
+const capitalize = (stringToCapitalize: string) => {
+  if (!isNonEmptyString(stringToCapitalize)) return '';
+
+  return stringToCapitalize[0].toUpperCase() + stringToCapitalize.slice(1);
+};
 
 export const recordInputFields = async (
   z: ZObject,
@@ -97,7 +103,7 @@ const perform = async (z: ZObject, bundle: Bundle) => {
     )
     {id}
   }`;
-  return await requestDb(z, bundle, query);
+  return await requestDb({ z, bundle, query });
 };
 
 export const crudRecordKey = 'crud_record';

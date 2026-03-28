@@ -1,17 +1,8 @@
-import { useRecordIndexContextOrThrow } from '@/object-record/record-index/contexts/RecordIndexContext';
-import { RecordTableCellCheckbox } from '@/object-record/record-table/record-table-cell/components/RecordTableCellCheckbox';
-import { RecordTableCellGrip } from '@/object-record/record-table/record-table-cell/components/RecordTableCellGrip';
-import { RecordTableLastEmptyCell } from '@/object-record/record-table/record-table-cell/components/RecordTableLastEmptyCell';
-import { RecordTableCells } from '@/object-record/record-table/record-table-row/components/RecordTableCells';
 import { RecordTableDraggableTr } from '@/object-record/record-table/record-table-row/components/RecordTableDraggableTr';
-import { RecordTableRowArrowKeysEffect } from '@/object-record/record-table/record-table-row/components/RecordTableRowArrowKeysEffect';
-import { RecordTableRowHotkeyEffect } from '@/object-record/record-table/record-table-row/components/RecordTableRowHotkeyEffect';
-import { isRecordTableRowFocusActiveComponentState } from '@/object-record/record-table/states/isRecordTableRowFocusActiveComponentState';
-import { isRecordTableRowFocusedComponentFamilyState } from '@/object-record/record-table/states/isRecordTableRowFocusedComponentFamilyState';
-import { ListenRecordUpdatesEffect } from '@/subscription/components/ListenRecordUpdatesEffect';
-import { getDefaultRecordFieldsToListen } from '@/subscription/utils/getDefaultRecordFieldsToListen.util';
-import { useRecoilComponentFamilyValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentFamilyValue';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { RecordTableRowCells } from '@/object-record/record-table/record-table-row/components/RecordTableRowCells';
+import { RecordTableStaticTr } from '@/object-record/record-table/record-table-row/components/RecordTableStaticTr';
+import { isRecordTableDragColumnHiddenComponentState } from '@/object-record/record-table/states/isRecordTableDragColumnHiddenComponentState';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 
 type RecordTableRowProps = {
   recordId: string;
@@ -24,17 +15,17 @@ export const RecordTableRow = ({
   rowIndexForFocus,
   rowIndexForDrag,
 }: RecordTableRowProps) => {
-  const { objectNameSingular } = useRecordIndexContextOrThrow();
-  const listenedFields = getDefaultRecordFieldsToListen({
-    objectNameSingular,
-  });
-  const isFocused = useRecoilComponentFamilyValue(
-    isRecordTableRowFocusedComponentFamilyState,
-    rowIndexForFocus,
+  const isRecordTableDragColumnHidden = useAtomComponentStateValue(
+    isRecordTableDragColumnHiddenComponentState,
   );
-  const isRowFocusActive = useRecoilComponentValue(
-    isRecordTableRowFocusActiveComponentState,
-  );
+
+  if (isRecordTableDragColumnHidden) {
+    return (
+      <RecordTableStaticTr recordId={recordId} focusIndex={rowIndexForFocus}>
+        <RecordTableRowCells rowIndexForFocus={rowIndexForFocus} />
+      </RecordTableStaticTr>
+    );
+  }
 
   return (
     <RecordTableDraggableTr
@@ -42,21 +33,7 @@ export const RecordTableRow = ({
       draggableIndex={rowIndexForDrag}
       focusIndex={rowIndexForFocus}
     >
-      {isRowFocusActive && isFocused && (
-        <>
-          <RecordTableRowHotkeyEffect />
-          <RecordTableRowArrowKeysEffect />
-        </>
-      )}
-      <RecordTableCellGrip />
-      <RecordTableCellCheckbox />
-      <RecordTableCells />
-      <RecordTableLastEmptyCell />
-      <ListenRecordUpdatesEffect
-        objectNameSingular={objectNameSingular}
-        recordId={recordId}
-        listenedFields={listenedFields}
-      />
+      <RecordTableRowCells rowIndexForFocus={rowIndexForFocus} />
     </RecordTableDraggableTr>
   );
 };

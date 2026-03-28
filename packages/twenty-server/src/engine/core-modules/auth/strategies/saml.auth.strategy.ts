@@ -37,40 +37,49 @@ export class SamlAuthStrategy extends PassportStrategy(
   'saml',
 ) {
   constructor(private readonly sSOService: SSOService) {
-    super({
-      getSamlOptions: (req, callback) => {
-        this.sSOService
-          .findSSOIdentityProviderById(req.params.identityProviderId)
-          .then((identityProvider) => {
-            if (
-              identityProvider &&
-              this.sSOService.isSAMLIdentityProvider(identityProvider)
-            ) {
-              const config: SamlConfig = {
-                entryPoint: identityProvider.ssoURL,
-                issuer: this.sSOService.buildIssuerURL(identityProvider),
-                callbackUrl: this.sSOService.buildCallbackUrl(identityProvider),
-                idpCert: identityProvider.certificate,
-                // TODO: Improve the feature by sign the response
-                wantAssertionsSigned: false,
-                wantAuthnResponseSigned: false,
-                disableRequestedAuthnContext: true,
-                signatureAlgorithm: 'sha256',
-              };
+    super(
+      {
+        getSamlOptions: (req, callback) => {
+          this.sSOService
+            .findSSOIdentityProviderById(req.params.identityProviderId)
+            .then((identityProvider) => {
+              if (
+                identityProvider &&
+                this.sSOService.isSAMLIdentityProvider(identityProvider)
+              ) {
+                // IdP metadata XML typically has whitespace-formatted certificates
+                const sanitizedCertificate =
+                  identityProvider.certificate.replace(/\s/g, '');
 
-              return callback(null, config);
-            }
+                const config: SamlConfig = {
+                  entryPoint: identityProvider.ssoURL,
+                  issuer: this.sSOService.buildIssuerURL(identityProvider),
+                  callbackUrl:
+                    this.sSOService.buildCallbackUrl(identityProvider),
+                  idpCert: sanitizedCertificate,
+                  wantAssertionsSigned: true,
+                  wantAuthnResponseSigned: false,
+                  disableRequestedAuthnContext: true,
+                  signatureAlgorithm: 'sha256',
+                };
 
-            // TODO: improve error management
-            return callback(new Error('Invalid SAML identity provider'));
-          })
-          .catch((err) => {
-            // TODO: improve error management
-            return callback(err);
-          });
+                return callback(null, config);
+              }
+
+              // TODO: improve error management
+              return callback(new Error('Invalid SAML identity provider'));
+            })
+            .catch((err) => {
+              // TODO: improve error management
+              return callback(err);
+            });
+        },
+        passReqToCallback: true,
+      } as PassportSamlConfig & MultiStrategyConfig,
+      async (request: Request, profile, done) => {
+        await this.validate(request, profile, done);
       },
-      passReqToCallback: true,
-    } as PassportSamlConfig & MultiStrategyConfig);
+    );
   }
 
   authenticate(req: Request, options: AuthenticateOptions) {

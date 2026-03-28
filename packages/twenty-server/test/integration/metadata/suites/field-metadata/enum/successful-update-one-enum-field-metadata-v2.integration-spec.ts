@@ -4,15 +4,13 @@ import { createOneFieldMetadata } from 'test/integration/metadata/suites/field-m
 import { deleteOneFieldMetadata } from 'test/integration/metadata/suites/field-metadata/utils/delete-one-field-metadata.util';
 import { updateOneFieldMetadata } from 'test/integration/metadata/suites/field-metadata/utils/update-one-field-metadata.util';
 import { CUSTOM_OBJECT_DISHES } from 'test/integration/metadata/suites/object-metadata/constants/custom-object-dishes.constants';
+import { createOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/create-one-object-metadata.util';
 import { deleteOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/delete-one-object-metadata.util';
 import { updateOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/update-one-object-metadata.util';
-import { updateFeatureFlag } from 'test/integration/metadata/suites/utils/update-feature-flag.util';
 import { eachTestingContextFilter } from 'twenty-shared/testing';
 import { FieldMetadataType } from 'twenty-shared/types';
 import { isDefined } from 'twenty-shared/utils';
-import { createOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/create-one-object-metadata.util';
 
-import { FeatureFlagKey } from 'src/engine/core-modules/feature-flag/enums/feature-flag-key.enum';
 import {
   type FieldMetadataComplexOption,
   type FieldMetadataDefaultOption,
@@ -47,12 +45,6 @@ describe.each(fieldMetadataEnumTypes)(
     ];
 
     beforeAll(async () => {
-      await updateFeatureFlag({
-        expectToFail: false,
-        featureFlag: FeatureFlagKey.IS_WORKSPACE_MIGRATION_V2_ENABLED,
-        value: true,
-      });
-
       const {
         labelPlural,
         description,
@@ -86,11 +78,6 @@ describe.each(fieldMetadataEnumTypes)(
       await deleteOneObjectMetadata({
         expectToFail: false,
         input: { idToDelete: createdObjectMetadataId },
-      });
-      await updateFeatureFlag({
-        expectToFail: false,
-        featureFlag: FeatureFlagKey.IS_WORKSPACE_MIGRATION_V2_ENABLED,
-        value: false,
       });
     });
 
@@ -141,6 +128,7 @@ describe.each(fieldMetadataEnumTypes)(
         : rawDefaultValue;
 
       const { data: firstUpdate } = await updateOneFieldMetadata({
+        expectToFail: false,
         input: {
           idToUpdate: createdFieldMetadataId,
           updatePayload: {
@@ -159,6 +147,7 @@ describe.each(fieldMetadataEnumTypes)(
 
       const updatedOptions = initialOptions.slice(1);
       const { data: secondUpdate, errors } = await updateOneFieldMetadata({
+        expectToFail: false,
         input: {
           idToUpdate: createdFieldMetadataId,
           updatePayload: {

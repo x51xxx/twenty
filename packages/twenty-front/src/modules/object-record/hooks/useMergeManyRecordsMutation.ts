@@ -1,12 +1,12 @@
 import gql from 'graphql-tag';
-import { useRecoilValue } from 'recoil';
 
 import { useObjectMetadataItem } from '@/object-metadata/hooks/useObjectMetadataItem';
-import { objectMetadataItemsState } from '@/object-metadata/states/objectMetadataItemsState';
+import { objectMetadataItemsSelector } from '@/object-metadata/states/objectMetadataItemsSelector';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { mapObjectMetadataToGraphQLQuery } from '@/object-metadata/utils/mapObjectMetadataToGraphQLQuery';
 import { EMPTY_MUTATION } from '@/object-record/constants/EmptyMutation';
-import { type RecordGqlOperationGqlRecordFields } from '@/object-record/graphql/types/RecordGqlOperationGqlRecordFields';
-import { generateDepthOneRecordGqlFields } from '@/object-record/graphql/utils/generateDepthOneRecordGqlFields';
+import { useGenerateDepthRecordGqlFieldsFromObject } from '@/object-record/graphql/record-gql-fields/hooks/useGenerateDepthRecordGqlFieldsFromObject';
+import { type RecordGqlOperationGqlRecordFields } from 'twenty-shared/types';
 import { useObjectPermissions } from '@/object-record/hooks/useObjectPermissions';
 import { getMergeManyRecordsMutationResponseField } from '@/object-record/utils/getMergeManyRecordsMutationResponseField';
 import { capitalize } from 'twenty-shared/utils';
@@ -22,14 +22,15 @@ export const useMergeManyRecordsMutation = ({
   const { objectMetadataItem } = useObjectMetadataItem({
     objectNameSingular,
   });
-
-  const appliedRecordGqlFields =
-    recordGqlFields ??
-    generateDepthOneRecordGqlFields({
-      objectMetadataItem,
+  const { recordGqlFields: depthOneRecordGqlFields } =
+    useGenerateDepthRecordGqlFieldsFromObject({
+      objectNameSingular,
+      depth: 1,
     });
 
-  const objectMetadataItems = useRecoilValue(objectMetadataItemsState);
+  const appliedRecordGqlFields = recordGqlFields ?? depthOneRecordGqlFields;
+
+  const objectMetadataItems = useAtomStateValue(objectMetadataItemsSelector);
 
   const { objectPermissionsByObjectMetadataId } = useObjectPermissions();
 

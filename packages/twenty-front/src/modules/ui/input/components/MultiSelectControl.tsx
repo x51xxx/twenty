@@ -1,16 +1,26 @@
 import {
   type SelectControlProps,
   StyledControlContainer,
-  StyledSelectControlIconChevronDown,
 } from '@/ui/input/components/SelectControl';
-import { useTheme } from '@emotion/react';
-import pluralize from 'pluralize';
-import React from 'react';
+import { styled } from '@linaria/react';
+import React, { useContext } from 'react';
 import { isDefined } from 'twenty-shared/utils';
 import {
+  IconChevronDown,
   type IconComponent,
   OverflowingTextWithTooltip,
 } from 'twenty-ui/display';
+import { ThemeContext, themeCssVariables } from 'twenty-ui/theme-constants';
+
+const StyledIconChevronDownWrapper = styled.div<{
+  disabled?: boolean;
+}>`
+  color: ${({ disabled }) =>
+    disabled
+      ? themeCssVariables.font.color.extraLight
+      : themeCssVariables.font.color.tertiary};
+  display: flex;
+`;
 
 type MultiSelectOptionType = {
   label: string;
@@ -32,18 +42,12 @@ export const MultiSelectControl = ({
   textAccent = 'default',
   hasRightElement,
 }: MultiSelectControlProps) => {
-  const theme = useTheme();
-
-  if (selectedOptions.length === 0) {
-    return null;
-  }
-
-  const firstSelectedOption = selectedOptions[0];
-  const selectedOptionsCount = selectedOptions.length;
+  const { theme } = useContext(ThemeContext);
+  const firstSelectedOption = selectedOptions?.[0];
   return (
     <StyledControlContainer
       disabled={isDisabled}
-      hasIcon={isDefined(fixedIcon) || isDefined(firstSelectedOption.Icon)}
+      hasIcon={isDefined(fixedIcon) || isDefined(firstSelectedOption?.Icon)}
       selectSizeVariant={selectSizeVariant}
       textAccent={textAccent}
       hasRightElement={hasRightElement}
@@ -54,7 +58,7 @@ export const MultiSelectControl = ({
           size: theme.icon.size.md,
           stroke: theme.icon.stroke.sm,
         })
-      ) : isDefined(firstSelectedOption.Icon) ? (
+      ) : isDefined(firstSelectedOption?.Icon) ? (
         <firstSelectedOption.Icon
           color={isDisabled ? theme.font.color.light : theme.font.color.primary}
           size={theme.icon.size.md}
@@ -62,19 +66,14 @@ export const MultiSelectControl = ({
         />
       ) : null}
       {isDefined(fixedText) ? (
-        <OverflowingTextWithTooltip
-          text={`${selectedOptionsCount} ${
-            selectedOptionsCount <= 1 ? fixedText : pluralize(fixedText)
-          }`}
-        />
+        <OverflowingTextWithTooltip text={fixedText} />
       ) : (
-        <OverflowingTextWithTooltip text={firstSelectedOption.label} />
+        <OverflowingTextWithTooltip text={firstSelectedOption?.label ?? ''} />
       )}
 
-      <StyledSelectControlIconChevronDown
-        disabled={isDisabled}
-        size={theme.icon.size.md}
-      />
+      <StyledIconChevronDownWrapper disabled={isDisabled}>
+        <IconChevronDown size={theme.icon.size.md} />
+      </StyledIconChevronDownWrapper>
     </StyledControlContainer>
   );
 };

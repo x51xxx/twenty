@@ -1,3 +1,4 @@
+import { t } from '@lingui/core/macro';
 import { FormFieldInputContainer } from '@/object-record/record-field/ui/form-types/components/FormFieldInputContainer';
 import { FormFieldInputInnerContainer } from '@/object-record/record-field/ui/form-types/components/FormFieldInputInnerContainer';
 import { FormFieldInputRowContainer } from '@/object-record/record-field/ui/form-types/components/FormFieldInputRowContainer';
@@ -7,17 +8,24 @@ import { TextInput } from '@/ui/field/input/components/TextInput';
 import { InputHint } from '@/ui/input/components/InputHint';
 import { InputLabel } from '@/ui/input/components/InputLabel';
 import { isStandaloneVariableString } from '@/workflow/utils/isStandaloneVariableString';
-import styled from '@emotion/styled';
 import isEmpty from 'lodash.isempty';
 import { useId, useState } from 'react';
 import { isDefined } from 'twenty-shared/utils';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import {
   canBeCastAsNumberOrNull,
   castAsNumberOrNull,
 } from '~/utils/cast-as-number-or-null';
 
-const StyledInput = styled(TextInput)`
-  padding: ${({ theme }) => `${theme.spacing(1)} ${theme.spacing(2)}`};
+import { styled } from '@linaria/react';
+
+const StyledInputWrapper = styled.div`
+  align-items: center;
+  display: flex;
+
+  & input {
+    padding: ${themeCssVariables.spacing[1]} ${themeCssVariables.spacing[2]};
+  }
 `;
 
 type FormNumberFieldInputProps = {
@@ -32,6 +40,16 @@ type FormNumberFieldInputProps = {
   error?: string;
   onError?: (error: string | undefined) => void;
 };
+
+type FormNumberFieldInputValue =
+  | {
+      type: 'static';
+      value: string;
+    }
+  | {
+      type: 'variable';
+      value: string;
+    };
 
 export const FormNumberFieldInput = ({
   label,
@@ -50,31 +68,22 @@ export const FormNumberFieldInput = ({
     undefined,
   );
 
-  const [draftValue, setDraftValue] = useState<
-    | {
-        type: 'static';
-        value: string;
+  const draftValue: FormNumberFieldInputValue = isStandaloneVariableString(
+    defaultValue,
+  )
+    ? {
+        type: 'variable',
+        value: defaultValue,
       }
-    | {
-        type: 'variable';
-        value: string;
-      }
-  >(
-    isStandaloneVariableString(defaultValue)
-      ? {
-          type: 'variable',
-          value: defaultValue,
-        }
-      : {
-          type: 'static',
-          value: isDefined(defaultValue) ? String(defaultValue) : '',
-        },
-  );
+    : {
+        type: 'static',
+        value: isDefined(defaultValue) ? String(defaultValue) : '',
+      };
 
   const persistNumber = (newValue: string) => {
     if (!canBeCastAsNumberOrNull(newValue)) {
-      setErrorMessage('Invalid number');
-      onError?.('Invalid number');
+      setErrorMessage(t`Invalid number`);
+      onError?.(t`Invalid number`);
       return;
     }
 
@@ -87,29 +96,14 @@ export const FormNumberFieldInput = ({
   };
 
   const handleChange = (newText: string) => {
-    setDraftValue({
-      type: 'static',
-      value: newText,
-    });
-
     persistNumber(newText.trim());
   };
 
   const handleUnlinkVariable = () => {
-    setDraftValue({
-      type: 'static',
-      value: '',
-    });
-
     onChange(null);
   };
 
   const handleVariableTagInsert = (variableName: string) => {
-    setDraftValue({
-      type: 'variable',
-      value: variableName,
-    });
-
     onChange(variableName);
   };
 
@@ -126,18 +120,20 @@ export const FormNumberFieldInput = ({
           onBlur={onBlur}
         >
           {draftValue.type === 'static' ? (
-            <StyledInput
-              instanceId={instanceId}
-              placeholder={
-                isDefined(placeholder) && !isEmpty(placeholder)
-                  ? placeholder
-                  : 'Enter a number'
-              }
-              value={draftValue.value}
-              copyButton={false}
-              onChange={handleChange}
-              disabled={readonly}
-            />
+            <StyledInputWrapper>
+              <TextInput
+                instanceId={instanceId}
+                placeholder={
+                  isDefined(placeholder) && !isEmpty(placeholder)
+                    ? placeholder
+                    : t`Enter a number`
+                }
+                value={draftValue.value}
+                copyButton={false}
+                onChange={handleChange}
+                disabled={readonly}
+              />
+            </StyledInputWrapper>
           ) : (
             <VariableChipStandalone
               rawVariableName={draftValue.value}

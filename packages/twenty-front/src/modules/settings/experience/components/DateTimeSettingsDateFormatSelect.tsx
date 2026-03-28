@@ -1,10 +1,10 @@
 import { formatInTimeZone } from 'date-fns-tz';
 
 import { DateFormat } from '@/localization/constants/DateFormat';
-import { detectDateFormat } from '@/localization/utils/detectDateFormat';
-import { detectTimeZone } from '@/localization/utils/detectTimeZone';
+import { detectDateFormat } from '@/localization/utils/detection/detectDateFormat';
+import { detectTimeZone } from '@/localization/utils/detection/detectTimeZone';
 import { Select } from '@/ui/input/components/Select';
-import { t } from '@lingui/core/macro';
+import { useLingui } from '@lingui/react/macro';
 
 type DateTimeSettingsDateFormatSelectProps = {
   value: DateFormat;
@@ -17,6 +17,8 @@ export const DateTimeSettingsDateFormatSelect = ({
   timeZone,
   value,
 }: DateTimeSettingsDateFormatSelectProps) => {
+  const { t } = useLingui();
+
   const systemTimeZone = detectTimeZone();
 
   const usedTimeZone = timeZone === 'system' ? systemTimeZone : timeZone;
@@ -32,38 +34,38 @@ export const DateTimeSettingsDateFormatSelect = ({
   return (
     <Select
       dropdownId="datetime-settings-date-format"
-      dropdownWidth={218}
+      dropdownWidth={320}
       label={t`Date format`}
       fullWidth
-      dropdownWidthAuto
       value={value}
+      pinnedOption={{
+        label: t`System settings`,
+        value: DateFormat.SYSTEM,
+        contextualText: systemDateFormatLabel,
+      }}
       options={[
         {
-          label: t`System settings - ${systemDateFormatLabel}`,
-          value: DateFormat.SYSTEM,
-        },
-        {
-          label: `${formatInTimeZone(
+          label: formatInTimeZone(
             Date.now(),
             usedTimeZone,
             DateFormat.MONTH_FIRST,
-          )}`,
+          ),
           value: DateFormat.MONTH_FIRST,
         },
         {
-          label: `${formatInTimeZone(
+          label: formatInTimeZone(
             Date.now(),
             usedTimeZone,
             DateFormat.DAY_FIRST,
-          )}`,
+          ),
           value: DateFormat.DAY_FIRST,
         },
         {
-          label: `${formatInTimeZone(
+          label: formatInTimeZone(
             Date.now(),
             usedTimeZone,
             DateFormat.YEAR_FIRST,
-          )}`,
+          ),
           value: DateFormat.YEAR_FIRST,
         },
       ]}

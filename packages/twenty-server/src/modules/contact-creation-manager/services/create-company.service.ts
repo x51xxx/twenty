@@ -1,19 +1,23 @@
 import { Injectable } from '@nestjs/common';
 
-import axios, { type AxiosInstance } from 'axios';
+import { type AxiosInstance } from 'axios';
 import uniqBy from 'lodash.uniqby';
 import { TWENTY_COMPANIES_BASE_URL } from 'twenty-shared/constants';
-import { type ConnectedAccountProvider } from 'twenty-shared/types';
-import { lowercaseUrlOriginAndRemoveTrailingSlash } from 'twenty-shared/utils';
+import {
+  type ConnectedAccountProvider,
+  type FieldActorSource,
+} from 'twenty-shared/types';
+import { isDefined, normalizeUrlOrigin } from 'twenty-shared/utils';
 import { type DeepPartial, ILike } from 'typeorm';
 
-import { type FieldActorSource } from 'src/engine/metadata-modules/field-metadata/composite-types/actor.composite-type';
+import { SecureHttpClientService } from 'src/engine/core-modules/secure-http-client/secure-http-client.service';
+import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
 import { type WorkspaceRepository } from 'src/engine/twenty-orm/repository/workspace.repository';
-import { TwentyORMGlobalManager } from 'src/engine/twenty-orm/twenty-orm-global.manager';
+import { buildSystemAuthContext } from 'src/engine/twenty-orm/utils/build-system-auth-context.util';
 import { CompanyWorkspaceEntity } from 'src/modules/company/standard-objects/company.workspace-entity';
 import { extractDomainFromLink } from 'src/modules/contact-creation-manager/utils/extract-domain-from-link.util';
 import { getCompanyNameFromDomainName } from 'src/modules/contact-creation-manager/utils/get-company-name-from-domain-name.util';
-import { type WorkspaceMemberWorkspaceEntity } from 'src/modules/workspace-member/standard-objects/workspace-member.workspace-entity';
+import { WorkspaceMemberWorkspaceEntity } from 'src/modules/workspace-member/standard-objects/workspace-member.workspace-entity';
 import { computeDisplayName } from 'src/utils/compute-display-name';
 
 export type CompanyToCreate = {
@@ -29,13 +33,16 @@ export type CompanyToCreate = {
 export class CreateCompanyService {
   private readonly httpService: AxiosInstance;
 
-  constructor(private readonly twentyORMGlobalManager: TwentyORMGlobalManager) {
-    this.httpService = axios.create({
+  constructor(
+    private readonly globalWorkspaceOrmManager: GlobalWorkspaceOrmManager,
+    private readonly secureHttpClientService: SecureHttpClientService,
+  ) {
+    this.httpService = this.secureHttpClientService.getHttpClient({
       baseURL: TWENTY_COMPANIES_BASE_URL,
     });
   }
 
-  async createCompanies(
+  async createOrRestoreCompanies(
     companies: CompanyToCreate[],
     workspaceId: string,
   ): Promise<{
@@ -45,70 +52,135 @@ export class CreateCompanyService {
       return {};
     }
 
-    const companyRepository =
-      await this.twentyORMGlobalManager.getRepositoryForWorkspace(
-        workspaceId,
-        CompanyWorkspaceEntity,
-        {
-          shouldBypassPermissionChecks: true,
-        },
-      );
+    const authContext = buildSystemAuthContext(workspaceId);
 
-    // Remove trailing slash from domain names
-    const companiesWithoutTrailingSlash = companies.map((company) => ({
-      ...company,
-      domainName: company.domainName
-        ? lowercaseUrlOriginAndRemoveTrailingSlash(company.domainName)
-        : undefined,
-    }));
+    return this.globalWorkspaceOrmManager.executeInWorkspaceContext(
+      async () => {
+        const companyRepository =
+          await this.globalWorkspaceOrmManager.getRepository(
+            workspaceId,
+            CompanyWorkspaceEntity,
+            {
+              shouldBypassPermissionChecks: true,
+            },
+          );
 
-    // Avoid creating duplicate companies, e.g. example.com and example.com/
-    const uniqueCompanies = uniqBy(companiesWithoutTrailingSlash, 'domainName');
-    const conditions = uniqueCompanies.map((companyToCreate) => ({
-      domainName: {
-        primaryLinkUrl: ILike(`%${companyToCreate.domainName}%`),
+        const companiesWithoutTrailingSlash = companies.map((company) => ({
+          ...company,
+          domainName: company.domainName
+            ? normalizeUrlOrigin(company.domainName)
+            : undefined,
+        }));
+
+        const uniqueCompanies = uniqBy(
+          companiesWithoutTrailingSlash,
+          'domainName',
+        );
+        const conditions = uniqueCompanies.map((companyToCreate) => ({
+          domainName: {
+            primaryLinkUrl: ILike(`%${companyToCreate.domainName}%`),
+          },
+        }));
+
+        const existingCompanies = await companyRepository.find({
+          where: conditions,
+          withDeleted: true,
+        });
+        const existingCompanyIdsMap = this.createCompanyMap(existingCompanies);
+
+        const newCompaniesToCreate = uniqueCompanies.filter(
+          (company) =>
+            !existingCompanies.some(
+              (existingCompany) =>
+                existingCompany.domainName &&
+                extractDomainFromLink(
+                  existingCompany.domainName.primaryLinkUrl,
+                ) === company.domainName,
+            ),
+        );
+
+        const companiesToRestore = this.filterCompaniesToRestore(
+          uniqueCompanies,
+          existingCompanies,
+        );
+
+        if (
+          newCompaniesToCreate.length === 0 &&
+          companiesToRestore.length === 0
+        ) {
+          return existingCompanyIdsMap;
+        }
+
+        let lastCompanyPosition =
+          await this.getLastCompanyPosition(companyRepository);
+        const newCompaniesData = await Promise.all(
+          newCompaniesToCreate.map((company) =>
+            this.prepareCompanyData(company, ++lastCompanyPosition),
+          ),
+        );
+
+        const createdCompanies = await companyRepository.save(newCompaniesData);
+
+        const restoredCompanies = await companyRepository.updateMany(
+          companiesToRestore.map((company) => {
+            return {
+              criteria: company.id,
+              partialEntity: {
+                deletedAt: null,
+              },
+            };
+          }),
+          undefined,
+          ['domainNamePrimaryLinkUrl', 'id'],
+        );
+
+        const formattedRestoredCompanies = restoredCompanies.raw.map(
+          (row: { id: string; domainNamePrimaryLinkUrl: string }) => {
+            return {
+              id: row.id,
+              domainName: {
+                primaryLinkUrl: row.domainNamePrimaryLinkUrl,
+              },
+            };
+          },
+        );
+
+        return {
+          ...existingCompanyIdsMap,
+          ...(createdCompanies.length > 0
+            ? this.createCompanyMap(createdCompanies)
+            : {}),
+          ...(formattedRestoredCompanies.length > 0
+            ? this.createCompanyMap(formattedRestoredCompanies)
+            : {}),
+        };
       },
-    }));
+      authContext,
+    );
+  }
 
-    // Find existing companies
-    const existingCompanies = await companyRepository.find({
-      where: conditions,
-    });
-    const existingCompanyIdsMap = this.createCompanyMap(existingCompanies);
-
-    // Filter out companies that already exist
-    const newCompaniesToCreate = uniqueCompanies.filter(
-      (company) =>
-        !existingCompanies.some(
+  private filterCompaniesToRestore(
+    uniqueCompanies: CompanyToCreate[],
+    existingCompanies: CompanyWorkspaceEntity[],
+  ) {
+    return uniqueCompanies
+      .map((company) => {
+        const existingCompany = existingCompanies.find(
           (existingCompany) =>
             existingCompany.domainName &&
             extractDomainFromLink(existingCompany.domainName.primaryLinkUrl) ===
               company.domainName,
-        ),
-    );
+        );
 
-    if (newCompaniesToCreate.length === 0) {
-      return existingCompanyIdsMap;
-    }
-
-    // Retrieve the last company position
-    let lastCompanyPosition =
-      await this.getLastCompanyPosition(companyRepository);
-    const newCompaniesData = await Promise.all(
-      newCompaniesToCreate.map((company) =>
-        this.prepareCompanyData(company, ++lastCompanyPosition),
-      ),
-    );
-
-    // Create new companies
-    const createdCompanies = await companyRepository.save(newCompaniesData);
-
-    const createdCompanyIdsMap = this.createCompanyMap(createdCompanies);
-
-    return {
-      ...existingCompanyIdsMap,
-      ...createdCompanyIdsMap,
-    };
+        return isDefined(existingCompany)
+          ? {
+              domainName: company.domainName,
+              id: existingCompany.id,
+              deletedAt: null,
+            }
+          : undefined;
+      })
+      .filter(isDefined);
   }
 
   private async prepareCompanyData(
@@ -142,7 +214,9 @@ export class CreateCompanyService {
     };
   }
 
-  private createCompanyMap(companies: DeepPartial<CompanyWorkspaceEntity>[]) {
+  private createCompanyMap(
+    companies: Pick<CompanyWorkspaceEntity, 'id' | 'domainName'>[],
+  ) {
     return companies.reduce(
       (acc, company) => {
         if (!company.domainName?.primaryLinkUrl || !company.id) {

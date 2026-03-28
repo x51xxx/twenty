@@ -1,35 +1,37 @@
 import { FieldContext } from '@/object-record/record-field/ui/contexts/FieldContext';
 import { recordStoreFamilyState } from '@/object-record/record-store/states/recordStoreFamilyState';
+import { useAtomFamilyStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomFamilyStateValue';
 import { useRecordTitleCell } from '@/object-record/record-title-cell/hooks/useRecordTitleCell';
 import { type RecordTitleCellContainerType } from '@/object-record/record-title-cell/types/RecordTitleCellContainerType';
 import { getRecordFieldInputInstanceId } from '@/object-record/utils/getRecordFieldInputId';
-import { withTheme, type Theme } from '@emotion/react';
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
+import { t } from '@lingui/core/macro';
 import { useContext } from 'react';
-import { useRecoilValue } from 'recoil';
+import { isDefined } from 'twenty-shared/utils';
 import { OverflowingTextWithTooltip } from 'twenty-ui/display';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 const StyledDiv = styled.div`
+  align-items: center;
   background: inherit;
   border: none;
-  border-radius: ${({ theme }) => theme.border.radius.sm};
-  color: ${({ theme }) => theme.font.color.primary};
-  cursor: pointer;
-  overflow: hidden;
-  height: 28px;
-  padding: ${({ theme }) => theme.spacing(0, 1.25)};
+  border-radius: ${themeCssVariables.border.radius.sm};
   box-sizing: border-box;
+  color: ${themeCssVariables.font.color.primary};
+  cursor: pointer;
   display: flex;
-  align-items: center;
+  height: 24px;
   justify-content: center;
+  overflow: hidden;
+  padding: ${themeCssVariables.spacing[0]} 5px;
   :hover {
-    background: ${({ theme }) => theme.background.transparent.light};
+    background: ${themeCssVariables.background.transparent.light};
   }
 `;
 
-const StyledEmptyText = withTheme(styled.div<{ theme: Theme }>`
-  color: ${({ theme }) => theme.font.color.tertiary};
-`);
+const StyledEmptyText = styled.div`
+  color: ${themeCssVariables.font.color.tertiary};
+`;
 
 export const RecordTitleCellSingleTextDisplayMode = ({
   containerType,
@@ -38,10 +40,10 @@ export const RecordTitleCellSingleTextDisplayMode = ({
 }) => {
   const { recordId, fieldDefinition } = useContext(FieldContext);
 
-  const recordValue = useRecoilValue(recordStoreFamilyState(recordId));
+  const recordStore = useAtomFamilyStateValue(recordStoreFamilyState, recordId);
 
-  const isEmpty =
-    recordValue?.[fieldDefinition.metadata.fieldName]?.trim() === '';
+  const fieldValue = recordStore?.[fieldDefinition.metadata.fieldName];
+  const isEmpty = !isDefined(fieldValue) || fieldValue.trim() === '';
 
   const { openRecordTitleCell } = useRecordTitleCell();
 
@@ -50,7 +52,7 @@ export const RecordTitleCellSingleTextDisplayMode = ({
       onClick={() => {
         openRecordTitleCell({
           recordId,
-          fieldName: fieldDefinition.metadata.fieldName,
+          fieldMetadataItemId: fieldDefinition.fieldMetadataId,
           instanceId: getRecordFieldInputInstanceId({
             recordId,
             fieldName: fieldDefinition.metadata.fieldName,
@@ -60,11 +62,11 @@ export const RecordTitleCellSingleTextDisplayMode = ({
       }}
     >
       {isEmpty ? (
-        <StyledEmptyText>Untitled</StyledEmptyText>
+        <StyledEmptyText>{t`Untitled`}</StyledEmptyText>
       ) : (
         <OverflowingTextWithTooltip
           text={
-            recordValue?.[fieldDefinition.metadata.fieldName] ||
+            recordStore?.[fieldDefinition.metadata.fieldName] ||
             fieldDefinition.label
           }
         />

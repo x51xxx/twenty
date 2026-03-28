@@ -1,7 +1,7 @@
 import { isObject } from '@sniptt/guards';
 
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
 import {
+  FieldMetadataType,
   type ActorFilter,
   type AddressFilter,
   type AndObjectRecordFilter,
@@ -10,6 +10,7 @@ import {
   type CurrencyFilter,
   type DateFilter,
   type EmailsFilter,
+  type FilesFilter,
   type FloatFilter,
   type FullNameFilter,
   type LeafObjectRecordFilter,
@@ -21,28 +22,34 @@ import {
   type RatingFilter,
   type RawJsonFilter,
   type RecordGqlOperationFilter,
-  type RichTextV2Filter,
+  type RichTextFilter,
   type SelectFilter,
   type StringFilter,
   type TSVectorFilter,
   type UUIDFilter,
-} from '@/object-record/graphql/types/RecordGqlOperationFilter';
-import { isMatchingArrayFilter } from '@/object-record/record-filter/utils/isMatchingArrayFilter';
-import { isMatchingBooleanFilter } from '@/object-record/record-filter/utils/isMatchingBooleanFilter';
-import { isMatchingCurrencyFilter } from '@/object-record/record-filter/utils/isMatchingCurrencyFilter';
-import { isMatchingDateFilter } from '@/object-record/record-filter/utils/isMatchingDateFilter';
-import { isMatchingFloatFilter } from '@/object-record/record-filter/utils/isMatchingFloatFilter';
-import { isMatchingMultiSelectFilter } from '@/object-record/record-filter/utils/isMatchingMultiSelectFilter';
-import { isMatchingRatingFilter } from '@/object-record/record-filter/utils/isMatchingRatingFilter';
-import { isMatchingRawJsonFilter } from '@/object-record/record-filter/utils/isMatchingRawJsonFilter';
-import { isMatchingRichTextV2Filter } from '@/object-record/record-filter/utils/isMatchingRichTextV2Filter';
-import { isMatchingSelectFilter } from '@/object-record/record-filter/utils/isMatchingSelectFilter';
-import { isMatchingStringFilter } from '@/object-record/record-filter/utils/isMatchingStringFilter';
-import { isMatchingTSVectorFilter } from '@/object-record/record-filter/utils/isMatchingTSVectorFilter';
-import { isMatchingUUIDFilter } from '@/object-record/record-filter/utils/isMatchingUUIDFilter';
-import { isDefined } from 'twenty-shared/utils';
-import { FieldMetadataType } from '~/generated-metadata/graphql';
-import { isEmptyObject } from '~/utils/isEmptyObject';
+} from 'twenty-shared/types';
+import {
+  isDefined,
+  isEmptyObject,
+  isMatchingArrayFilter,
+  isMatchingBooleanFilter,
+  isMatchingCurrencyFilter,
+  isMatchingDateFilter,
+  isMatchingFilesFilter,
+  isMatchingFloatFilter,
+  isMatchingMultiSelectFilter,
+  isMatchingRatingFilter,
+  isMatchingRawJsonFilter,
+  isMatchingRichTextFilter,
+  isMatchingSelectFilter,
+  isMatchingStringFilter,
+  isMatchingTSVectorFilter,
+  isMatchingUUIDFilter,
+} from 'twenty-shared/utils';
+
+import { type FieldMetadataItem } from '@/object-metadata/types/FieldMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
+import { computePossibleMorphGqlFieldForFieldName } from '@/object-record/cache/utils/computePossibleMorphGqlFieldForFieldName';
 
 const isLeafFilter = (
   filter: RecordGqlOperationFilter,
@@ -56,6 +63,27 @@ const isAndFilter = (
 
 const isImplicitAndFilter = (filter: RecordGqlOperationFilter) =>
   Object.keys(filter).length > 1;
+
+const isMorphRelationJoinColumnKey = ({
+  fieldMetadataItem,
+  key,
+}: {
+  fieldMetadataItem: FieldMetadataItem;
+  key: string;
+}): boolean => {
+  if (!fieldMetadataItem.morphRelations?.length) {
+    return false;
+  }
+
+  const possibleJoinColumnNames = computePossibleMorphGqlFieldForFieldName({
+    fieldMetadata: {
+      morphRelations: fieldMetadataItem.morphRelations,
+      fieldName: fieldMetadataItem.name,
+    },
+  }).map((name) => `${name}Id`);
+
+  return possibleJoinColumnNames.includes(key);
+};
 
 const isOrFilter = (
   filter: RecordGqlOperationFilter,
@@ -72,7 +100,7 @@ export const isRecordMatchingFilter = ({
 }: {
   record: any;
   filter: RecordGqlOperationFilter;
-  objectMetadataItem: ObjectMetadataItem;
+  objectMetadataItem: EnrichedObjectMetadataItem;
 }): boolean => {
   if (Object.keys(filter).length === 0 && record.deletedAt === null) {
     return true;
@@ -173,8 +201,17 @@ export const isRecordMatchingFilter = ({
       objectMetadataItem.fields.find((field) => field.name === filterKey) ??
       objectMetadataItem.fields.find(
         (field) =>
-          field.type === FieldMetadataType.RELATION &&
+          (field.type === FieldMetadataType.RELATION ||
+            field.type === FieldMetadataType.MORPH_RELATION) &&
           field.settings?.joinColumnName === filterKey,
+      ) ??
+      objectMetadataItem.fields.find(
+        (field) =>
+          field.type === FieldMetadataType.MORPH_RELATION &&
+          isMorphRelationJoinColumnKey({
+            fieldMetadataItem: field,
+            key: filterKey,
+          }),
       );
 
     if (!isDefined(objectMetadataField)) {
@@ -199,17 +236,8 @@ export const isRecordMatchingFilter = ({
         });
       }
       case FieldMetadataType.RICH_TEXT: {
-        // TODO: Implement a better rich text filter once it becomes a composite field
-        // See this issue for more context: https://github.com/twentyhq/twenty/issues/7613#issuecomment-2408944585
-        // This should be tackled in Q4'24
-        return isMatchingStringFilter({
-          stringFilter: filterValue as StringFilter,
-          value: record[filterKey],
-        });
-      }
-      case FieldMetadataType.RICH_TEXT_V2: {
-        return isMatchingRichTextV2Filter({
-          richTextV2Filter: filterValue as RichTextV2Filter,
+        return isMatchingRichTextFilter({
+          richTextFilter: filterValue as RichTextFilter,
           value: record[filterKey],
         });
       }
@@ -235,6 +263,12 @@ export const isRecordMatchingFilter = ({
           value: record[filterKey],
         });
       }
+      case FieldMetadataType.FILES: {
+        return isMatchingFilesFilter({
+          filesFilter: filterValue as FilesFilter,
+          value: record[filterKey],
+        });
+      }
       case FieldMetadataType.FULL_NAME: {
         const fullNameFilter = filterValue as FullNameFilter;
 
@@ -242,12 +276,12 @@ export const isRecordMatchingFilter = ({
           (fullNameFilter.firstName === undefined ||
             isMatchingStringFilter({
               stringFilter: fullNameFilter.firstName,
-              value: record[filterKey].firstName,
+              value: record[filterKey]?.firstName,
             })) &&
           (fullNameFilter.lastName === undefined ||
             isMatchingStringFilter({
               stringFilter: fullNameFilter.lastName,
-              value: record[filterKey].lastName,
+              value: record[filterKey]?.lastName,
             }))
         );
       }
@@ -271,7 +305,7 @@ export const isRecordMatchingFilter = ({
 
           return isMatchingStringFilter({
             stringFilter: value,
-            value: record[filterKey][key],
+            value: record[filterKey]?.[key],
           });
         });
       }
@@ -288,7 +322,7 @@ export const isRecordMatchingFilter = ({
 
           return isMatchingStringFilter({
             stringFilter: value,
-            value: record[filterKey][key],
+            value: record[filterKey]?.[key],
           });
         });
       }
@@ -327,11 +361,25 @@ export const isRecordMatchingFilter = ({
       case FieldMetadataType.ACTOR: {
         const actorFilter = filterValue as ActorFilter;
 
+        if (isDefined(actorFilter.workspaceMemberId)) {
+          return isMatchingUUIDFilter({
+            uuidFilter: actorFilter.workspaceMemberId,
+            value: record[filterKey]?.workspaceMemberId,
+          });
+        }
+
+        if (isDefined(actorFilter.source)) {
+          return isMatchingSelectFilter({
+            selectFilter: actorFilter.source,
+            value: record[filterKey].source,
+          });
+        }
+
         return (
           actorFilter.name === undefined ||
           isMatchingStringFilter({
             stringFilter: actorFilter.name,
-            value: record[filterKey].name,
+            value: record[filterKey]?.name,
           })
         );
       }
@@ -344,7 +392,7 @@ export const isRecordMatchingFilter = ({
 
         return isMatchingStringFilter({
           stringFilter: emailsFilter.primaryEmail,
-          value: record[filterKey].primaryEmail,
+          value: record[filterKey]?.primaryEmail,
         });
       }
       case FieldMetadataType.PHONES: {
@@ -360,13 +408,19 @@ export const isRecordMatchingFilter = ({
 
           return isMatchingStringFilter({
             stringFilter: value,
-            value: record[filterKey][key],
+            value: record[filterKey]?.[key],
           });
         });
       }
-      case FieldMetadataType.RELATION: {
+      case FieldMetadataType.RELATION:
+      case FieldMetadataType.MORPH_RELATION: {
         const isJoinColumn =
-          objectMetadataField.settings?.joinColumnName === filterKey;
+          objectMetadataField.settings?.joinColumnName === filterKey ||
+          (objectMetadataField.type === FieldMetadataType.MORPH_RELATION &&
+            isMorphRelationJoinColumnKey({
+              fieldMetadataItem: objectMetadataField,
+              key: filterKey,
+            }));
 
         if (isJoinColumn) {
           return isMatchingUUIDFilter({

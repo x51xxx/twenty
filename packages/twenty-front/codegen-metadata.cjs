@@ -9,22 +9,30 @@ module.exports = {
     './src/modules/users/graphql/**/*.{ts,tsx}',
     './src/modules/views/graphql/**/*.{ts,tsx}',
     './src/modules/ai/graphql/**/*.{ts,tsx}',
+    './src/modules/applications/graphql/**/*.{ts,tsx}',
 
     './src/modules/workspace/graphql/**/*.{ts,tsx}',
     './src/modules/workspace-member/graphql/**/*.{ts,tsx}',
     './src/modules/workspace-invitation/graphql/**/*.{ts,tsx}',
 
-    './src/modules/billing/graphql/**/*.{ts,tsx}',
     './src/modules/settings/**/graphql/**/*.{ts,tsx}',
+    './src/modules/logic-functions/graphql/**/*.{ts,tsx}',
 
     './src/modules/databases/graphql/**/*.{ts,tsx}',
-    './src/modules/workflow/**/graphql/**/*.{ts,tsx}',
     './src/modules/analytics/graphql/**/*.{ts,tsx}',
     './src/modules/object-metadata/graphql/**/*.{ts,tsx}',
+    './src/modules/navigation-menu-item/**/graphql/**/*.{ts,tsx}',
+    './src/modules/command-menu-item/graphql/**/*.{ts,tsx}',
     './src/modules/attachments/graphql/**/*.{ts,tsx}',
     './src/modules/file/graphql/**/*.{ts,tsx}',
     './src/modules/onboarding/graphql/**/*.{ts,tsx}',
+    './src/modules/front-components/graphql/**/*.{ts,tsx}',
 
+    './src/modules/page-layout/widgets/**/graphql/**/*.{ts,tsx}',
+
+    './src/modules/dashboards/graphql/**/*.{ts,tsx}',
+    './src/modules/page-layout/graphql/**/*.{ts,tsx}',
+    './src/modules/marketplace/graphql/**/*.{ts,tsx}',
     '!./src/**/*.test.{ts,tsx}',
     '!./src/**/*.stories.{ts,tsx}',
     '!./src/**/__mocks__/*.ts',
@@ -32,16 +40,9 @@ module.exports = {
   overwrite: true,
   generates: {
     './src/generated-metadata/graphql.ts': {
-      plugins: [
-        'typescript',
-        'typescript-operations',
-        'typescript-react-apollo',
-      ],
+      plugins: ['typescript', 'typescript-operations', 'typed-document-node'],
       config: {
         skipTypename: false,
-        withHooks: true,
-        withHOC: false,
-        withComponent: false,
         scalars: {
           DateTime: 'string',
           UUID: 'string',

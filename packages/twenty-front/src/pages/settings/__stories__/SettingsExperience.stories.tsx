@@ -1,4 +1,4 @@
-import { type Meta, type StoryObj } from '@storybook/react';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
 
 import {
   PageDecorator,
@@ -6,9 +6,8 @@ import {
 } from '~/testing/decorators/PageDecorator';
 import { graphqlMocks } from '~/testing/graphqlMocks';
 
-import { within } from '@storybook/test';
-import { getCanvasElementForDropdownTesting } from 'twenty-ui/testing';
-import { SettingsExperience } from '../profile/appearance/components/SettingsExperience';
+import { within } from 'storybook/test';
+import { SettingsExperience } from '~/pages/settings/profile/appearance/components/SettingsExperience';
 
 const meta: Meta<PageDecoratorArgs> = {
   title: 'Pages/Settings/SettingsExperience',
@@ -26,23 +25,23 @@ export default meta;
 export type Story = StoryObj<typeof SettingsExperience>;
 
 export const Default: Story = {
-  play: async () => {
-    const canvas = within(getCanvasElementForDropdownTesting());
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
 
     await canvas.findAllByText('Experience', undefined, {
       timeout: 3000,
     });
 
-    await canvas.findByText('Date and time');
+    await canvas.findByText('Formats');
   },
 };
 
 // TEMP_DISABLED_TEST: Temporarily commented out due to test failure
 // export const DateTimeSettingsTimeFormat: Story = {
-//   play: async () => {
-//     const canvas = within(getCanvasElementForDropdownTesting());
+//   play: async ({ canvasElement }) => {
+//     const canvas = within(canvasElement.ownerDocument.body);
 
-//     await canvas.findByText('Date and time');
+//     await canvas.findByText('Formats');
 
 //     const timeFormatSelect = await canvas.findByText('24h (05:30)');
 
@@ -58,10 +57,10 @@ export const Default: Story = {
 
 // TEMP_DISABLED_TEST: Temporarily commented out due to test failure
 // export const DateTimeSettingsTimezone: Story = {
-//   play: async () => {
-//     const canvas = within(getCanvasElementForDropdownTesting());
+//   play: async ({ canvasElement }) => {
+//     const canvas = within(canvasElement.ownerDocument.body);
 
-//     await canvas.findByText('Date and time');
+//     await canvas.findByText('Formats');
 
 //     const timezoneSelect = await canvas.findByText(
 //       '(GMT-04:00) Eastern Daylight Time - New York',
@@ -81,10 +80,10 @@ export const Default: Story = {
 
 // TEMP_DISABLED_TEST: Temporarily commented out due to test failure
 // export const DateTimeSettingsDateFormat: Story = {
-//   play: async () => {
-//     const canvas = within(getCanvasElementForDropdownTesting());
+//   play: async ({ canvasElement }) => {
+//     const canvas = within(canvasElement.ownerDocument.body);
 
-//     await canvas.findByText('Date and time');
+//     await canvas.findByText('Formats');
 
 //     const timeFormatSelect = await canvas.findByText('12 Mar, 2024');
 

@@ -1,8 +1,9 @@
 import { RecordIndexContextProvider } from '@/object-record/record-index/contexts/RecordIndexContext';
 
-import { ActionMenuComponentInstanceContext } from '@/action-menu/states/contexts/ActionMenuComponentInstanceContext';
-import { getActionMenuIdFromRecordIndexId } from '@/action-menu/utils/getActionMenuIdFromRecordIndexId';
+import { CommandMenuComponentInstanceContext } from '@/command-menu/states/contexts/CommandMenuComponentInstanceContext';
+import { getCommandMenuIdFromRecordIndexId } from '@/command-menu-item/utils/getCommandMenuIdFromRecordIndexId';
 import { getObjectPermissionsForObject } from '@/object-metadata/utils/getObjectPermissionsForObject';
+import { MainContainerLayoutWithSidePanel } from '@/object-record/components/MainContainerLayoutWithSidePanel';
 import { RecordComponentInstanceContextsWrapper } from '@/object-record/components/RecordComponentInstanceContextsWrapper';
 import { useObjectPermissions } from '@/object-record/hooks/useObjectPermissions';
 import { lastShowPageRecordIdState } from '@/object-record/record-field/ui/states/lastShowPageRecordId';
@@ -13,13 +14,13 @@ import { RecordIndexPageHeader } from '@/object-record/record-index/components/R
 import { useHandleIndexIdentifierClick } from '@/object-record/record-index/hooks/useHandleIndexIdentifierClick';
 import { useRecordIndexFieldMetadataDerivedStates } from '@/object-record/record-index/hooks/useRecordIndexFieldMetadataDerivedStates';
 import { useRecordIndexIdFromCurrentContextStore } from '@/object-record/record-index/hooks/useRecordIndexIdFromCurrentContextStore';
-import { PageBody } from '@/ui/layout/page/components/PageBody';
 import { RECORD_INDEX_DRAG_SELECT_BOUNDARY_CLASS } from '@/ui/utilities/drag-select/constants/RecordIndecDragSelectBoundaryClass';
 import { PageTitle } from '@/ui/utilities/page-title/components/PageTitle';
 import { ViewComponentInstanceContext } from '@/views/states/contexts/ViewComponentInstanceContext';
-import styled from '@emotion/styled';
-import { useRecoilCallback } from 'recoil';
+import { styled } from '@linaria/react';
+import { useCallback } from 'react';
 import { NotFound } from '~/pages/not-found/NotFound';
+import { useStore } from 'jotai';
 
 const StyledIndexContainer = styled.div`
   display: flex;
@@ -28,21 +29,17 @@ const StyledIndexContainer = styled.div`
 `;
 
 export const RecordIndexContainerGater = () => {
+  const store = useStore();
   const { recordIndexId, objectMetadataItem } =
     useRecordIndexIdFromCurrentContextStore();
 
-  const handleIndexRecordsLoaded = useRecoilCallback(
-    ({ set }) =>
-      () => {
-        // TODO: find a better way to reset this state ?
-        set(lastShowPageRecordIdState, null);
-      },
-    [],
-  );
+  const handleIndexRecordsLoaded = useCallback(() => {
+    // TODO: find a better way to reset this state ?
+    store.set(lastShowPageRecordIdState.atom, null);
+  }, [store]);
 
   const { indexIdentifierUrl } = useHandleIndexIdentifierClick({
     objectMetadataItem,
-    recordIndexId,
   });
 
   const { objectPermissionsByObjectMetadataId } = useObjectPermissions();
@@ -73,6 +70,7 @@ export const RecordIndexContainerGater = () => {
         value={{
           objectPermissionsByObjectMetadataId,
           recordIndexId,
+          viewBarInstanceId: recordIndexId,
           objectNamePlural: objectMetadataItem.namePlural,
           objectNameSingular: objectMetadataItem.nameSingular,
           objectMetadataItem,
@@ -90,22 +88,22 @@ export const RecordIndexContainerGater = () => {
           <RecordComponentInstanceContextsWrapper
             componentInstanceId={recordIndexId}
           >
-            <ActionMenuComponentInstanceContext.Provider
+            <CommandMenuComponentInstanceContext.Provider
               value={{
-                instanceId: getActionMenuIdFromRecordIndexId(recordIndexId),
+                instanceId: getCommandMenuIdFromRecordIndexId(recordIndexId),
               }}
             >
               <PageTitle title={objectMetadataItem.labelPlural} />
               <RecordIndexPageHeader />
-              <PageBody>
+              <MainContainerLayoutWithSidePanel>
                 <StyledIndexContainer
                   className={RECORD_INDEX_DRAG_SELECT_BOUNDARY_CLASS}
                 >
                   <RecordIndexContainerContextStoreNumberOfSelectedRecordsEffect />
                   <RecordIndexContainer />
                 </StyledIndexContainer>
-              </PageBody>
-            </ActionMenuComponentInstanceContext.Provider>
+              </MainContainerLayoutWithSidePanel>
+            </CommandMenuComponentInstanceContext.Provider>
           </RecordComponentInstanceContextsWrapper>
           <RecordIndexLoadBaseOnContextStoreEffect />
         </ViewComponentInstanceContext.Provider>

@@ -1,16 +1,17 @@
 import {
+  IconCalendar,
   type IconComponent,
   IconLayoutKanban,
   IconTable,
 } from 'twenty-ui/display';
-export enum ViewType {
-  Table = 'table',
-  Kanban = 'kanban',
-}
+
+export { ViewType } from '~/generated-metadata/graphql';
+import { ViewType } from '~/generated-metadata/graphql';
 
 const VIEW_TYPE_ICON_MAPPING = [
-  { icon: IconLayoutKanban, value: ViewType.Kanban },
-  { icon: IconTable, value: ViewType.Table },
+  { icon: IconLayoutKanban, value: ViewType.KANBAN },
+  { icon: IconTable, value: ViewType.TABLE },
+  { icon: IconCalendar, value: ViewType.CALENDAR },
 ] as const satisfies {
   icon: IconComponent;
   value: ViewType;

@@ -1,46 +1,74 @@
 import { contextStoreCurrentViewIdComponentState } from '@/context-store/states/contextStoreCurrentViewIdComponentState';
-import { recordIndexKanbanAggregateOperationState } from '@/object-record/record-index/states/recordIndexKanbanAggregateOperationState';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
+import { useLoadRecordIndexStates } from '@/object-record/record-index/hooks/useLoadRecordIndexStates';
 import { type ExtendedAggregateOperations } from '@/object-record/record-table/types/ExtendedAggregateOperations';
 import { convertExtendedAggregateOperationToAggregateOperation } from '@/object-record/utils/convertExtendedAggregateOperationToAggregateOperation';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
-import { useUpdateView } from '@/views/hooks/useUpdateView';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+import { usePerformViewAPIUpdate } from '@/views/hooks/internal/usePerformViewAPIUpdate';
+import { useCanPersistViewChanges } from '@/views/hooks/useCanPersistViewChanges';
 import { useCallback } from 'react';
-import { useSetRecoilState } from 'recoil';
+import { isDefined } from 'twenty-shared/utils';
+import { type View as GqlView } from '~/generated-metadata/graphql';
 
 export const useUpdateViewAggregate = () => {
-  const currentViewId = useRecoilComponentValue(
+  const { canPersistChanges } = useCanPersistViewChanges();
+  const contextStoreCurrentViewId = useAtomComponentStateValue(
     contextStoreCurrentViewIdComponentState,
   );
-  const { updateView } = useUpdateView();
-
-  const setRecordIndexKanbanAggregateOperationState = useSetRecoilState(
-    recordIndexKanbanAggregateOperationState,
-  );
+  const { performViewAPIUpdate } = usePerformViewAPIUpdate();
+  const { loadRecordIndexStates } = useLoadRecordIndexStates();
 
   const updateViewAggregate = useCallback(
-    ({
+    async ({
       kanbanAggregateOperationFieldMetadataId,
       kanbanAggregateOperation,
+      objectMetadataItem,
     }: {
       kanbanAggregateOperationFieldMetadataId: string | null;
       kanbanAggregateOperation: ExtendedAggregateOperations | null;
+      objectMetadataItem: EnrichedObjectMetadataItem;
     }) => {
-      const convertedKanbanAggregateOperation =
-        convertExtendedAggregateOperationToAggregateOperation(
-          kanbanAggregateOperation,
-        );
-      updateView({
-        id: currentViewId,
-        kanbanAggregateOperationFieldMetadataId,
-        kanbanAggregateOperation: convertedKanbanAggregateOperation,
+      if (!canPersistChanges) {
+        return;
+      }
+
+      const convertedKanbanAggregateOperation = isDefined(
+        kanbanAggregateOperation,
+      )
+        ? convertExtendedAggregateOperationToAggregateOperation(
+            kanbanAggregateOperation,
+          )
+        : null;
+
+      if (!isDefined(contextStoreCurrentViewId)) {
+        return;
+      }
+
+      const updatedViewResult = await performViewAPIUpdate({
+        id: contextStoreCurrentViewId,
+        input: {
+          kanbanAggregateOperationFieldMetadataId,
+          kanbanAggregateOperation: convertedKanbanAggregateOperation,
+        },
       });
 
-      setRecordIndexKanbanAggregateOperationState({
-        operation: kanbanAggregateOperation,
-        fieldMetadataId: kanbanAggregateOperationFieldMetadataId,
-      });
+      if (updatedViewResult.status === 'successful') {
+        const updatedView = updatedViewResult.response.data
+          ?.updateView as GqlView;
+
+        if (!isDefined(updatedView)) {
+          return;
+        }
+
+        loadRecordIndexStates(updatedView, objectMetadataItem);
+      }
     },
-    [currentViewId, updateView, setRecordIndexKanbanAggregateOperationState],
+    [
+      canPersistChanges,
+      contextStoreCurrentViewId,
+      performViewAPIUpdate,
+      loadRecordIndexStates,
+    ],
   );
 
   return {

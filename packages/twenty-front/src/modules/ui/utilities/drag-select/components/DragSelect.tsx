@@ -1,13 +1,13 @@
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import { type RefObject, useCallback, useState } from 'react';
 
+import { useDragSelect } from '@/ui/utilities/drag-select/hooks/useDragSelect';
 import { useDragSelectWithAutoScroll } from '@/ui/utilities/drag-select/hooks/useDragSelectWithAutoScroll';
 import { useTrackPointer } from '@/ui/utilities/pointer-event/hooks/useTrackPointer';
 import { isDefined } from 'twenty-shared/utils';
 import { isDeeplyEqual } from '~/utils/isDeeplyEqual';
-import { useDragSelect } from '../hooks/useDragSelect';
-import { type SelectionBox } from '../types/SelectionBox';
-import { isValidSelectionStart } from '../utils/selectionBoxValidation';
+import { type SelectionBox } from '@/ui/utilities/drag-select/types/SelectionBox';
+import { isValidSelectionStart } from '@/ui/utilities/drag-select/utils/selectionBoxValidation';
 
 type DragSelectProps = {
   selectableItemsContainerRef: RefObject<HTMLElement>;
@@ -23,16 +23,18 @@ type Position = {
   y: number;
 };
 
+import { themeCssVariables } from 'twenty-ui/theme-constants';
+
 const StyledDragSelection = styled.div<SelectionBox>`
-  position: absolute;
-  z-index: 99;
-  opacity: 0.2;
-  border: 1px solid ${({ theme }) => theme.color.blue10};
-  background: ${({ theme }) => theme.color.blue30};
-  top: ${({ top }) => top}px;
-  left: ${({ left }) => left}px;
-  width: ${({ width }) => width}px;
+  background: ${themeCssVariables.color.blue7};
+  border: 1px solid ${themeCssVariables.color.blue3};
   height: ${({ height }) => height}px;
+  left: ${({ left }) => left}px;
+  opacity: 0.2;
+  position: absolute;
+  top: ${({ top }) => top}px;
+  width: ${({ width }) => width}px;
+  z-index: 99;
 `;
 
 export const DragSelect = ({

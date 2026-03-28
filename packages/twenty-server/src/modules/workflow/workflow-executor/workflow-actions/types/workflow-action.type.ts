@@ -1,29 +1,27 @@
 import { type WorkflowAiAgentActionSettings } from 'src/modules/workflow/workflow-executor/workflow-actions/ai-agent/types/workflow-ai-agent-action-settings.type';
 import { type WorkflowCodeActionSettings } from 'src/modules/workflow/workflow-executor/workflow-actions/code/types/workflow-code-action-settings.type';
+import { type WorkflowDelayActionSettings } from 'src/modules/workflow/workflow-executor/workflow-actions/delay/types/workflow-delay-action-settings.type';
 import { type WorkflowFilterActionSettings } from 'src/modules/workflow/workflow-executor/workflow-actions/filter/types/workflow-filter-action-settings.type';
 import { type WorkflowFormActionSettings } from 'src/modules/workflow/workflow-executor/workflow-actions/form/types/workflow-form-action-settings.type';
 import { type WorkflowHttpRequestActionSettings } from 'src/modules/workflow/workflow-executor/workflow-actions/http-request/types/workflow-http-request-action-settings.type';
+import { type WorkflowIfElseActionSettings } from 'src/modules/workflow/workflow-executor/workflow-actions/if-else/types/workflow-if-else-action-settings.type';
+import { type WorkflowIteratorActionSettings } from 'src/modules/workflow/workflow-executor/workflow-actions/iterator/types/workflow-iterator-action-settings.type';
+import { type WorkflowLogicFunctionActionSettings } from 'src/modules/workflow/workflow-executor/workflow-actions/logic-function/types/workflow-logic-function-action-settings.type';
 import { type WorkflowSendEmailActionSettings } from 'src/modules/workflow/workflow-executor/workflow-actions/mail-sender/types/workflow-send-email-action-settings.type';
 import {
   type WorkflowCreateRecordActionSettings,
   type WorkflowDeleteRecordActionSettings,
   type WorkflowFindRecordsActionSettings,
   type WorkflowUpdateRecordActionSettings,
+  type WorkflowUpsertRecordActionSettings,
 } from 'src/modules/workflow/workflow-executor/workflow-actions/record-crud/types/workflow-record-crud-action-settings.type';
 import { type WorkflowActionSettings } from 'src/modules/workflow/workflow-executor/workflow-actions/types/workflow-action-settings.type';
 
-export enum WorkflowActionType {
-  CODE = 'CODE',
-  SEND_EMAIL = 'SEND_EMAIL',
-  CREATE_RECORD = 'CREATE_RECORD',
-  UPDATE_RECORD = 'UPDATE_RECORD',
-  DELETE_RECORD = 'DELETE_RECORD',
-  FIND_RECORDS = 'FIND_RECORDS',
-  FORM = 'FORM',
-  FILTER = 'FILTER',
-  HTTP_REQUEST = 'HTTP_REQUEST',
-  AI_AGENT = 'AI_AGENT',
-}
+// Import the enum from its dedicated file to avoid circular dependencies
+import { WorkflowActionType } from './workflow-action-type.enum';
+
+// Re-export for consumers
+export { WorkflowActionType };
 
 type BaseWorkflowAction = {
   id: string;
@@ -43,8 +41,18 @@ export type WorkflowCodeAction = BaseWorkflowAction & {
   settings: WorkflowCodeActionSettings;
 };
 
+export type WorkflowLogicFunctionAction = BaseWorkflowAction & {
+  type: WorkflowActionType.LOGIC_FUNCTION;
+  settings: WorkflowLogicFunctionActionSettings;
+};
+
 export type WorkflowSendEmailAction = BaseWorkflowAction & {
   type: WorkflowActionType.SEND_EMAIL;
+  settings: WorkflowSendEmailActionSettings;
+};
+
+export type WorkflowDraftEmailAction = BaseWorkflowAction & {
+  type: WorkflowActionType.DRAFT_EMAIL;
   settings: WorkflowSendEmailActionSettings;
 };
 
@@ -63,6 +71,11 @@ export type WorkflowDeleteRecordAction = BaseWorkflowAction & {
   settings: WorkflowDeleteRecordActionSettings;
 };
 
+export type WorkflowUpsertRecordAction = BaseWorkflowAction & {
+  type: WorkflowActionType.UPSERT_RECORD;
+  settings: WorkflowUpsertRecordActionSettings;
+};
+
 export type WorkflowFindRecordsAction = BaseWorkflowAction & {
   type: WorkflowActionType.FIND_RECORDS;
   settings: WorkflowFindRecordsActionSettings;
@@ -78,6 +91,11 @@ export type WorkflowFilterAction = BaseWorkflowAction & {
   settings: WorkflowFilterActionSettings;
 };
 
+export type WorkflowIfElseAction = BaseWorkflowAction & {
+  type: WorkflowActionType.IF_ELSE;
+  settings: WorkflowIfElseActionSettings;
+};
+
 export type WorkflowHttpRequestAction = BaseWorkflowAction & {
   type: WorkflowActionType.HTTP_REQUEST;
   settings: WorkflowHttpRequestActionSettings;
@@ -88,14 +106,35 @@ export type WorkflowAiAgentAction = BaseWorkflowAction & {
   settings: WorkflowAiAgentActionSettings;
 };
 
+export type WorkflowIteratorAction = BaseWorkflowAction & {
+  type: WorkflowActionType.ITERATOR;
+  settings: WorkflowIteratorActionSettings;
+};
+
+export type WorkflowEmptyAction = BaseWorkflowAction & {
+  type: WorkflowActionType.EMPTY;
+};
+
+export type WorkflowDelayAction = BaseWorkflowAction & {
+  type: WorkflowActionType.DELAY;
+  settings: WorkflowDelayActionSettings;
+};
+
 export type WorkflowAction =
   | WorkflowCodeAction
+  | WorkflowLogicFunctionAction
   | WorkflowSendEmailAction
+  | WorkflowDraftEmailAction
   | WorkflowCreateRecordAction
   | WorkflowUpdateRecordAction
   | WorkflowDeleteRecordAction
+  | WorkflowUpsertRecordAction
   | WorkflowFindRecordsAction
   | WorkflowFormAction
   | WorkflowFilterAction
+  | WorkflowIfElseAction
   | WorkflowHttpRequestAction
-  | WorkflowAiAgentAction;
+  | WorkflowAiAgentAction
+  | WorkflowIteratorAction
+  | WorkflowEmptyAction
+  | WorkflowDelayAction;

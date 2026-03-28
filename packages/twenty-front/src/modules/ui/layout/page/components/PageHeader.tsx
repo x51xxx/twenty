@@ -1,7 +1,5 @@
-import { useTheme } from '@emotion/react';
-import styled from '@emotion/styled';
-import { type ReactNode } from 'react';
-import { useRecoilValue } from 'recoil';
+import { styled } from '@linaria/react';
+import { type ReactNode, useContext } from 'react';
 
 import { NavigationDrawerCollapseButton } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerCollapseButton';
 
@@ -9,65 +7,78 @@ import { PAGE_ACTION_CONTAINER_CLICK_OUTSIDE_ID } from '@/ui/layout/page/constan
 import { PAGE_BAR_MIN_HEIGHT } from '@/ui/layout/page/constants/PageBarMinHeight';
 import { isNavigationDrawerExpandedState } from '@/ui/navigation/states/isNavigationDrawerExpanded';
 import { useIsMobile } from '@/ui/utilities/responsive/hooks/useIsMobile';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
+import { AnimatePresence } from 'framer-motion';
+import { isDefined } from 'twenty-shared/utils';
 import {
   type IconComponent,
   IconX,
   OverflowingTextWithTooltip,
 } from 'twenty-ui/display';
 import { LightIconButton } from 'twenty-ui/input';
-import { MOBILE_VIEWPORT } from 'twenty-ui/theme';
+import {
+  MOBILE_VIEWPORT,
+  ThemeContext,
+  themeCssVariables,
+} from 'twenty-ui/theme-constants';
 
 const StyledTopBarContainer = styled.div<{ isMobile: boolean }>`
   align-items: center;
-  background: ${({ theme }) => theme.background.noisy};
-  color: ${({ theme }) => theme.font.color.primary};
+  background: ${themeCssVariables.background.noisy};
+  color: ${themeCssVariables.font.color.primary};
   display: flex;
   flex-direction: row;
-  font-size: ${({ theme }) => theme.font.size.lg};
+  font-size: ${themeCssVariables.font.size.lg};
+  gap: ${themeCssVariables.spacing[2]};
   justify-content: space-between;
   min-height: ${PAGE_BAR_MIN_HEIGHT}px;
-  padding-top: ${({ theme }) => theme.spacing(3)};
-  padding-bottom: ${({ theme }) => theme.spacing(3)};
-  padding-left: ${({ isMobile, theme }) => (isMobile ? theme.spacing(3) : 0)};
-  padding-right: ${({ theme }) => theme.spacing(3)};
-  gap: ${({ theme }) => theme.spacing(2)};
+  padding-bottom: ${themeCssVariables.spacing[3]};
+  padding-left: ${({ isMobile }) =>
+    isMobile ? themeCssVariables.spacing[3] : themeCssVariables.spacing[4]};
+  padding-right: ${themeCssVariables.spacing[3]};
+  padding-top: ${themeCssVariables.spacing[3]};
 `;
 
 const StyledLeftContainer = styled.div`
   align-items: center;
   display: flex;
+  flex: 0 1 auto;
   flex-direction: row;
-  gap: ${({ theme }) => theme.spacing(1)};
+  gap: ${themeCssVariables.spacing[1]};
+  min-width: 0;
   overflow-x: hidden;
-  width: 100%;
   @media (max-width: ${MOBILE_VIEWPORT}px) {
-    padding-left: ${({ theme }) => theme.spacing(1)};
+    padding-left: ${themeCssVariables.spacing[1]};
   }
 `;
 
 const StyledTitleContainer = styled.div`
-  display: flex;
-  font-size: ${({ theme }) => theme.font.size.md};
-  font-weight: ${({ theme }) => theme.font.weight.medium};
-  margin-right: ${({ theme }) => theme.spacing(1)};
-  width: 100%;
-  overflow: hidden;
   align-items: center;
+  display: flex;
+  font-size: ${themeCssVariables.font.size.md};
+  font-weight: ${themeCssVariables.font.weight.medium};
+  margin-right: ${themeCssVariables.spacing[1]};
+  overflow: hidden;
+  width: 100%;
 `;
 
 const StyledTopBarIconStyledTitleContainer = styled.div`
   align-items: center;
   display: flex;
-  gap: ${({ theme }) => theme.spacing(1)};
   flex-direction: row;
-  width: 100%;
+  gap: ${themeCssVariables.spacing[1]};
   overflow: hidden;
+  width: 100%;
 `;
 
 const StyledPageActionContainer = styled.div`
-  display: inline-flex;
-  gap: ${({ theme }) => theme.spacing(2)};
-  flex: 1 0 auto;
+  align-items: center;
+  display: flex;
+  flex: 1 1 0;
+  gap: ${themeCssVariables.spacing[2]};
+
+  justify-content: flex-end;
+  min-width: 0;
 `;
 
 const StyledIconContainer = styled.div`
@@ -94,49 +105,50 @@ export const PageHeader = ({
   className,
 }: PageHeaderProps) => {
   const isMobile = useIsMobile();
-  const theme = useTheme();
-  const isNavigationDrawerExpanded = useRecoilValue(
+  const { theme } = useContext(ThemeContext);
+  const isNavigationDrawerExpanded = useAtomStateValue(
     isNavigationDrawerExpandedState,
   );
 
   return (
-    <StyledTopBarContainer className={className} isMobile={isMobile}>
-      <StyledLeftContainer>
-        {!isMobile && !isNavigationDrawerExpanded && (
-          <NavigationDrawerCollapseButton direction="right" />
-        )}
-        {hasClosePageButton && (
-          <LightIconButton
-            Icon={IconX}
-            size="small"
-            accent="tertiary"
-            onClick={() => onClosePage?.()}
-          />
-        )}
-
-        <StyledTopBarIconStyledTitleContainer>
-          {Icon && (
-            <StyledIconContainer>
-              <Icon size={theme.icon.size.md} />
-            </StyledIconContainer>
+    <AnimatePresence initial={false}>
+      <StyledTopBarContainer className={className} isMobile={isMobile}>
+        <StyledLeftContainer>
+          {!isMobile && !isNavigationDrawerExpanded && (
+            <NavigationDrawerCollapseButton direction="right" />
           )}
-          {title && (
-            <StyledTitleContainer data-testid="top-bar-title">
-              {typeof title === 'string' ? (
-                <OverflowingTextWithTooltip text={title} />
-              ) : (
-                title
-              )}
-            </StyledTitleContainer>
+          {hasClosePageButton && (
+            <LightIconButton
+              Icon={IconX}
+              size="small"
+              accent="tertiary"
+              onClick={() => onClosePage?.()}
+            />
           )}
-        </StyledTopBarIconStyledTitleContainer>
-      </StyledLeftContainer>
 
-      <StyledPageActionContainer
-        data-click-outside-id={PAGE_ACTION_CONTAINER_CLICK_OUTSIDE_ID}
-      >
-        {children}
-      </StyledPageActionContainer>
-    </StyledTopBarContainer>
+          <StyledTopBarIconStyledTitleContainer>
+            {Icon && (
+              <StyledIconContainer>
+                <Icon size={theme.icon.size.md} />
+              </StyledIconContainer>
+            )}
+            {isDefined(title) && (
+              <StyledTitleContainer data-testid="top-bar-title">
+                {typeof title === 'string' ? (
+                  <OverflowingTextWithTooltip text={title} />
+                ) : (
+                  title
+                )}
+              </StyledTitleContainer>
+            )}
+          </StyledTopBarIconStyledTitleContainer>
+        </StyledLeftContainer>
+        <StyledPageActionContainer
+          data-click-outside-id={PAGE_ACTION_CONTAINER_CLICK_OUTSIDE_ID}
+        >
+          {children}
+        </StyledPageActionContainer>
+      </StyledTopBarContainer>
+    </AnimatePresence>
   );
 };

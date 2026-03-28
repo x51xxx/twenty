@@ -1,22 +1,23 @@
-import { expect, within } from '@storybook/test';
-import { type Meta, type StoryObj } from '@storybook/react';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useEffect } from 'react';
-import { useSetRecoilState } from 'recoil';
+import { expect, within } from 'storybook/test';
 
 import { currentWorkspaceMemberState } from '@/auth/states/currentWorkspaceMemberState';
-import { objectMetadataItemsState } from '@/object-metadata/states/objectMetadataItemsState';
-import { SettingsPath } from '@/types/SettingsPath';
+import { jotaiStore } from '@/ui/utilities/state/jotai/jotaiStore';
+import { setTestObjectMetadataItemsInMetadataStore } from '~/testing/utils/setTestObjectMetadataItemsInMetadataStore';
+import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
+import { SettingsPath } from 'twenty-shared/types';
 import { ComponentWithRouterDecorator } from '~/testing/decorators/ComponentWithRouterDecorator';
 import { ObjectMetadataItemsDecorator } from '~/testing/decorators/ObjectMetadataItemsDecorator';
-import { PrefetchLoadedDecorator } from '~/testing/decorators/PrefetchLoadedDecorator';
+import { LoadedDecorator } from '~/testing/decorators/LoadedDecorator';
 import { SnackBarDecorator } from '~/testing/decorators/SnackBarDecorator';
 import { graphqlMocks } from '~/testing/graphqlMocks';
 import { mockedWorkspaceMemberData } from '~/testing/mock-data/users';
-import { generatedMockObjectMetadataItems } from '~/testing/utils/generatedMockObjectMetadataItems';
+import { getTestEnrichedObjectMetadataItemsMock } from '~/testing/utils/getTestEnrichedObjectMetadataItemsMock';
 
-import { CurrentWorkspaceMemberFavoritesFolders } from '@/favorites/components/CurrentWorkspaceMemberFavoritesFolders';
 import { NavigationDrawerFixedContent } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerFixedContent';
 import { NavigationDrawerSubItem } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerSubItem';
+import { getSettingsPath } from 'twenty-shared/utils';
 import {
   IconAt,
   IconBell,
@@ -35,13 +36,12 @@ import {
 } from 'twenty-ui/display';
 import { AdvancedSettingsToggle } from 'twenty-ui/navigation';
 import { getOsControlSymbol } from 'twenty-ui/utilities';
-import { I18nFrontDecorator } from '~/testing/decorators/I18nFrontDecorator';
-import { getSettingsPath } from '~/utils/navigation/getSettingsPath';
-import { NavigationDrawer } from '../NavigationDrawer';
-import { NavigationDrawerItem } from '../NavigationDrawerItem';
-import { NavigationDrawerItemGroup } from '../NavigationDrawerItemGroup';
-import { NavigationDrawerSection } from '../NavigationDrawerSection';
-import { NavigationDrawerSectionTitle } from '../NavigationDrawerSectionTitle';
+
+import { NavigationDrawer } from '@/ui/navigation/navigation-drawer/components/NavigationDrawer';
+import { NavigationDrawerItem } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerItem';
+import { NavigationDrawerItemGroup } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerItemGroup';
+import { NavigationDrawerSection } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerSection';
+import { NavigationDrawerSectionTitle } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerSectionTitle';
 
 const meta: Meta<typeof NavigationDrawer> = {
   title: 'UI/Navigation/NavigationDrawer/NavigationDrawer',
@@ -50,19 +50,18 @@ const meta: Meta<typeof NavigationDrawer> = {
     ComponentWithRouterDecorator,
     SnackBarDecorator,
     ObjectMetadataItemsDecorator,
-    PrefetchLoadedDecorator,
-    I18nFrontDecorator,
+    LoadedDecorator,
     (Story) => {
-      const setCurrentWorkspaceMember = useSetRecoilState(
+      const setCurrentWorkspaceMember = useSetAtomState(
         currentWorkspaceMemberState,
       );
-      const setObjectMetadataItems = useSetRecoilState(
-        objectMetadataItemsState,
-      );
       useEffect(() => {
-        setObjectMetadataItems(generatedMockObjectMetadataItems);
+        setTestObjectMetadataItemsInMetadataStore(
+          jotaiStore,
+          getTestEnrichedObjectMetadataItemsMock(),
+        );
         setCurrentWorkspaceMember(mockedWorkspaceMemberData);
-      }, [setObjectMetadataItems, setCurrentWorkspaceMember]);
+      }, [setCurrentWorkspaceMember]);
       return <Story />;
     },
   ],
@@ -87,27 +86,20 @@ export const Default: Story = {
             label="Notifications"
             to="/inbox"
             Icon={IconBell}
-            soon={true}
+            modifier="soon"
           />
           <NavigationDrawerItem
             label="Search"
             Icon={IconSearch}
-            keyboard={[`${getOsControlSymbol()}`, 'K']}
+            modifier={{ keyboard: [`${getOsControlSymbol()}`, 'K'] }}
           />
           <NavigationDrawerItem
             label="Settings"
             to="/settings/profile"
             Icon={IconSettings}
           />
-          <NavigationDrawerItem
-            label="Tasks"
-            to="/tasks"
-            Icon={IconCheckbox}
-            count={2}
-          />
+          <NavigationDrawerItem label="Tasks" to="/tasks" Icon={IconCheckbox} />
         </NavigationDrawerSection>
-
-        <CurrentWorkspaceMemberFavoritesFolders />
 
         <NavigationDrawerSection>
           <NavigationDrawerSectionTitle label="Workspace" />
@@ -122,8 +114,8 @@ export const Default: Story = {
       </>
     ),
   },
-  play: async () => {
-    const canvas = within(document.body);
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
 
     expect(await canvas.findByText('Workspace')).toBeInTheDocument();
   },
@@ -201,8 +193,8 @@ export const Settings: Story = {
       </>
     ),
   },
-  play: async () => {
-    const canvas = within(document.body);
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
 
     expect(await canvas.findByText('User')).toBeInTheDocument();
   },

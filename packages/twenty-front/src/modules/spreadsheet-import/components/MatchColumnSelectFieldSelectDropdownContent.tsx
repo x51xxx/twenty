@@ -1,3 +1,5 @@
+import { useMemo, useState } from 'react';
+
 import { type FieldMetadataItem } from '@/object-metadata/types/FieldMetadataItem';
 import { getFieldMetadataTypeLabel } from '@/object-record/object-filter-dropdown/utils/getFieldMetadataTypeLabel';
 import { DO_NOT_IMPORT_OPTION_KEY } from '@/spreadsheet-import/constants/DoNotImportOptionKey';
@@ -12,14 +14,14 @@ import { DropdownMenuSectionLabel } from '@/ui/layout/dropdown/components/Dropdo
 import { DropdownMenuSeparator } from '@/ui/layout/dropdown/components/DropdownMenuSeparator';
 import { GenericDropdownContentWidth } from '@/ui/layout/dropdown/constants/GenericDropdownContentWidth';
 import { ScrollWrapper } from '@/ui/utilities/scroll/components/ScrollWrapper';
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import { useLingui } from '@lingui/react/macro';
 import { isNonEmptyString } from '@sniptt/guards';
-import { useState } from 'react';
 import { IconForbid, IconX, useIcons } from 'twenty-ui/display';
 import { type SelectOption } from 'twenty-ui/input';
 import { MenuItemSelect } from 'twenty-ui/navigation';
 import { type ReadonlyDeep } from 'type-fest';
+import { normalizeSearchText } from '~/utils/normalizeSearchText';
 
 const StyledContainer = styled.div`
   max-height: 360px;
@@ -54,12 +56,15 @@ export const MatchColumnSelectFieldSelectDropdownContent = ({
 
   const { availableFieldMetadataItems } = useSpreadsheetImportInternal();
 
-  const filteredAvailableFieldMetadataItems =
-    availableFieldMetadataItems.filter(
-      (field) =>
-        field.label.toLowerCase().includes(searchFilter.toLowerCase()) ||
-        field.name.toLowerCase().includes(searchFilter.toLowerCase()),
-    );
+  const filteredAvailableFieldMetadataItems = useMemo(() => {
+    const searchTerm = normalizeSearchText(searchFilter);
+    return availableFieldMetadataItems.filter((field) => {
+      return (
+        normalizeSearchText(field.label).includes(searchTerm) ||
+        normalizeSearchText(field.name).includes(searchTerm)
+      );
+    });
+  }, [availableFieldMetadataItems, searchFilter]);
 
   const { getIcon } = useIcons();
 
@@ -87,7 +92,7 @@ export const MatchColumnSelectFieldSelectDropdownContent = ({
           />
         }
       >
-        Select matching field
+        {t`Select matching field`}
       </DropdownMenuHeader>
       <DropdownMenuSearchInput
         value={searchFilter}

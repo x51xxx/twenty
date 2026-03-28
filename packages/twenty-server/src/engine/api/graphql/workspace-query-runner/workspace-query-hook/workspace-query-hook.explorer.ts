@@ -3,13 +3,18 @@ import { DiscoveryService, ModuleRef, createContextId } from '@nestjs/core';
 import { Injector } from '@nestjs/core/injector/injector';
 import { type Module } from '@nestjs/core/injector/module';
 
-import { type ObjectRecord } from 'src/engine/api/graphql/workspace-query-builder/interfaces/object-record.interface';
+import { type ObjectRecord } from 'twenty-shared/types';
+import { assertIsDefinedOrThrow } from 'twenty-shared/utils';
+
 import { type QueryResultFieldValue } from 'src/engine/api/graphql/workspace-query-runner/factories/query-result-getters/interfaces/query-result-field-value';
 import {
   type WorkspacePostQueryHookInstance,
   type WorkspacePreQueryHookInstance,
 } from 'src/engine/api/graphql/workspace-query-runner/workspace-query-hook/interfaces/workspace-query-hook.interface';
 
+import { isApiKeyAuthContext } from 'src/engine/core-modules/auth/guards/is-api-key-auth-context.guard';
+import { isUserAuthContext } from 'src/engine/core-modules/auth/guards/is-user-auth-context.guard';
+import { STANDARD_ERROR_MESSAGE } from 'src/engine/api/common/common-query-runners/errors/standard-error-message.constant';
 import {
   GraphqlQueryRunnerException,
   GraphqlQueryRunnerExceptionCode,
@@ -22,7 +27,7 @@ import { type WorkspaceQueryHookKey } from 'src/engine/api/graphql/workspace-que
 import { WorkspaceQueryHookStorage } from 'src/engine/api/graphql/workspace-query-runner/workspace-query-hook/storage/workspace-query-hook.storage';
 import { WorkspaceQueryHookType } from 'src/engine/api/graphql/workspace-query-runner/workspace-query-hook/types/workspace-query-hook.type';
 import { WorkspaceQueryHookMetadataAccessor } from 'src/engine/api/graphql/workspace-query-runner/workspace-query-hook/workspace-query-hook-metadata.accessor';
-import { workspaceValidator } from 'src/engine/core-modules/workspace/workspace.validate';
+import { WorkspaceNotFoundDefaultError } from 'src/engine/core-modules/workspace/workspace.exception';
 
 @Injectable()
 export class WorkspaceQueryHookExplorer implements OnModuleInit {
@@ -92,7 +97,7 @@ export class WorkspaceQueryHookExplorer implements OnModuleInit {
 
     const workspace = executeParams?.[0].workspace;
 
-    workspaceValidator.assertIsDefinedOrThrow(workspace);
+    assertIsDefinedOrThrow(workspace, WorkspaceNotFoundDefaultError);
 
     if (isRequestScoped) {
       const contextId = createContextId();
@@ -146,6 +151,7 @@ export class WorkspaceQueryHookExplorer implements OnModuleInit {
     throw new GraphqlQueryRunnerException(
       `Unsupported payload type: ${payload}`,
       GraphqlQueryRunnerExceptionCode.INVALID_POST_HOOK_PAYLOAD,
+      { userFriendlyMessage: STANDARD_ERROR_MESSAGE },
     );
   }
 
@@ -159,7 +165,7 @@ export class WorkspaceQueryHookExplorer implements OnModuleInit {
 
     const workspace = executeParams?.[0].workspace;
 
-    workspaceValidator.assertIsDefinedOrThrow(workspace);
+    assertIsDefinedOrThrow(workspace, WorkspaceNotFoundDefaultError);
 
     const transformedPayload = this.transformPayload(executeParams[2]);
 
@@ -167,14 +173,24 @@ export class WorkspaceQueryHookExplorer implements OnModuleInit {
       const contextId = createContextId();
 
       if (this.moduleRef.registerRequestByContextId) {
+        const authContext = executeParams[0];
+
         this.moduleRef.registerRequestByContextId(
           {
             req: {
               workspaceId: workspace.id,
-              userWorkspaceId: executeParams?.[0].userWorkspaceId,
-              apiKey: executeParams?.[0].apiKey,
-              workspaceMemberId: executeParams?.[0].workspaceMemberId,
-              user: executeParams?.[0].user,
+              userWorkspaceId: isUserAuthContext(authContext)
+                ? authContext.userWorkspaceId
+                : undefined,
+              apiKey: isApiKeyAuthContext(authContext)
+                ? authContext.apiKey
+                : undefined,
+              workspaceMemberId: isUserAuthContext(authContext)
+                ? authContext.workspaceMemberId
+                : undefined,
+              user: isUserAuthContext(authContext)
+                ? authContext.user
+                : undefined,
             },
           },
           contextId,

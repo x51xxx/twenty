@@ -1,14 +1,28 @@
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import { motion } from 'framer-motion';
+import Linkify from 'linkify-react';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { AnimatedEaseInOut } from 'twenty-ui/utilities';
 
 const StyledThreadMessageBody = styled(motion.div)`
-  color: ${({ theme }) => theme.font.color.primary};
+  color: ${themeCssVariables.font.color.primary};
   display: flex;
   flex-direction: column;
-  margin-top: ${({ theme }) => theme.spacing(4)};
-  white-space: pre-line;
+  margin-top: ${themeCssVariables.spacing[4]};
   overflow-wrap: break-word;
+  white-space: pre-line;
+
+  a {
+    color: ${themeCssVariables.font.color.primary};
+
+    text-decoration: underline;
+    text-decoration-color: ${themeCssVariables.font.color.primary};
+
+    &:hover {
+      color: ${themeCssVariables.font.color.tertiary};
+      text-decoration-color: ${themeCssVariables.border.color.strong};
+    }
+  }
 `;
 
 type EmailThreadMessageBodyProps = {
@@ -22,7 +36,16 @@ export const EmailThreadMessageBody = ({
 }: EmailThreadMessageBodyProps) => {
   return (
     <AnimatedEaseInOut isOpen={isDisplayed} duration="fast">
-      <StyledThreadMessageBody>{body}</StyledThreadMessageBody>
+      <StyledThreadMessageBody>
+        <Linkify
+          options={{
+            target: '_blank',
+            rel: 'noopener noreferrer',
+          }}
+        >
+          {body}
+        </Linkify>
+      </StyledThreadMessageBody>
     </AnimatedEaseInOut>
   );
 };

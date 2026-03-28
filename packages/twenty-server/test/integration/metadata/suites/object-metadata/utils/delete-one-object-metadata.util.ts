@@ -1,4 +1,4 @@
-import { makeGraphqlAPIRequest } from 'test/integration/graphql/utils/make-graphql-api-request.util';
+import { makeMetadataAPIRequest } from 'test/integration/metadata/suites/utils/make-metadata-api-request.util';
 import {
   type DeleteOneObjectFactoryInput,
   deleteOneObjectMetadataQueryFactory,
@@ -10,14 +10,14 @@ import { warnIfNoErrorButExpectedToFail } from 'test/integration/metadata/utils/
 export const deleteOneObjectMetadata = async ({
   input,
   gqlFields,
-  expectToFail,
+  expectToFail = false,
 }: PerformMetadataQueryParams<DeleteOneObjectFactoryInput>) => {
   const graphqlOperation = deleteOneObjectMetadataQueryFactory({
     input,
     gqlFields,
   });
 
-  const response = await makeGraphqlAPIRequest(graphqlOperation);
+  const response = await makeMetadataAPIRequest(graphqlOperation);
 
   if (expectToFail === true) {
     warnIfNoErrorButExpectedToFail({

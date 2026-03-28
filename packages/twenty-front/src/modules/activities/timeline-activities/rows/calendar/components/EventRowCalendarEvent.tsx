@@ -1,4 +1,5 @@
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
+import { useLingui } from '@lingui/react/macro';
 import { useState } from 'react';
 
 import { EventCardCalendarEvent } from '@/activities/timeline-activities/rows/calendar/components/EventCardCalendarEvent';
@@ -10,19 +11,20 @@ import {
   StyledEventRowItemColumn,
 } from '@/activities/timeline-activities/rows/components/EventRowDynamicComponent';
 import { isTimelineActivityWithLinkedRecord } from '@/activities/timeline-activities/types/TimelineActivity';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 type EventRowCalendarEventProps = EventRowDynamicComponentProps;
 
 const StyledEventRowCalendarEventContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.spacing(1)};
+  gap: ${themeCssVariables.spacing[1]};
 `;
 
 const StyledRowContainer = styled.div`
   display: flex;
   flex-direction: row;
-  gap: ${({ theme }) => theme.spacing(1)};
+  gap: ${themeCssVariables.spacing[1]};
 `;
 
 export const EventRowCalendarEvent = ({
@@ -30,6 +32,7 @@ export const EventRowCalendarEvent = ({
   authorFullName,
   labelIdentifierValue,
 }: EventRowCalendarEventProps) => {
+  const { t } = useLingui();
   const [, eventAction] = event.name.split('.');
   const [isOpen, setIsOpen] = useState(false);
 
@@ -42,7 +45,7 @@ export const EventRowCalendarEvent = ({
       <StyledRowContainer>
         <StyledEventRowItemColumn>{authorFullName}</StyledEventRowItemColumn>
         <StyledEventRowItemAction>
-          linked a calendar event with {labelIdentifierValue}
+          {t`linked a calendar event with ${labelIdentifierValue}`}
         </StyledEventRowItemAction>
         <EventCardToggleButton isOpen={isOpen} setIsOpen={setIsOpen} />
       </StyledRowContainer>

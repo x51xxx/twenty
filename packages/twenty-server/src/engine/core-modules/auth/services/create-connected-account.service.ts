@@ -2,9 +2,10 @@ import { Injectable } from '@nestjs/common';
 
 import { type ConnectedAccountProvider } from 'twenty-shared/types';
 
+import { ConnectedAccountDataAccessService } from 'src/engine/metadata-modules/connected-account/data-access/services/connected-account-data-access.service';
 import { type WorkspaceEntityManager } from 'src/engine/twenty-orm/entity-manager/workspace-entity-manager';
-import { TwentyORMGlobalManager } from 'src/engine/twenty-orm/twenty-orm-global.manager';
-import { type ConnectedAccountWorkspaceEntity } from 'src/modules/connected-account/standard-objects/connected-account.workspace-entity';
+import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
+import { buildSystemAuthContext } from 'src/engine/twenty-orm/utils/build-system-auth-context.util';
 
 export type CreateConnectedAccountInput = {
   workspaceId: string;
@@ -21,7 +22,8 @@ export type CreateConnectedAccountInput = {
 @Injectable()
 export class CreateConnectedAccountService {
   constructor(
-    private readonly twentyORMGlobalManager: TwentyORMGlobalManager,
+    private readonly globalWorkspaceOrmManager: GlobalWorkspaceOrmManager,
+    private readonly connectedAccountDataAccessService: ConnectedAccountDataAccessService,
   ) {}
 
   async createConnectedAccount(
@@ -39,24 +41,22 @@ export class CreateConnectedAccountService {
       manager,
     } = input;
 
-    const connectedAccountRepository =
-      await this.twentyORMGlobalManager.getRepositoryForWorkspace<ConnectedAccountWorkspaceEntity>(
-        workspaceId,
-        'connectedAccount',
-      );
+    const authContext = buildSystemAuthContext(workspaceId);
 
-    await connectedAccountRepository.save(
-      {
-        id: connectedAccountId,
-        handle,
-        provider,
-        accessToken,
-        refreshToken,
-        accountOwnerId,
-        scopes,
-      },
-      {},
-      manager,
-    );
+    await this.globalWorkspaceOrmManager.executeInWorkspaceContext(async () => {
+      await this.connectedAccountDataAccessService.save(
+        workspaceId,
+        {
+          id: connectedAccountId,
+          handle,
+          provider,
+          accessToken,
+          refreshToken,
+          accountOwnerId,
+          scopes,
+        },
+        manager,
+      );
+    }, authContext);
   }
 }

@@ -1,73 +1,25 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { Repository } from 'typeorm';
 
+import { WorkspaceCacheProvider } from 'src/engine/workspace-cache/interfaces/workspace-cache-provider.service';
 import { type FeatureFlagMap } from 'src/engine/core-modules/feature-flag/interfaces/feature-flag-map.interface';
 
-import { FeatureFlag } from 'src/engine/core-modules/feature-flag/feature-flag.entity';
-import { TwentyORMExceptionCode } from 'src/engine/twenty-orm/exceptions/twenty-orm.exception';
-import { getFromCacheWithRecompute } from 'src/engine/utils/get-data-from-cache-with-recompute.util';
-import { WorkspaceCacheStorageService } from 'src/engine/workspace-cache-storage/workspace-cache-storage.service';
-
-const FEATURE_FLAG_MAP = 'Feature flag map';
+import { FeatureFlagEntity } from 'src/engine/core-modules/feature-flag/feature-flag.entity';
+import { WorkspaceCache } from 'src/engine/workspace-cache/decorators/workspace-cache.decorator';
 
 @Injectable()
-export class WorkspaceFeatureFlagsMapCacheService {
-  logger = new Logger(WorkspaceFeatureFlagsMapCacheService.name);
-
+@WorkspaceCache('featureFlagsMap')
+export class WorkspaceFeatureFlagsMapCacheService extends WorkspaceCacheProvider<FeatureFlagMap> {
   constructor(
-    private readonly workspaceCacheStorageService: WorkspaceCacheStorageService,
-    @InjectRepository(FeatureFlag)
-    private readonly featureFlagRepository: Repository<FeatureFlag>,
-  ) {}
-
-  async getWorkspaceFeatureFlagsMap({
-    workspaceId,
-  }: {
-    workspaceId: string;
-  }): Promise<FeatureFlagMap> {
-    const { data: workspaceFeatureFlagsMap } =
-      await this.getWorkspaceFeatureFlagsMapAndVersion({ workspaceId });
-
-    return workspaceFeatureFlagsMap;
+    @InjectRepository(FeatureFlagEntity)
+    private readonly featureFlagRepository: Repository<FeatureFlagEntity>,
+  ) {
+    super();
   }
 
-  async getWorkspaceFeatureFlagsMapAndVersion({
-    workspaceId,
-  }: {
-    workspaceId: string;
-  }) {
-    return getFromCacheWithRecompute<string, FeatureFlagMap>({
-      workspaceId,
-      getCacheData: () =>
-        this.workspaceCacheStorageService.getFeatureFlagsMap(workspaceId),
-      getCacheVersion: () =>
-        this.workspaceCacheStorageService.getFeatureFlagsMapVersionFromCache(
-          workspaceId,
-        ),
-      recomputeCache: (params) => this.recomputeFeatureFlagsMapCache(params),
-      cachedEntityName: FEATURE_FLAG_MAP,
-      exceptionCode: TwentyORMExceptionCode.FEATURE_FLAG_MAP_VERSION_NOT_FOUND,
-      logger: this.logger,
-    });
-  }
-
-  async recomputeFeatureFlagsMapCache({
-    workspaceId,
-  }: {
-    workspaceId: string;
-  }): Promise<void> {
-    const freshFeatureFlagMap =
-      await this.getFeatureFlagsMapFromDatabase(workspaceId);
-
-    await this.workspaceCacheStorageService.setFeatureFlagsMap(
-      workspaceId,
-      freshFeatureFlagMap,
-    );
-  }
-
-  private async getFeatureFlagsMapFromDatabase(workspaceId: string) {
+  async computeForCache(workspaceId: string): Promise<FeatureFlagMap> {
     const workspaceFeatureFlags = await this.featureFlagRepository.find({
       where: { workspaceId },
     });

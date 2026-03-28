@@ -3,37 +3,32 @@ import { recordGroupIdsComponentState } from '@/object-record/record-group/state
 import { type RecordGroupDefinition } from '@/object-record/record-group/types/RecordGroupDefinition';
 import { RecordGroupSort } from '@/object-record/record-group/types/RecordGroupSort';
 import { recordGroupSortedInsert } from '@/object-record/record-group/utils/recordGroupSortedInsert';
-import { recordIndexRecordGroupHideComponentFamilyState } from '@/object-record/record-index/states/recordIndexRecordGroupHideComponentFamilyState';
 import { recordIndexRecordGroupSortComponentState } from '@/object-record/record-index/states/recordIndexRecordGroupSortComponentState';
 import { recordIndexRecordIdsByGroupComponentFamilyState } from '@/object-record/record-index/states/recordIndexRecordIdsByGroupComponentFamilyState';
-import { createComponentFamilySelector } from '@/ui/utilities/state/component-state/utils/createComponentFamilySelector';
-
+import { recordIndexShouldHideEmptyRecordGroupsComponentState } from '@/object-record/record-index/states/recordIndexShouldHideEmptyRecordGroupsComponentState';
+import { createAtomComponentFamilySelector } from '@/ui/utilities/state/jotai/utils/createAtomComponentFamilySelector';
 import { ViewComponentInstanceContext } from '@/views/states/contexts/ViewComponentInstanceContext';
 import { type ViewType } from '@/views/types/ViewType';
 import { isDefined } from 'twenty-shared/utils';
 
 export const visibleRecordGroupIdsComponentFamilySelector =
-  createComponentFamilySelector<RecordGroupDefinition['id'][], ViewType>({
+  createAtomComponentFamilySelector<RecordGroupDefinition['id'][], ViewType>({
     key: 'visibleRecordGroupIdsComponentFamilySelector',
     componentInstanceContext: ViewComponentInstanceContext,
     get:
-      ({ instanceId, familyKey }) =>
+      ({ instanceId, familyKey: _viewType }) =>
       ({ get }) => {
-        const recordGroupSort = get(
-          recordIndexRecordGroupSortComponentState.atomFamily({
-            instanceId,
-          }),
-        );
-        const recordGroupIds = get(
-          recordGroupIdsComponentState.atomFamily({
-            instanceId,
-          }),
-        );
-        const hideEmptyRecordGroup = get(
-          recordIndexRecordGroupHideComponentFamilyState.atomFamily({
-            instanceId,
-            familyKey,
-          }),
+        const recordGroupSort = get(recordIndexRecordGroupSortComponentState, {
+          instanceId,
+        });
+
+        const recordGroupIds = get(recordGroupIdsComponentState, {
+          instanceId,
+        });
+
+        const shouldHideEmptyRecordGroups = get(
+          recordIndexShouldHideEmptyRecordGroupsComponentState,
+          { instanceId },
         );
 
         const result: RecordGroupDefinition[] = [];
@@ -55,25 +50,26 @@ export const visibleRecordGroupIdsComponentFamilySelector =
 
         for (const recordGroupId of recordGroupIds) {
           const recordGroupDefinition = get(
-            recordGroupDefinitionFamilyState(recordGroupId),
-          );
-          const recordIds = get(
-            recordIndexRecordIdsByGroupComponentFamilyState.atomFamily({
-              instanceId,
-              familyKey: recordGroupId,
-            }),
+            recordGroupDefinitionFamilyState,
+            recordGroupId,
           );
 
           if (!isDefined(recordGroupDefinition)) {
             continue;
           }
 
-          if (hideEmptyRecordGroup && recordIds.length === 0) {
+          if (!recordGroupDefinition.isVisible) {
             continue;
           }
 
-          if (!recordGroupDefinition.isVisible) {
-            continue;
+          if (shouldHideEmptyRecordGroups) {
+            const rowIds = get(
+              recordIndexRecordIdsByGroupComponentFamilyState,
+              { instanceId, familyKey: recordGroupId },
+            );
+            if (rowIds.length === 0) {
+              continue;
+            }
           }
 
           recordGroupSortedInsert(result, recordGroupDefinition, comparator);

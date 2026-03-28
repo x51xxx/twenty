@@ -17,12 +17,14 @@ jest.mock('@clickhouse/client', () => ({
     close: jest.fn().mockResolvedValue({}),
     exec: jest.fn().mockResolvedValue({}),
   }),
+  ClickHouseLogLevel: { OFF: 'OFF' },
 }));
 
 describe('ClickHouseService', () => {
   let service: ClickHouseService;
   let twentyConfigService: TwentyConfigService;
   let mockClickHouseClient: jest.Mocked<ClickHouseClient>;
+  let loggerErrorSpy: jest.SpyInstance;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -55,6 +57,11 @@ describe('ClickHouseService', () => {
 
     service = module.get<ClickHouseService>(ClickHouseService);
     twentyConfigService = module.get<TwentyConfigService>(TwentyConfigService);
+
+    // Mock logger error method to avoid polluting test output
+    loggerErrorSpy = jest
+      .spyOn((service as any).logger, 'error')
+      .mockImplementation();
 
     // Set the mock client
     (service as any).mainClient = mockClickHouseClient;
@@ -119,8 +126,10 @@ describe('ClickHouseService', () => {
       const result = await service.insert('test_table', testData);
 
       expect(result).toEqual({ success: false });
-      // Since the service uses logger.error instead of exceptionHandlerService.captureExceptions,
-      // we don't need to assert on exceptionHandlerService
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        'Error inserting data into ClickHouse',
+        testError,
+      );
     });
   });
 
@@ -161,8 +170,10 @@ describe('ClickHouseService', () => {
       const result = await service.select(query);
 
       expect(result).toEqual([]);
-      // Since the service uses logger.error instead of exceptionHandlerService.captureExceptions,
-      // we don't need to assert on exceptionHandlerService
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        'Error executing select query in ClickHouse',
+        testError,
+      );
     });
   });
 

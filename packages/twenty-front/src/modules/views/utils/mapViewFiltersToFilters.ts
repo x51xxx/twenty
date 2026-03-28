@@ -2,17 +2,18 @@ import { type RecordFilter } from '@/object-record/record-filter/types/RecordFil
 
 import { type FieldMetadataItem } from '@/object-metadata/types/FieldMetadataItem';
 
-import { getFilterTypeFromFieldType } from '@/object-metadata/utils/formatFieldMetadataItemsAsFilterDefinitions';
 import { isSystemSearchVectorField } from '@/object-record/utils/isSystemSearchVectorField';
 import { type CompositeFieldSubFieldName } from '@/settings/data-model/types/CompositeFieldSubFieldName';
-import { convertViewFilterOperandFromCore } from '@/views/utils/convertViewFilterOperandFromCore';
-import { type ViewFilterOperand } from 'twenty-shared/types';
-import { isDefined } from 'twenty-shared/utils';
-import { type CoreViewFilter } from '~/generated/graphql';
-import { type ViewFilter } from '../types/ViewFilter';
+import {
+  convertViewFilterValueToString,
+  getFilterTypeFromFieldType,
+  isDefined,
+} from 'twenty-shared/utils';
+import { type ViewFilter as GqlViewFilter } from '~/generated-metadata/graphql';
+import { type ViewFilter } from '@/views/types/ViewFilter';
 
 export const mapViewFiltersToFilters = (
-  viewFilters: ViewFilter[] | CoreViewFilter[],
+  viewFilters: ViewFilter[] | GqlViewFilter[],
   availableFieldMetadataItems: FieldMetadataItem[],
 ): RecordFilter[] => {
   return viewFilters
@@ -35,21 +36,20 @@ export const mapViewFiltersToFilters = (
         ? 'Search'
         : availableFieldMetadataItem.label;
 
-      const operand =
-        viewFilter.__typename === 'CoreViewFilter'
-          ? convertViewFilterOperandFromCore(viewFilter.operand)
-          : (viewFilter.operand as ViewFilterOperand);
+      const operand = viewFilter.operand;
+
+      const stringValue = convertViewFilterValueToString(viewFilter.value);
 
       return {
         id: viewFilter.id,
         fieldMetadataId: viewFilter.fieldMetadataId,
-        value: viewFilter.value,
+        value: stringValue,
         displayValue:
-          'displayValue' in viewFilter
+          'displayValue' in viewFilter && isDefined(viewFilter.displayValue)
             ? viewFilter.displayValue
-            : viewFilter.value,
+            : stringValue,
         operand,
-        recordFilterGroupId: viewFilter.viewFilterGroupId,
+        recordFilterGroupId: viewFilter.viewFilterGroupId ?? undefined,
         positionInRecordFilterGroup: viewFilter.positionInViewFilterGroup,
         label,
         type: filterType,

@@ -1,64 +1,69 @@
-import {
-  BadRequestException,
-  Injectable,
-  InternalServerErrorException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
-import { type Request } from 'express';
-import { isDefined } from 'twenty-shared/utils';
+import { ObjectRecord } from 'twenty-shared/types';
+import { capitalize } from 'twenty-shared/utils';
 
-import { RestApiBaseHandler } from 'src/engine/api/rest/core/interfaces/rest-api-base.handler';
+import { CommonCreateOneQueryRunnerService } from 'src/engine/api/common/common-query-runners/common-create-one-query-runner.service';
+import { RestApiBaseHandler } from 'src/engine/api/rest/core/handlers/rest-api-base.handler';
+import { parseDepthRestRequest } from 'src/engine/api/rest/input-request-parsers/depth-parser-utils/parse-depth-rest-request.util';
+import { parseUpsertRestRequest } from 'src/engine/api/rest/input-request-parsers/upsert-parser-utils/parse-upsert-rest-request.util';
+import { AuthenticatedRequest } from 'src/engine/api/rest/types/authenticated-request';
+import { workspaceQueryRunnerRestApiExceptionHandler } from 'src/engine/api/rest/utils/workspace-query-runner-rest-api-exception-handler.util';
 
 @Injectable()
 export class RestApiCreateOneHandler extends RestApiBaseHandler {
-  async handle(request: Request) {
-    const { objectMetadata, repository, restrictedFields } =
-      await this.getRepositoryAndMetadataOrFail(request);
+  constructor(
+    private readonly commonCreateOneQueryRunnerService: CommonCreateOneQueryRunnerService,
+  ) {
+    super();
+  }
 
-    const overriddenBody = await this.recordInputTransformerService.process({
-      recordInput: request.body,
-      objectMetadataMapItem: objectMetadata.objectMetadataMapItem,
-    });
+  async handle(request: AuthenticatedRequest) {
+    try {
+      const { data, depth, upsert } = this.parseRequestArgs(request);
 
-    const recordExists =
-      isDefined(overriddenBody.id) &&
-      (await repository.exists({
-        where: {
-          id: overriddenBody.id,
+      const {
+        authContext,
+        flatObjectMetadata,
+        flatObjectMetadataMaps,
+        flatFieldMetadataMaps,
+        objectIdByNameSingular,
+      } = await this.buildCommonOptions(request);
+
+      const selectedFields = await this.computeSelectedFields({
+        depth,
+        flatObjectMetadata,
+        flatObjectMetadataMaps,
+        flatFieldMetadataMaps,
+        authContext,
+      });
+
+      const record = await this.commonCreateOneQueryRunnerService.execute(
+        { data, selectedFields, upsert },
+        {
+          authContext,
+          flatObjectMetadata,
+          flatObjectMetadataMaps,
+          flatFieldMetadataMaps,
+          objectIdByNameSingular,
         },
-      }));
-
-    if (recordExists) {
-      throw new BadRequestException('Record already exists');
-    }
-
-    const [recordToCreate] =
-      await this.createdByFromAuthContextService.injectCreatedBy(
-        [overriddenBody],
-        objectMetadata.objectMetadataMapItem.nameSingular,
-        this.getAuthContextFromRequest(request),
       );
 
-    const createdRecord = await repository.save(recordToCreate);
-
-    const records = await this.getRecord({
-      recordIds: [createdRecord.id],
-      repository,
-      objectMetadata,
-      depth: this.depthInputFactory.create(request),
-      restrictedFields,
-    });
-
-    const record = records[0];
-
-    if (!isDefined(record)) {
-      throw new InternalServerErrorException('Created record not found');
+      return this.formatRestResponse(record, flatObjectMetadata.nameSingular);
+    } catch (error) {
+      return workspaceQueryRunnerRestApiExceptionHandler(error);
     }
+  }
 
-    return this.formatResult({
-      operation: 'create',
-      objectNameSingular: objectMetadata.objectMetadataMapItem.nameSingular,
-      data: record,
-    });
+  private formatRestResponse(record: ObjectRecord, objectNameSingular: string) {
+    return { data: { [`create${capitalize(objectNameSingular)}`]: record } };
+  }
+
+  private parseRequestArgs(request: AuthenticatedRequest) {
+    return {
+      data: request.body,
+      depth: parseDepthRestRequest(request),
+      upsert: parseUpsertRestRequest(request),
+    };
   }
 }

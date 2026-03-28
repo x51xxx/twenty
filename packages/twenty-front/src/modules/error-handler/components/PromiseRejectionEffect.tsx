@@ -1,9 +1,25 @@
 import { useCallback, useEffect } from 'react';
 
-import { type CustomError } from '@/error-handler/CustomError';
 import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
-import isEmpty from 'lodash.isempty';
-import { isDefined } from 'twenty-shared/utils';
+import {
+  CombinedGraphQLErrors,
+  CombinedProtocolErrors,
+  LinkError,
+  LocalStateError,
+  ServerError,
+  ServerParseError,
+  UnconventionalError,
+} from '@apollo/client/errors';
+import { isDefined, type CustomError } from 'twenty-shared/utils';
+
+const isApolloError = (error: unknown): boolean =>
+  CombinedGraphQLErrors.is(error) ||
+  CombinedProtocolErrors.is(error) ||
+  LinkError.is(error) ||
+  LocalStateError.is(error) ||
+  ServerError.is(error) ||
+  ServerParseError.is(error) ||
+  UnconventionalError.is(error);
 
 const hasErrorCode = (
   error: CustomError | any,
@@ -17,15 +33,21 @@ export const PromiseRejectionEffect = () => {
   const handlePromiseRejection = useCallback(
     async (event: PromiseRejectionEvent) => {
       const error = event.reason;
-      if (error.name === 'ApolloError' && !isEmpty(error.graphQLErrors)) {
+      if (isApolloError(error)) {
         enqueueErrorSnackBar({
           apolloError: error,
         });
         return; // already handled by apolloLink
       }
 
-      if (error.networkError?.name !== 'AbortError') {
-        enqueueErrorSnackBar({});
+      const isAbortError =
+        error?.networkError?.name === 'AbortError' ||
+        error?.name === 'AbortError';
+
+      if (!isAbortError) {
+        enqueueErrorSnackBar(
+          error instanceof Error ? { message: error.message } : {},
+        );
       }
 
       try {
@@ -39,7 +61,7 @@ export const PromiseRejectionEffect = () => {
           return scope;
         });
       } catch (sentryError) {
-        // eslint-disable-next-line no-console
+        // oxlint-disable-next-line no-console
         console.error('Failed to capture exception with Sentry:', sentryError);
       }
     },

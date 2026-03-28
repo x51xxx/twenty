@@ -1,8 +1,10 @@
-import { useRecoilCallback } from 'recoil';
+import { useStore } from 'jotai';
+import { useCallback } from 'react';
 
 import { type FieldDefinition } from '@/object-record/record-field/ui/types/FieldDefinition';
 import {
   type FieldMetadata,
+  type FieldMorphRelationMetadata,
   type FieldRelationMetadata,
 } from '@/object-record/record-field/ui/types/FieldMetadata';
 import { isFieldAddress } from '@/object-record/record-field/ui/types/guards/isFieldAddress';
@@ -21,34 +23,40 @@ import { isFieldPhones } from '@/object-record/record-field/ui/types/guards/isFi
 import { isFieldPhonesValue } from '@/object-record/record-field/ui/types/guards/isFieldPhonesValue';
 import { isFieldRawJson } from '@/object-record/record-field/ui/types/guards/isFieldRawJson';
 import { isFieldRawJsonValue } from '@/object-record/record-field/ui/types/guards/isFieldRawJsonValue';
-import { isFieldRelationToOneObject } from '@/object-record/record-field/ui/types/guards/isFieldRelationToOneObject';
-import { isFieldRelationToOneValue } from '@/object-record/record-field/ui/types/guards/isFieldRelationToOneValue';
 import { isFieldSelect } from '@/object-record/record-field/ui/types/guards/isFieldSelect';
 import { isFieldSelectValue } from '@/object-record/record-field/ui/types/guards/isFieldSelectValue';
 import { recordStoreFamilySelector } from '@/object-record/record-store/states/selectors/recordStoreFamilySelector';
 
 import { useObjectMetadataItemById } from '@/object-metadata/hooks/useObjectMetadataItemById';
+import { useObjectMetadataItems } from '@/object-metadata/hooks/useObjectMetadataItems';
+import { getRecordFromRecordNode } from '@/object-record/cache/utils/getRecordFromRecordNode';
 import { useUpdateOneRecord } from '@/object-record/hooks/useUpdateOneRecord';
+import { buildMorphRelationUpdateInput } from '@/object-record/record-field/ui/meta-types/input/utils/buildMorphRelationUpdateInput';
 import { isFieldArray } from '@/object-record/record-field/ui/types/guards/isFieldArray';
 import { isFieldArrayValue } from '@/object-record/record-field/ui/types/guards/isFieldArrayValue';
+import { isFieldBoolean } from '@/object-record/record-field/ui/types/guards/isFieldBoolean';
+import { isFieldBooleanValue } from '@/object-record/record-field/ui/types/guards/isFieldBooleanValue';
+import { isFieldCurrency } from '@/object-record/record-field/ui/types/guards/isFieldCurrency';
+import { isFieldCurrencyValue } from '@/object-record/record-field/ui/types/guards/isFieldCurrencyValue';
+import { isFieldDateTime } from '@/object-record/record-field/ui/types/guards/isFieldDateTime';
+import { isFieldDateTimeValue } from '@/object-record/record-field/ui/types/guards/isFieldDateTimeValue';
+import { isFieldFiles } from '@/object-record/record-field/ui/types/guards/isFieldFiles';
+import { isFieldFilesValue } from '@/object-record/record-field/ui/types/guards/isFieldFilesValue';
+import { isFieldMorphRelationManyToOne } from '@/object-record/record-field/ui/types/guards/isFieldMorphRelationManyToOne';
+import { isFieldNumber } from '@/object-record/record-field/ui/types/guards/isFieldNumber';
+import { isFieldNumberValue } from '@/object-record/record-field/ui/types/guards/isFieldNumberValue';
+import { isFieldRating } from '@/object-record/record-field/ui/types/guards/isFieldRating';
+import { isFieldRatingValue } from '@/object-record/record-field/ui/types/guards/isFieldRatingValue';
+import { isFieldRelationManyToOne } from '@/object-record/record-field/ui/types/guards/isFieldRelationManyToOne';
+import { isFieldRelationManyToOneValue } from '@/object-record/record-field/ui/types/guards/isFieldRelationManyToOneValue';
 import { isFieldRichText } from '@/object-record/record-field/ui/types/guards/isFieldRichText';
-import { isFieldRichTextV2 } from '@/object-record/record-field/ui/types/guards/isFieldRichTextV2';
 import { isFieldRichTextValue } from '@/object-record/record-field/ui/types/guards/isFieldRichTextValue';
-import { isFieldRichTextV2Value } from '@/object-record/record-field/ui/types/guards/isFieldRichTextValueV2';
+import { isFieldText } from '@/object-record/record-field/ui/types/guards/isFieldText';
+import { isFieldTextValue } from '@/object-record/record-field/ui/types/guards/isFieldTextValue';
+import { useUpsertRecordsInStore } from '@/object-record/record-store/hooks/useUpsertRecordsInStore';
 import { getForeignKeyNameFromRelationFieldName } from '@/object-record/utils/getForeignKeyNameFromRelationFieldName';
+import { isDefined } from 'twenty-shared/utils';
 import { isDeeplyEqual } from '~/utils/isDeeplyEqual';
-import { isFieldBoolean } from '../types/guards/isFieldBoolean';
-import { isFieldBooleanValue } from '../types/guards/isFieldBooleanValue';
-import { isFieldCurrency } from '../types/guards/isFieldCurrency';
-import { isFieldCurrencyValue } from '../types/guards/isFieldCurrencyValue';
-import { isFieldDateTime } from '../types/guards/isFieldDateTime';
-import { isFieldDateTimeValue } from '../types/guards/isFieldDateTimeValue';
-import { isFieldNumber } from '../types/guards/isFieldNumber';
-import { isFieldNumberValue } from '../types/guards/isFieldNumberValue';
-import { isFieldRating } from '../types/guards/isFieldRating';
-import { isFieldRatingValue } from '../types/guards/isFieldRatingValue';
-import { isFieldText } from '../types/guards/isFieldText';
-import { isFieldTextValue } from '../types/guards/isFieldTextValue';
 
 export const usePersistField = ({
   objectMetadataItemId,
@@ -59,168 +67,235 @@ export const usePersistField = ({
     objectId: objectMetadataItemId,
   });
 
-  const { updateOneRecord } = useUpdateOneRecord({
-    objectNameSingular: objectMetadataItem?.nameSingular ?? '',
-  });
+  const { objectMetadataItems } = useObjectMetadataItems();
 
-  const persistField = useRecoilCallback(
-    ({ set, snapshot }) =>
-      ({
-        recordId,
-        fieldDefinition,
-        valueToPersist,
-      }: {
-        recordId: string;
-        fieldDefinition: FieldDefinition<FieldMetadata>;
-        valueToPersist: unknown;
-      }) => {
-        const fieldIsRelationToOneObject =
-          isFieldRelationToOneObject(
-            fieldDefinition as FieldDefinition<FieldRelationMetadata>,
-          ) && isFieldRelationToOneValue(valueToPersist);
+  const { updateOneRecord } = useUpdateOneRecord();
 
-        const fieldIsText =
-          isFieldText(fieldDefinition) && isFieldTextValue(valueToPersist);
+  const store = useStore();
+  const { upsertRecordsInStore } = useUpsertRecordsInStore();
 
-        const fieldIsEmails =
-          isFieldEmails(fieldDefinition) && isFieldEmailsValue(valueToPersist);
+  const persistField = useCallback(
+    async ({
+      recordId,
+      fieldDefinition,
+      valueToPersist,
+    }: {
+      recordId: string;
+      fieldDefinition: FieldDefinition<FieldMetadata>;
+      valueToPersist: unknown;
+    }) => {
+      const fieldIsRelationManyToOne =
+        isFieldRelationManyToOne(
+          fieldDefinition as FieldDefinition<FieldRelationMetadata>,
+        ) && isFieldRelationManyToOneValue(valueToPersist);
 
-        const fieldIsDateTime =
-          isFieldDateTime(fieldDefinition) &&
-          isFieldDateTimeValue(valueToPersist);
+      const fieldIsMorphRelationManyToOne =
+        isFieldMorphRelationManyToOne(
+          fieldDefinition as FieldDefinition<FieldMorphRelationMetadata>,
+        ) && isFieldRelationManyToOneValue(valueToPersist);
 
-        const fieldIsDate =
-          isFieldDate(fieldDefinition) && isFieldDateValue(valueToPersist);
+      const fieldIsText =
+        isFieldText(fieldDefinition) && isFieldTextValue(valueToPersist);
 
-        const fieldIsLinks =
-          isFieldLinks(fieldDefinition) && isFieldLinksValue(valueToPersist);
+      const fieldIsEmails =
+        isFieldEmails(fieldDefinition) && isFieldEmailsValue(valueToPersist);
 
-        const fieldIsBoolean =
-          isFieldBoolean(fieldDefinition) &&
-          isFieldBooleanValue(valueToPersist);
+      const fieldIsDateTime =
+        isFieldDateTime(fieldDefinition) &&
+        isFieldDateTimeValue(valueToPersist);
 
-        const fieldIsRating =
-          isFieldRating(fieldDefinition) && isFieldRatingValue(valueToPersist);
+      const fieldIsDate =
+        isFieldDate(fieldDefinition) && isFieldDateValue(valueToPersist);
 
-        const fieldIsNumber =
-          isFieldNumber(fieldDefinition) && isFieldNumberValue(valueToPersist);
+      const fieldIsLinks =
+        isFieldLinks(fieldDefinition) && isFieldLinksValue(valueToPersist);
 
-        const fieldIsCurrency =
-          isFieldCurrency(fieldDefinition) &&
-          isFieldCurrencyValue(valueToPersist);
+      const fieldIsBoolean =
+        isFieldBoolean(fieldDefinition) && isFieldBooleanValue(valueToPersist);
 
-        const fieldIsFullName =
-          isFieldFullName(fieldDefinition) &&
-          isFieldFullNameValue(valueToPersist);
+      const fieldIsRating =
+        isFieldRating(fieldDefinition) && isFieldRatingValue(valueToPersist);
 
-        const fieldIsPhones =
-          isFieldPhones(fieldDefinition) && isFieldPhonesValue(valueToPersist);
+      const fieldIsNumber =
+        isFieldNumber(fieldDefinition) && isFieldNumberValue(valueToPersist);
 
-        const fieldIsSelect =
-          isFieldSelect(fieldDefinition) && isFieldSelectValue(valueToPersist);
+      const fieldIsCurrency =
+        isFieldCurrency(fieldDefinition) &&
+        isFieldCurrencyValue(valueToPersist);
 
-        const fieldIsMultiSelect =
-          isFieldMultiSelect(fieldDefinition) &&
-          isFieldMultiSelectValue(valueToPersist);
+      const fieldIsFullName =
+        isFieldFullName(fieldDefinition) &&
+        isFieldFullNameValue(valueToPersist);
 
-        const fieldIsAddress =
-          isFieldAddress(fieldDefinition) &&
-          isFieldAddressValue(valueToPersist);
+      const fieldIsPhones =
+        isFieldPhones(fieldDefinition) && isFieldPhonesValue(valueToPersist);
 
-        const fieldIsRawJson =
-          isFieldRawJson(fieldDefinition) &&
-          isFieldRawJsonValue(valueToPersist);
+      const fieldIsSelect =
+        isFieldSelect(fieldDefinition) && isFieldSelectValue(valueToPersist);
 
-        const fieldIsRichText =
-          isFieldRichText(fieldDefinition) &&
-          isFieldRichTextValue(valueToPersist);
+      const fieldIsMultiSelect =
+        isFieldMultiSelect(fieldDefinition) &&
+        isFieldMultiSelectValue(valueToPersist);
 
-        const fieldIsRichTextV2 =
-          isFieldRichTextV2(fieldDefinition) &&
-          isFieldRichTextV2Value(valueToPersist);
+      const fieldIsAddress =
+        isFieldAddress(fieldDefinition) && isFieldAddressValue(valueToPersist);
 
-        const fieldIsArray =
-          isFieldArray(fieldDefinition) && isFieldArrayValue(valueToPersist);
+      const fieldIsRawJson =
+        isFieldRawJson(fieldDefinition) && isFieldRawJsonValue(valueToPersist);
 
-        const fieldIsUIReadOnly =
-          fieldDefinition.metadata.isUIReadOnly ?? false;
+      const fieldIsRichText =
+        isFieldRichText(fieldDefinition) &&
+        isFieldRichTextValue(valueToPersist);
 
-        if (fieldIsRawJson && fieldIsUIReadOnly) {
+      const fieldIsArray =
+        isFieldArray(fieldDefinition) && isFieldArrayValue(valueToPersist);
+
+      const fieldIsFiles =
+        isFieldFiles(fieldDefinition) && isFieldFilesValue(valueToPersist);
+
+      const fieldIsUIReadOnly = fieldDefinition.metadata.isUIReadOnly ?? false;
+
+      if (fieldIsRawJson && fieldIsUIReadOnly) {
+        return;
+      }
+
+      const isValuePersistable =
+        fieldIsMorphRelationManyToOne ||
+        fieldIsRelationManyToOne ||
+        fieldIsText ||
+        fieldIsBoolean ||
+        fieldIsEmails ||
+        fieldIsRating ||
+        fieldIsNumber ||
+        fieldIsDateTime ||
+        fieldIsDate ||
+        fieldIsPhones ||
+        fieldIsLinks ||
+        fieldIsCurrency ||
+        fieldIsFullName ||
+        fieldIsSelect ||
+        fieldIsMultiSelect ||
+        fieldIsAddress ||
+        fieldIsRawJson ||
+        fieldIsArray ||
+        fieldIsFiles ||
+        fieldIsRichText;
+
+      if (isValuePersistable) {
+        const fieldName = fieldDefinition.metadata.fieldName;
+
+        const currentValue = store.get(
+          recordStoreFamilySelector.selectorFamily({ recordId, fieldName }),
+        ) as { id?: string } | null | undefined;
+
+        if (fieldIsRelationManyToOne) {
+          if (valueToPersist?.id === currentValue?.id) {
+            return;
+          }
+
+          const newRecord = await updateOneRecord({
+            objectNameSingular: objectMetadataItem.nameSingular,
+            idToUpdate: recordId,
+            updateOneRecordInput: {
+              [getForeignKeyNameFromRelationFieldName(fieldName)]:
+                valueToPersist?.id ?? null,
+            },
+          });
+
+          upsertRecordsInStore({
+            partialRecords: [
+              getRecordFromRecordNode({
+                recordNode: newRecord,
+              }),
+            ],
+            recordGqlFields: {
+              [getForeignKeyNameFromRelationFieldName(fieldName)]: true,
+            },
+          });
           return;
         }
 
-        const isValuePersistable =
-          fieldIsRelationToOneObject ||
-          fieldIsText ||
-          fieldIsBoolean ||
-          fieldIsEmails ||
-          fieldIsRating ||
-          fieldIsNumber ||
-          fieldIsDateTime ||
-          fieldIsDate ||
-          fieldIsPhones ||
-          fieldIsLinks ||
-          fieldIsCurrency ||
-          fieldIsFullName ||
-          fieldIsSelect ||
-          fieldIsMultiSelect ||
-          fieldIsAddress ||
-          fieldIsRawJson ||
-          fieldIsArray ||
-          fieldIsRichText ||
-          fieldIsRichTextV2;
-
-        if (isValuePersistable) {
-          const fieldName = fieldDefinition.metadata.fieldName;
-
-          const currentValue: any = snapshot
-            .getLoadable(recordStoreFamilySelector({ recordId, fieldName }))
-            .getValue();
-
+        if (fieldIsMorphRelationManyToOne) {
           if (
-            fieldIsRelationToOneObject &&
-            valueToPersist?.id === currentValue?.id
+            isDefined(valueToPersist) &&
+            valueToPersist.id === currentValue?.id
           ) {
             return;
           }
 
-          if (isDeeplyEqual(valueToPersist, currentValue)) {
-            return;
-          }
+          const morphMetadata = (
+            fieldDefinition as FieldDefinition<FieldMorphRelationMetadata>
+          ).metadata;
 
-          set(
-            recordStoreFamilySelector({ recordId, fieldName }),
-            valueToPersist,
-          );
-
-          if (fieldIsRelationToOneObject) {
-            updateOneRecord?.({
-              idToUpdate: recordId,
-              updateOneRecordInput: {
-                [getForeignKeyNameFromRelationFieldName(fieldName)]:
-                  valueToPersist?.id ?? null,
-              },
+          const { updateInput, allMorphForeignKeysNulled } =
+            buildMorphRelationUpdateInput({
+              morphRelations: morphMetadata.morphRelations,
+              fieldName,
+              relationType: morphMetadata.relationType,
+              objectMetadataItems,
+              targetRecordId: valueToPersist?.id,
+              targetObjectMetadataId: valueToPersist?.objectMetadataId,
             });
-            return;
+
+          const newRecord = await updateOneRecord({
+            objectNameSingular: objectMetadataItem.nameSingular,
+            idToUpdate: recordId,
+            updateOneRecordInput: updateInput,
+          });
+
+          const morphForeignKeyGqlFields: Record<string, true> = {};
+
+          for (const key of Object.keys(allMorphForeignKeysNulled)) {
+            morphForeignKeyGqlFields[key] = true;
           }
 
-          updateOneRecord?.({
-            idToUpdate: recordId,
-            updateOneRecordInput: {
-              [fieldName]: valueToPersist,
-            },
+          upsertRecordsInStore({
+            partialRecords: [
+              {
+                ...getRecordFromRecordNode({ recordNode: newRecord }),
+                ...allMorphForeignKeysNulled,
+                ...updateInput,
+              },
+            ],
+            recordGqlFields: morphForeignKeyGqlFields,
           });
-        } else {
-          throw new Error(
-            `Invalid value to persist: ${JSON.stringify(
-              valueToPersist,
-            )} for type : ${
-              fieldDefinition.type
-            }, type may not be implemented in usePersistField.`,
-          );
+
+          return;
         }
-      },
-    [updateOneRecord],
+
+        if (isDeeplyEqual(valueToPersist, currentValue)) {
+          return;
+        }
+
+        updateOneRecord({
+          objectNameSingular: objectMetadataItem.nameSingular,
+          idToUpdate: recordId,
+          updateOneRecordInput: {
+            [fieldName]: valueToPersist,
+          },
+        });
+
+        store.set(
+          recordStoreFamilySelector.selectorFamily({ recordId, fieldName }),
+          valueToPersist,
+        );
+      } else {
+        throw new Error(
+          `Invalid value to persist: ${JSON.stringify(
+            valueToPersist,
+          )} for type : ${
+            fieldDefinition.type
+          }, type may not be implemented in usePersistField.`,
+        );
+      }
+    },
+    [
+      objectMetadataItem?.nameSingular,
+      objectMetadataItems,
+      store,
+      updateOneRecord,
+      upsertRecordsInStore,
+    ],
   );
 
   return persistField;

@@ -8,7 +8,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 
+import { join } from 'path';
+
 import { Request, Response } from 'express';
+import { FileFolder } from 'twenty-shared/types';
 
 import {
   FileStorageException,
@@ -20,44 +23,102 @@ import {
   FileExceptionCode,
 } from 'src/engine/core-modules/file/file.exception';
 import { FileApiExceptionFilter } from 'src/engine/core-modules/file/filters/file-api-exception.filter';
-import { FilePathGuard } from 'src/engine/core-modules/file/guards/file-path-guard';
+import {
+  FileByIdGuard,
+  SupportedFileFolder,
+} from 'src/engine/core-modules/file/guards/file-by-id.guard';
 import { FileService } from 'src/engine/core-modules/file/services/file.service';
-import { extractFileInfoFromRequest } from 'src/engine/core-modules/file/utils/extract-file-info-from-request.utils';
+import { setFileResponseHeaders } from 'src/engine/core-modules/file/utils/set-file-response-headers.utils';
+import { NoPermissionGuard } from 'src/engine/guards/no-permission.guard';
 import { PublicEndpointGuard } from 'src/engine/guards/public-endpoint.guard';
 
-@Controller('files')
+@Controller()
 @UseFilters(FileApiExceptionFilter)
-@UseGuards(FilePathGuard)
 export class FileController {
   constructor(private readonly fileService: FileService) {}
 
-  @Get('*/:filename')
-  @UseGuards(PublicEndpointGuard)
-  async getFile(
-    @Param() _params: string[],
+  @Get('public-assets/:workspaceId/:applicationId/*path')
+  @UseGuards(PublicEndpointGuard, NoPermissionGuard)
+  async getPublicAssets(
     @Res() res: Response,
     @Req() req: Request,
+    @Param('workspaceId') workspaceId: string,
+    @Param('applicationId')
+    applicationId: string,
   ) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const workspaceId = (req as any)?.workspaceId;
-
-    const { filename, rawFolder } = extractFileInfoFromRequest(req);
+    const filepath = join(...req.params.path);
 
     try {
-      const fileStream = await this.fileService.getFileStream(
-        rawFolder,
-        filename,
+      const { stream, mimeType } = await this.fileService.getFileStreamByPath({
         workspaceId,
-      );
+        applicationId,
+        fileFolder: FileFolder.PublicAsset,
+        filepath,
+      });
 
-      fileStream.on('error', () => {
+      setFileResponseHeaders(res, mimeType);
+
+      stream.on('error', () => {
         throw new FileException(
           'Error streaming file from storage',
           FileExceptionCode.INTERNAL_SERVER_ERROR,
         );
       });
 
-      fileStream.pipe(res);
+      stream.pipe(res);
+    } catch (error) {
+      if (
+        error instanceof FileStorageException &&
+        error.code === FileStorageExceptionCode.FILE_NOT_FOUND
+      ) {
+        throw new FileException(
+          'File not found',
+          FileExceptionCode.FILE_NOT_FOUND,
+        );
+      }
+
+      throw new FileException(
+        `Error retrieving file: ${error.message}`,
+        FileExceptionCode.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('file/:fileFolder/:id')
+  @UseGuards(FileByIdGuard, NoPermissionGuard)
+  async getFileById(
+    @Res() res: Response,
+    @Req() req: Request,
+    @Param('fileFolder') fileFolder: SupportedFileFolder,
+    @Param('id') fileId: string,
+  ) {
+    // oxlint-disable-next-line @typescripttypescript/no-explicit-any
+    const workspaceId = (req as any)?.workspaceId;
+
+    try {
+      const fileResponse = await this.fileService.getFileResponseById({
+        fileId,
+        workspaceId,
+        fileFolder,
+      });
+
+      if (fileResponse.type === 'redirect') {
+        return res.redirect(fileResponse.presignedUrl);
+      }
+
+      setFileResponseHeaders(res, fileResponse.mimeType);
+
+      fileResponse.stream.on('error', () => {
+        if (!res.headersSent) {
+          res.status(500).send('Error streaming file from storage');
+
+          return;
+        }
+
+        res.destroy();
+      });
+
+      fileResponse.stream.pipe(res);
     } catch (error) {
       if (
         error instanceof FileStorageException &&

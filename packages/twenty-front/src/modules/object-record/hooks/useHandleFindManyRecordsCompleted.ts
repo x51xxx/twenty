@@ -1,6 +1,4 @@
-import { useSetRecoilState } from 'recoil';
-
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import { getRecordsFromRecordConnection } from '@/object-record/cache/utils/getRecordsFromRecordConnection';
 import { type RecordGqlOperationFindManyResult } from '@/object-record/graphql/types/RecordGqlOperationFindManyResult';
 import { cursorFamilyState } from '@/object-record/states/cursorFamilyState';
@@ -8,6 +6,7 @@ import { hasNextPageFamilyState } from '@/object-record/states/hasNextPageFamily
 import { type OnFindManyRecordsCompleted } from '@/object-record/types/OnFindManyRecordsCompleted';
 import { useCallback } from 'react';
 import { isDefined } from 'twenty-shared/utils';
+import { useStore } from 'jotai';
 
 export const useHandleFindManyRecordsCompleted = <T>({
   queryIdentifier,
@@ -15,21 +14,12 @@ export const useHandleFindManyRecordsCompleted = <T>({
   objectMetadataItem,
 }: {
   queryIdentifier: string;
-  objectMetadataItem: ObjectMetadataItem;
+  objectMetadataItem: EnrichedObjectMetadataItem;
   onCompleted?: OnFindManyRecordsCompleted<T>;
 }) => {
-  const setLastCursor = useSetRecoilState(cursorFamilyState(queryIdentifier));
-
-  const setHasNextPage = useSetRecoilState(
-    hasNextPageFamilyState(queryIdentifier),
-  );
-
+  const store = useStore();
   const handleFindManyRecordsCompleted = useCallback(
     (data: RecordGqlOperationFindManyResult) => {
-      if (!isDefined(data)) {
-        onCompleted?.([]);
-      }
-
       const pageInfo = data?.[objectMetadataItem.namePlural]?.pageInfo;
 
       const records = getRecordsFromRecordConnection({
@@ -42,11 +32,17 @@ export const useHandleFindManyRecordsCompleted = <T>({
       });
 
       if (isDefined(data?.[objectMetadataItem.namePlural])) {
-        setLastCursor(pageInfo.endCursor ?? '');
-        setHasNextPage(pageInfo.hasNextPage ?? false);
+        store.set(
+          cursorFamilyState.atomFamily(queryIdentifier),
+          pageInfo.endCursor ?? '',
+        );
+        store.set(
+          hasNextPageFamilyState.atomFamily(queryIdentifier),
+          pageInfo.hasNextPage ?? false,
+        );
       }
     },
-    [onCompleted, objectMetadataItem.namePlural, setLastCursor, setHasNextPage],
+    [objectMetadataItem.namePlural, onCompleted, queryIdentifier, store],
   );
 
   return {

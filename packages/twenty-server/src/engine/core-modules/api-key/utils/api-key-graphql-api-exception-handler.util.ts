@@ -3,7 +3,7 @@ import { assertUnreachable } from 'twenty-shared/utils';
 import {
   ApiKeyException,
   ApiKeyExceptionCode,
-} from 'src/engine/core-modules/api-key/api-key.exception';
+} from 'src/engine/core-modules/api-key/exceptions/api-key.exception';
 import {
   ForbiddenError,
   NotFoundError,
@@ -25,6 +25,10 @@ export const apiKeyGraphqlApiExceptionHandler = (error: Error) => {
         });
       case ApiKeyExceptionCode.API_KEY_NO_ROLE_ASSIGNED:
         throw new ForbiddenError(error.message, {
+          userFriendlyMessage: error.userFriendlyMessage,
+        });
+      case ApiKeyExceptionCode.ROLE_CANNOT_BE_ASSIGNED_TO_API_KEYS:
+        throw new UserInputError(error.message, {
           userFriendlyMessage: error.userFriendlyMessage,
         });
       default: {

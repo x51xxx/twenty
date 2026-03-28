@@ -1,13 +1,14 @@
-import { useRecoilValue } from 'recoil';
+import { useMemo } from 'react';
 
 import { useObjectMetadataItem } from '@/object-metadata/hooks/useObjectMetadataItem';
-import { objectMetadataItemsState } from '@/object-metadata/states/objectMetadataItemsState';
-import { type RecordGqlOperationGqlRecordFields } from '@/object-record/graphql/types/RecordGqlOperationGqlRecordFields';
+import { objectMetadataItemsSelector } from '@/object-metadata/states/objectMetadataItemsSelector';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { useObjectPermissions } from '@/object-record/hooks/useObjectPermissions';
+import { generateFindManyRecordsQuery } from '@/object-record/utils/generateFindManyRecordsQuery';
 import {
-  generateFindManyRecordsQuery,
   type QueryCursorDirection,
-} from '@/object-record/utils/generateFindManyRecordsQuery';
+  type RecordGqlOperationGqlRecordFields,
+} from 'twenty-shared/types';
 
 export const useFindManyRecordsQuery = ({
   objectNameSingular,
@@ -24,18 +25,29 @@ export const useFindManyRecordsQuery = ({
     objectNameSingular,
   });
 
-  const objectMetadataItems = useRecoilValue(objectMetadataItemsState);
+  const objectMetadataItems = useAtomStateValue(objectMetadataItemsSelector);
 
   const { objectPermissionsByObjectMetadataId } = useObjectPermissions();
 
-  const findManyRecordsQuery = generateFindManyRecordsQuery({
-    objectMetadataItem,
-    objectMetadataItems,
-    recordGqlFields,
-    computeReferences,
-    cursorDirection,
-    objectPermissionsByObjectMetadataId,
-  });
+  const findManyRecordsQuery = useMemo(
+    () =>
+      generateFindManyRecordsQuery({
+        objectMetadataItem,
+        objectMetadataItems,
+        recordGqlFields,
+        computeReferences,
+        cursorDirection,
+        objectPermissionsByObjectMetadataId,
+      }),
+    [
+      objectMetadataItem,
+      objectMetadataItems,
+      recordGqlFields,
+      computeReferences,
+      cursorDirection,
+      objectPermissionsByObjectMetadataId,
+    ],
+  );
 
   return {
     findManyRecordsQuery,

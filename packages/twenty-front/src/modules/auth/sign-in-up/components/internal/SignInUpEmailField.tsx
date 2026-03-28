@@ -1,16 +1,18 @@
 import { type Form } from '@/auth/sign-in-up/hooks/useSignInUpForm';
 import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
+import { useLingui } from '@lingui/react/macro';
 import { motion } from 'framer-motion';
 import { Controller, useFormContext } from 'react-hook-form';
 import { isDefined } from 'twenty-shared/utils';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 const StyledFullWidthMotionDiv = styled(motion.div)`
   width: 100%;
 `;
 
 const StyledInputContainer = styled.div`
-  margin-bottom: ${({ theme }) => theme.spacing(3)};
+  margin-bottom: ${themeCssVariables.spacing[3]};
 `;
 
 export const SignInUpEmailField = ({
@@ -20,6 +22,7 @@ export const SignInUpEmailField = ({
   showErrors: boolean;
   onInputChange?: (value: string) => void;
 }) => {
+  const { t } = useLingui();
   const form = useFormContext<Form>();
 
   return (
@@ -42,9 +45,10 @@ export const SignInUpEmailField = ({
           <StyledInputContainer>
             <SettingsTextInput
               instanceId="sign-in-up-email"
+              autoComplete="email"
               autoFocus
               value={value}
-              placeholder="Email"
+              placeholder={t`Email`}
               onBlur={onBlur}
               onChange={(email: string) => {
                 if (isDefined(onInputChange)) onInputChange(email);

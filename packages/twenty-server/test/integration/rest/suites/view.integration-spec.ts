@@ -1,31 +1,24 @@
-import { TEST_NOT_EXISTING_VIEW_ID } from 'test/integration/constants/test-view-ids.constants';
+import { createOneSelectFieldMetadataForIntegrationTests } from 'test/integration/metadata/suites/field-metadata/utils/create-one-select-field-metadata-for-integration-tests.util';
 import { createOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/create-one-object-metadata.util';
 import { deleteOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/delete-one-object-metadata.util';
+import { updateOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/update-one-object-metadata.util';
+import { destroyOneView } from 'test/integration/metadata/suites/view/utils/destroy-one-view.util';
 import { makeRestAPIRequest } from 'test/integration/rest/utils/make-rest-api-request.util';
 import {
-  assertRestApiErrorResponse,
+  assertRestApiErrorNotFoundResponse,
   assertRestApiSuccessfulResponse,
 } from 'test/integration/rest/utils/rest-test-assertions.util';
-import {
-  createTestViewWithRestApi,
-  deleteTestViewWithRestApi,
-} from 'test/integration/rest/utils/view-rest-api.util';
+import { createTestViewWithRestApi } from 'test/integration/rest/utils/view-rest-api.util';
 import { generateRecordName } from 'test/integration/utils/generate-record-name';
-import {
-  assertViewStructure,
-  cleanupViewRecords,
-} from 'test/integration/utils/view-test.util';
+import { assertViewStructure } from 'test/integration/utils/view-test.util';
+import { ViewOpenRecordIn, ViewType } from 'twenty-shared/types';
 
-import { ViewKey } from 'src/engine/core-modules/view/enums/view-key.enum';
-import { ViewOpenRecordIn } from 'src/engine/core-modules/view/enums/view-open-record-in';
-import { ViewType } from 'src/engine/core-modules/view/enums/view-type.enum';
-import {
-  ViewExceptionMessageKey,
-  generateViewExceptionMessage,
-} from 'src/engine/core-modules/view/exceptions/view.exception';
+import { ViewKey } from 'twenty-shared/types';
 
 describe('View REST API', () => {
   let testObjectMetadataId: string;
+  let testSelectFieldMetadataId: string;
+  let testViewId: string | undefined;
 
   beforeAll(async () => {
     const {
@@ -34,29 +27,49 @@ describe('View REST API', () => {
       },
     } = await createOneObjectMetadata({
       input: {
-        nameSingular: 'myTestObject',
-        namePlural: 'myTestObjects',
-        labelSingular: 'My Test Object',
-        labelPlural: 'My Test Objects',
-        icon: 'Icon123',
+        nameSingular: 'testViewObject',
+        namePlural: 'testViewObjects',
+        labelSingular: 'Test View Object',
+        labelPlural: 'Test View Objects',
+        icon: 'IconView',
       },
     });
 
     testObjectMetadataId = objectMetadataId;
+
+    const { selectFieldMetadataId } =
+      await createOneSelectFieldMetadataForIntegrationTests({
+        input: {
+          objectMetadataId,
+        },
+      });
+
+    testSelectFieldMetadataId = selectFieldMetadataId;
   });
 
   afterAll(async () => {
+    await updateOneObjectMetadata({
+      expectToFail: false,
+      input: {
+        idToUpdate: testObjectMetadataId,
+        updatePayload: {
+          isActive: false,
+        },
+      },
+    });
     await deleteOneObjectMetadata({
       input: { idToDelete: testObjectMetadataId },
     });
   });
 
-  beforeEach(async () => {
-    await cleanupViewRecords();
-  });
+  afterEach(async () => {
+    if (!testViewId) return;
 
-  afterAll(async () => {
-    await cleanupViewRecords();
+    await destroyOneView({
+      viewId: testViewId,
+      expectToFail: false,
+    });
+    testViewId = undefined;
   });
 
   describe('GET /metadata/views', () => {
@@ -101,6 +114,8 @@ describe('View REST API', () => {
         objectMetadataId: testObjectMetadataId,
       });
 
+      testViewId = view.id;
+
       assertViewStructure(view, {
         name: viewName,
         objectMetadataId: testObjectMetadataId,
@@ -124,7 +139,10 @@ describe('View REST API', () => {
         isCompact: true,
         openRecordIn: ViewOpenRecordIn.SIDE_PANEL,
         objectMetadataId: testObjectMetadataId,
+        mainGroupByFieldMetadataId: testSelectFieldMetadataId,
       });
+
+      testViewId = kanbanView.id;
 
       assertViewStructure(kanbanView, {
         name: viewName,
@@ -133,8 +151,6 @@ describe('View REST API', () => {
         openRecordIn: ViewOpenRecordIn.SIDE_PANEL,
         objectMetadataId: testObjectMetadataId,
       });
-
-      await deleteTestViewWithRestApi(kanbanView.id);
     });
   });
 
@@ -151,6 +167,8 @@ describe('View REST API', () => {
         openRecordIn: ViewOpenRecordIn.SIDE_PANEL,
         objectMetadataId: testObjectMetadataId,
       });
+
+      testViewId = view.id;
 
       const response = await makeRestAPIRequest({
         method: 'get',
@@ -169,12 +187,11 @@ describe('View REST API', () => {
     it('should return empty object for non-existent view', async () => {
       const response = await makeRestAPIRequest({
         method: 'get',
-        path: `/metadata/views/${TEST_NOT_EXISTING_VIEW_ID}`,
+        path: `/metadata/views/20202020-b7a4-4f8e-9c1d-2e3f4a5b6c7d`,
         bearer: APPLE_JANE_ADMIN_ACCESS_TOKEN,
       });
 
-      assertRestApiSuccessfulResponse(response);
-      expect(response.body).toEqual({});
+      assertRestApiErrorNotFoundResponse(response);
     });
   });
 
@@ -192,12 +209,15 @@ describe('View REST API', () => {
         objectMetadataId: testObjectMetadataId,
       });
 
+      testViewId = view.id;
+
       const updatedName = generateRecordName('Updated View');
       const updateData = {
         name: updatedName,
         type: ViewType.KANBAN,
         isCompact: true,
         openRecordIn: ViewOpenRecordIn.SIDE_PANEL,
+        mainGroupByFieldMetadataId: testSelectFieldMetadataId,
       };
 
       const response = await makeRestAPIRequest({
@@ -226,19 +246,12 @@ describe('View REST API', () => {
 
       const response = await makeRestAPIRequest({
         method: 'patch',
-        path: `/metadata/views/${TEST_NOT_EXISTING_VIEW_ID}`,
+        path: `/metadata/views/20202020-b7a4-4f8e-9c1d-2e3f4a5b6c7d`,
         body: updateData,
         bearer: APPLE_JANE_ADMIN_ACCESS_TOKEN,
       });
 
-      assertRestApiErrorResponse(
-        response,
-        404,
-        generateViewExceptionMessage(
-          ViewExceptionMessageKey.VIEW_NOT_FOUND,
-          TEST_NOT_EXISTING_VIEW_ID,
-        ),
-      );
+      assertRestApiErrorNotFoundResponse(response);
     });
   });
 
@@ -256,6 +269,8 @@ describe('View REST API', () => {
         objectMetadataId: testObjectMetadataId,
       });
 
+      testViewId = view.id;
+
       const deleteResponse = await makeRestAPIRequest({
         method: 'delete',
         path: `/metadata/views/${view.id}`,
@@ -271,25 +286,17 @@ describe('View REST API', () => {
         bearer: APPLE_JANE_ADMIN_ACCESS_TOKEN,
       });
 
-      assertRestApiSuccessfulResponse(getResponse);
-      expect(getResponse.body).toEqual({});
+      assertRestApiErrorNotFoundResponse(getResponse);
     });
 
     it('should return 404 error when deleting non-existent view', async () => {
       const response = await makeRestAPIRequest({
         method: 'delete',
-        path: `/metadata/views/${TEST_NOT_EXISTING_VIEW_ID}`,
+        path: `/metadata/views/20202020-b7a4-4f8e-9c1d-2e3f4a5b6c7d`,
         bearer: APPLE_JANE_ADMIN_ACCESS_TOKEN,
       });
 
-      assertRestApiErrorResponse(
-        response,
-        404,
-        generateViewExceptionMessage(
-          ViewExceptionMessageKey.VIEW_NOT_FOUND,
-          TEST_NOT_EXISTING_VIEW_ID,
-        ),
-      );
+      assertRestApiErrorNotFoundResponse(response);
     });
   });
 });

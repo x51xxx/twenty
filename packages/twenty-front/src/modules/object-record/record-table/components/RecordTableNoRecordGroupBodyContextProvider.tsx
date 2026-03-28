@@ -1,6 +1,5 @@
 import { RecordTableBodyContextProvider } from '@/object-record/record-table/contexts/RecordTableBodyContext';
 import { useRecordTableContextOrThrow } from '@/object-record/record-table/contexts/RecordTableContext';
-import { useHandleContainerMouseEnter } from '@/object-record/record-table/hooks/internal/useHandleContainerMouseEnter';
 import { useRecordTableMoveFocusedCell } from '@/object-record/record-table/hooks/useRecordTableMoveFocusedCell';
 import { useCloseRecordTableCellNoGroup } from '@/object-record/record-table/record-table-cell/hooks/internal/useCloseRecordTableCellNoGroup';
 import { useMoveHoverToCurrentCell } from '@/object-record/record-table/record-table-cell/hooks/useMoveHoverToCurrentCell';
@@ -8,9 +7,11 @@ import {
   type OpenTableCellArgs,
   useOpenRecordTableCell,
 } from '@/object-record/record-table/record-table-cell/hooks/useOpenRecordTableCell';
-import { useTriggerActionMenuDropdown } from '@/object-record/record-table/record-table-cell/hooks/useTriggerActionMenuDropdown';
+import { useTriggerCommandMenuDropdown } from '@/object-record/record-table/record-table-cell/hooks/useTriggerCommandMenuDropdown';
+import { hasUserSelectedAllRowsComponentState } from '@/object-record/record-table/record-table-row/states/hasUserSelectedAllRowsFamilyState';
 import { type MoveFocusDirection } from '@/object-record/record-table/types/MoveFocusDirection';
 import { type TableCellPosition } from '@/object-record/record-table/types/TableCellPosition';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 import { type ReactNode } from 'react';
 
 type RecordTableNoRecordGroupBodyContextProviderProps = {
@@ -46,20 +47,21 @@ export const RecordTableNoRecordGroupBodyContextProvider = ({
     moveHoverToCurrentCell(cellPosition);
   };
 
-  const { triggerActionMenuDropdown } = useTriggerActionMenuDropdown({
+  const { triggerCommandMenuDropdown } = useTriggerCommandMenuDropdown({
     recordTableId,
   });
 
-  const handleActionMenuDropdown = (
+  const handleCommandMenuDropdown = (
     event: React.MouseEvent,
     recordId: string,
   ) => {
-    triggerActionMenuDropdown(event, recordId);
+    triggerCommandMenuDropdown(event, recordId);
   };
 
-  const { handleContainerMouseEnter } = useHandleContainerMouseEnter({
+  const hasUserSelectedAllRows = useAtomComponentStateValue(
+    hasUserSelectedAllRowsComponentState,
     recordTableId,
-  });
+  );
 
   return (
     <RecordTableBodyContextProvider
@@ -68,8 +70,8 @@ export const RecordTableNoRecordGroupBodyContextProvider = ({
         onMoveFocus: handleMoveFocus,
         onCloseTableCell: handleCloseTableCell,
         onMoveHoverToCurrentCell: handleMoveHoverToCurrentCell,
-        onActionMenuDropdownOpened: handleActionMenuDropdown,
-        onCellMouseEnter: handleContainerMouseEnter,
+        onCommandMenuDropdownOpened: handleCommandMenuDropdown,
+        hasUserSelectedAllRows,
       }}
     >
       {children}

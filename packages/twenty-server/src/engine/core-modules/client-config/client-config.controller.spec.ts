@@ -2,11 +2,9 @@ import { Test, type TestingModule } from '@nestjs/testing';
 
 import { SupportDriver } from 'src/engine/core-modules/twenty-config/interfaces/support.interface';
 
-import {
-  type ModelId,
-  ModelProvider,
-} from 'src/engine/core-modules/ai/constants/ai-models.const';
 import { ClientConfigService } from 'src/engine/core-modules/client-config/services/client-config.service';
+import { ModelFamily } from 'src/engine/metadata-modules/ai/ai-models/types/model-family.enum';
+import { type ModelId } from 'src/engine/metadata-modules/ai/ai-models/types/model-id.type';
 
 import { ClientConfigController } from './client-config.controller';
 
@@ -50,11 +48,12 @@ describe('ClientConfigController', () => {
         },
         aiModels: [
           {
-            modelId: 'gpt-4o' as ModelId,
+            modelId: 'openai/gpt-4o' as ModelId,
             label: 'GPT-4o',
-            provider: ModelProvider.OPENAI,
-            inputCostPer1kTokensInCredits: 2.5,
-            outputCostPer1kTokensInCredits: 10.0,
+            modelFamily: ModelFamily.GPT,
+            sdkPackage: '@ai-sdk/openai' as const,
+            inputCostPerMillionTokensInCredits: 2500000,
+            outputCostPerMillionTokensInCredits: 10000000,
           },
         ],
         authProviders: {
@@ -62,6 +61,7 @@ describe('ClientConfigController', () => {
           magicLink: false,
           password: true,
           microsoft: false,
+          casdoor: false,
           sso: [],
         },
         signInPrefilled: false,
@@ -69,7 +69,6 @@ describe('ClientConfigController', () => {
         isEmailVerificationRequired: false,
         defaultSubdomain: 'app',
         frontDomain: 'localhost',
-        debugMode: true,
         support: {
           supportDriver: SupportDriver.NONE,
           supportFrontChatId: undefined,
@@ -83,7 +82,6 @@ describe('ClientConfigController', () => {
           provider: undefined,
           siteKey: undefined,
         },
-        chromeExtensionId: undefined,
         api: {
           mutationMaximumAffectedRecords: 100,
         },
@@ -99,6 +97,9 @@ describe('ClientConfigController', () => {
         isImapSmtpCaldavEnabled: false,
         calendarBookingPageId: undefined,
         isTwoFactorAuthenticationEnabled: false,
+        allowRequestsToTwentyIcons: true,
+        isCloudflareIntegrationEnabled: false,
+        isClickHouseConfigured: false,
       };
 
       jest

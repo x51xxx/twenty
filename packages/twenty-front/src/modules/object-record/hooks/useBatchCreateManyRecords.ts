@@ -1,3 +1,4 @@
+import { useNumberFormat } from '@/localization/hooks/useNumberFormat';
 import { useObjectMetadataItem } from '@/object-metadata/hooks/useObjectMetadataItem';
 import { DEFAULT_MUTATION_BATCH_SIZE } from '@/object-record/constants/DefaultMutationBatchSize';
 import {
@@ -6,10 +7,10 @@ import {
 } from '@/object-record/hooks/useCreateManyRecords';
 import { useRefetchAggregateQueries } from '@/object-record/hooks/useRefetchAggregateQueries';
 import { type ObjectRecord } from '@/object-record/types/ObjectRecord';
+import { dispatchObjectRecordOperationBrowserEvent } from '@/browser-event/utils/dispatchObjectRecordOperationBrowserEvent';
 import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
-import { ApolloError } from '@apollo/client';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { t } from '@lingui/core/macro';
-import { formatNumber } from '~/utils/format/number';
 
 export const useBatchCreateManyRecords = <
   CreatedObjectRecord extends ObjectRecord = ObjectRecord,
@@ -38,11 +39,10 @@ export const useBatchCreateManyRecords = <
     objectNameSingular,
   });
 
-  const { refetchAggregateQueries } = useRefetchAggregateQueries({
-    objectMetadataNamePlural: objectMetadataItem.namePlural,
-  });
+  const { refetchAggregateQueries } = useRefetchAggregateQueries();
 
   const { enqueueWarningSnackBar } = useSnackBar();
+  const { formatNumber } = useNumberFormat();
 
   const batchCreateManyRecords = async ({
     recordsToCreate,
@@ -81,7 +81,10 @@ export const useBatchCreateManyRecords = <
         allCreatedRecords.push(...createdRecords);
       }
     } catch (error) {
-      if (error instanceof ApolloError && error.message.includes('aborted')) {
+      if (
+        CombinedGraphQLErrors.is(error) &&
+        error.message.includes('aborted')
+      ) {
         const formattedCreatedRecordsCount = formatNumber(createdRecordsCount);
         enqueueWarningSnackBar({
           message: t`Record creation stopped. ${formattedCreatedRecordsCount} records created.`,
@@ -94,7 +97,14 @@ export const useBatchCreateManyRecords = <
       }
     }
 
-    await refetchAggregateQueries();
+    await refetchAggregateQueries({
+      objectMetadataNamePlural: objectMetadataItem.namePlural,
+    });
+
+    dispatchObjectRecordOperationBrowserEvent({
+      objectMetadataItem,
+      operation: { type: 'create-many' },
+    });
 
     return allCreatedRecords;
   };

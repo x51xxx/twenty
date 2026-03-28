@@ -1,22 +1,20 @@
-import { CmdEnterActionButton } from '@/action-menu/components/CmdEnterActionButton';
-import { useCommandMenuHistory } from '@/command-menu/hooks/useCommandMenuHistory';
+import { WorkflowStepCmdEnterButton } from '@/workflow/workflow-steps/components/WorkflowStepCmdEnterButton';
+import { useSidePanelHistory } from '@/side-panel/hooks/useSidePanelHistory';
 import { FormFieldInput } from '@/object-record/record-field/ui/components/FormFieldInput';
 import { FormSingleRecordPicker } from '@/object-record/record-field/ui/form-types/components/FormSingleRecordPicker';
 import { type FieldMetadata } from '@/object-record/record-field/ui/types/FieldMetadata';
-import { RightDrawerFooter } from '@/ui/layout/right-drawer/components/RightDrawerFooter';
+import { SidePanelFooter } from '@/ui/layout/side-panel/components/SidePanelFooter';
 import { useWorkflowRunIdOrThrow } from '@/workflow/hooks/useWorkflowRunIdOrThrow';
 import { type WorkflowFormAction } from '@/workflow/types/Workflow';
 import { WorkflowStepBody } from '@/workflow/workflow-steps/components/WorkflowStepBody';
-import { WorkflowStepHeader } from '@/workflow/workflow-steps/components/WorkflowStepHeader';
 import { useUpdateWorkflowRunStep } from '@/workflow/workflow-steps/hooks/useUpdateWorkflowRunStep';
+import { WorkflowFormFieldInput } from '@/workflow/workflow-steps/workflow-actions/components/WorkflowFormFieldInput';
 import { useSubmitFormStep } from '@/workflow/workflow-steps/workflow-actions/form-action/hooks/useSubmitFormStep';
 import { type WorkflowFormActionField } from '@/workflow/workflow-steps/workflow-actions/form-action/types/WorkflowFormActionField';
 import { getDefaultFormFieldSettings } from '@/workflow/workflow-steps/workflow-actions/form-action/utils/getDefaultFormFieldSettings';
-import { getActionIcon } from '@/workflow/workflow-steps/workflow-actions/utils/getActionIcon';
-import { useTheme } from '@emotion/react';
+import { useLingui } from '@lingui/react/macro';
 import { useEffect, useState } from 'react';
 import { isDefined } from 'twenty-shared/utils';
-import { useIcons } from 'twenty-ui/display';
 import { useDebouncedCallback } from 'use-debounce';
 
 export type WorkflowEditActionFormFillerProps = {
@@ -32,18 +30,15 @@ export const WorkflowEditActionFormFiller = ({
   action,
   actionOptions,
 }: WorkflowEditActionFormFillerProps) => {
-  const theme = useTheme();
-  const { getIcon } = useIcons();
+  const { t } = useLingui();
   const { submitFormStep } = useSubmitFormStep();
   const [formData, setFormData] = useState<FormData>(action.settings.input);
   const workflowRunId = useWorkflowRunIdOrThrow();
-  const { goBackFromCommandMenu } = useCommandMenuHistory();
+  const { goBackFromSidePanel } = useSidePanelHistory();
   const { updateWorkflowRunStep } = useUpdateWorkflowRunStep();
   const [error, setError] = useState<string | undefined>(undefined);
 
   const canSubmit = !actionOptions.readonly && !isDefined(error);
-  const headerTitle = isDefined(action.name) ? action.name : `Form`;
-  const headerIcon = getActionIcon(action.type);
 
   const onFieldUpdate = ({
     fieldId,
@@ -94,7 +89,7 @@ export const WorkflowEditActionFormFiller = ({
       response,
     });
 
-    goBackFromCommandMenu();
+    goBackFromSidePanel();
   };
 
   useEffect(() => {
@@ -105,13 +100,6 @@ export const WorkflowEditActionFormFiller = ({
 
   return (
     <>
-      <WorkflowStepHeader
-        Icon={getIcon(headerIcon)}
-        iconColor={theme.font.color.tertiary}
-        initialTitle={headerTitle}
-        headerType="Action"
-        disabled
-      />
       <WorkflowStepBody>
         {formData.map((field) => {
           if (field.type === 'RECORD') {
@@ -136,8 +124,31 @@ export const WorkflowEditActionFormFiller = ({
                     },
                   });
                 }}
-                objectNameSingular={objectNameSingular}
+                objectNameSingulars={[objectNameSingular]}
                 disabled={actionOptions.readonly}
+              />
+            );
+          }
+
+          if (field.type === 'SELECT' || field.type === 'MULTI_SELECT') {
+            const selectedFieldId = field.settings?.selectedFieldId;
+
+            if (!isDefined(selectedFieldId)) {
+              return null;
+            }
+
+            return (
+              <WorkflowFormFieldInput
+                key={field.id}
+                fieldMetadataId={selectedFieldId}
+                defaultValue={field.value}
+                readonly={actionOptions.readonly}
+                onChange={(value) => {
+                  onFieldUpdate({
+                    fieldId: field.id,
+                    value,
+                  });
+                }}
               />
             );
           }
@@ -170,10 +181,10 @@ export const WorkflowEditActionFormFiller = ({
         })}
       </WorkflowStepBody>
       {!actionOptions.readonly && (
-        <RightDrawerFooter
+        <SidePanelFooter
           actions={[
-            <CmdEnterActionButton
-              title="Submit"
+            <WorkflowStepCmdEnterButton
+              title={t`Submit`}
               onClick={onSubmit}
               disabled={!canSubmit}
             />,

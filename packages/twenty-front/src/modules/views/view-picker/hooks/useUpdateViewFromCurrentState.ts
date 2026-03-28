@@ -1,78 +1,85 @@
-import { useRecoilComponentCallbackState } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentCallbackState';
-import { getSnapshotValue } from '@/ui/utilities/state/utils/getSnapshotValue';
-import { useChangeView } from '@/views/hooks/useChangeView';
-import { useUpdateView } from '@/views/hooks/useUpdateView';
+import { useCallback } from 'react';
+import { useStore } from 'jotai';
+
+import { useAtomComponentStateCallbackState } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateCallbackState';
+import { usePerformViewAPIUpdate } from '@/views/hooks/internal/usePerformViewAPIUpdate';
+import { useCanPersistViewChanges } from '@/views/hooks/useCanPersistViewChanges';
 import { useCloseAndResetViewPicker } from '@/views/view-picker/hooks/useCloseAndResetViewPicker';
 import { viewPickerInputNameComponentState } from '@/views/view-picker/states/viewPickerInputNameComponentState';
 import { viewPickerIsDirtyComponentState } from '@/views/view-picker/states/viewPickerIsDirtyComponentState';
 import { viewPickerIsPersistingComponentState } from '@/views/view-picker/states/viewPickerIsPersistingComponentState';
 import { viewPickerReferenceViewIdComponentState } from '@/views/view-picker/states/viewPickerReferenceViewIdComponentState';
 import { viewPickerSelectedIconComponentState } from '@/views/view-picker/states/viewPickerSelectedIconComponentState';
-import { useRecoilCallback } from 'recoil';
+import { viewPickerVisibilityComponentState } from '@/views/view-picker/states/viewPickerVisibilityComponentState';
 
 export const useUpdateViewFromCurrentState = () => {
+  const { canPersistChanges } = useCanPersistViewChanges();
   const { closeAndResetViewPicker } = useCloseAndResetViewPicker();
 
-  const viewPickerInputNameCallbackState = useRecoilComponentCallbackState(
+  const viewPickerInputNameCallbackState = useAtomComponentStateCallbackState(
     viewPickerInputNameComponentState,
   );
 
-  const viewPickerSelectedIconCallbackState = useRecoilComponentCallbackState(
-    viewPickerSelectedIconComponentState,
-  );
+  const viewPickerSelectedIconCallbackState =
+    useAtomComponentStateCallbackState(viewPickerSelectedIconComponentState);
 
-  const viewPickerIsPersistingCallbackState = useRecoilComponentCallbackState(
-    viewPickerIsPersistingComponentState,
-  );
+  const viewPickerIsPersistingCallbackState =
+    useAtomComponentStateCallbackState(viewPickerIsPersistingComponentState);
 
-  const viewPickerIsDirtyCallbackState = useRecoilComponentCallbackState(
+  const viewPickerIsDirtyCallbackState = useAtomComponentStateCallbackState(
     viewPickerIsDirtyComponentState,
   );
 
   const viewPickerReferenceViewIdCallbackState =
-    useRecoilComponentCallbackState(viewPickerReferenceViewIdComponentState);
+    useAtomComponentStateCallbackState(viewPickerReferenceViewIdComponentState);
 
-  const { updateView } = useUpdateView();
-  const { changeView } = useChangeView();
-
-  const updateViewFromCurrentState = useRecoilCallback(
-    ({ set, snapshot }) =>
-      async () => {
-        set(viewPickerIsPersistingCallbackState, true);
-        set(viewPickerIsDirtyCallbackState, false);
-        closeAndResetViewPicker();
-
-        const viewPickerReferenceViewId = getSnapshotValue(
-          snapshot,
-          viewPickerReferenceViewIdCallbackState,
-        );
-        const viewPickerInputName = getSnapshotValue(
-          snapshot,
-          viewPickerInputNameCallbackState,
-        );
-        const viewPickerSelectedIcon = getSnapshotValue(
-          snapshot,
-          viewPickerSelectedIconCallbackState,
-        );
-
-        await updateView({
-          id: viewPickerReferenceViewId,
-          name: viewPickerInputName,
-          icon: viewPickerSelectedIcon,
-        });
-        changeView(viewPickerReferenceViewId);
-      },
-    [
-      viewPickerIsPersistingCallbackState,
-      viewPickerIsDirtyCallbackState,
-      closeAndResetViewPicker,
-      viewPickerReferenceViewIdCallbackState,
-      viewPickerInputNameCallbackState,
-      viewPickerSelectedIconCallbackState,
-      updateView,
-      changeView,
-    ],
+  const viewPickerVisibilityCallbackState = useAtomComponentStateCallbackState(
+    viewPickerVisibilityComponentState,
   );
+
+  const { performViewAPIUpdate } = usePerformViewAPIUpdate();
+
+  const store = useStore();
+
+  const updateViewFromCurrentState = useCallback(async () => {
+    if (!canPersistChanges) {
+      closeAndResetViewPicker();
+      return;
+    }
+
+    store.set(viewPickerIsPersistingCallbackState, true);
+    store.set(viewPickerIsDirtyCallbackState, false);
+    closeAndResetViewPicker();
+
+    const viewPickerReferenceViewId = store.get(
+      viewPickerReferenceViewIdCallbackState,
+    );
+    const viewPickerInputName = store.get(viewPickerInputNameCallbackState);
+    const viewPickerSelectedIcon = store.get(
+      viewPickerSelectedIconCallbackState,
+    );
+    const visibility = store.get(viewPickerVisibilityCallbackState);
+
+    await performViewAPIUpdate({
+      id: viewPickerReferenceViewId,
+      input: {
+        name: viewPickerInputName,
+        icon: viewPickerSelectedIcon,
+        visibility: visibility,
+      },
+    });
+  }, [
+    canPersistChanges,
+    viewPickerIsPersistingCallbackState,
+    viewPickerIsDirtyCallbackState,
+    closeAndResetViewPicker,
+    viewPickerReferenceViewIdCallbackState,
+    viewPickerInputNameCallbackState,
+    viewPickerSelectedIconCallbackState,
+    viewPickerVisibilityCallbackState,
+    performViewAPIUpdate,
+    store,
+  ]);
 
   return {
     updateViewFromCurrentState,

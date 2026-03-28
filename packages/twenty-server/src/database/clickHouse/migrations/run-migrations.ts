@@ -1,8 +1,12 @@
-/* eslint-disable no-console */
+/* oxlint-disable no-console */
 import fs from 'fs';
 import path from 'path';
 
-import { type ClickHouseClient, createClient } from '@clickhouse/client';
+import {
+  type ClickHouseClient,
+  ClickHouseLogLevel,
+  createClient,
+} from '@clickhouse/client';
 import { config } from 'dotenv';
 
 config({
@@ -24,6 +28,7 @@ async function ensureDatabaseExists() {
   const [url, database] = clickHouseUrl().split(/\/(?=[^/]*$)/);
   const client = createClient({
     url,
+    log: { level: ClickHouseLogLevel.OFF },
   });
 
   try {
@@ -82,6 +87,7 @@ async function runMigrations() {
     clickhouse_settings: {
       allow_experimental_json_type: 1,
     },
+    log: { level: ClickHouseLogLevel.OFF },
   });
 
   await ensureMigrationTable(client);
@@ -97,7 +103,29 @@ async function runMigrations() {
     const sql = fs.readFileSync(path.join(dir, file), 'utf8');
 
     console.log(`⚡ Running ${file}...`);
-    await client.command({ query: sql });
+
+    // Split by semicolons and filter out empty statements/comments
+    const statements = sql
+      .split(';')
+      .map((stmt) => stmt.trim())
+      .filter(
+        (stmt) =>
+          stmt.length > 0 && !stmt.startsWith('--') && !stmt.match(/^[\s-]*$/),
+      );
+
+    for (const statement of statements) {
+      // Skip comment-only blocks
+      const cleanedStatement = statement
+        .split('\n')
+        .filter((line) => !line.trim().startsWith('--'))
+        .join('\n')
+        .trim();
+
+      if (cleanedStatement.length > 0) {
+        await client.command({ query: cleanedStatement });
+      }
+    }
+
     await recordMigration(file, client);
   }
 

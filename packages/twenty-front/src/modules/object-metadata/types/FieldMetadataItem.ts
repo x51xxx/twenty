@@ -1,26 +1,42 @@
 import { type FieldMetadataItemRelation } from '@/object-metadata/types/FieldMetadataItemRelation';
-import { type FieldDateMetadataSettings } from '@/object-record/record-field/ui/types/FieldMetadata';
+import {
+  type FieldDateMetadataSettings,
+  type FieldRelationMetadataSettings,
+} from '@/object-record/record-field/ui/types/FieldMetadata';
 
+import {
+  type FieldMetadataMultiItemSettings,
+  type PartialFieldMetadataItemOption,
+} from 'twenty-shared/types';
 import { type ThemeColor } from 'twenty-ui/theme';
 import { type Field } from '~/generated-metadata/graphql';
 
-export type FieldMetadataItemOption = {
+export type FieldMetadataItemOption = PartialFieldMetadataItemOption & {
   color: ThemeColor;
-  id: string;
-  label: string;
-  position: number;
-  value: string;
 };
 
 export type FieldMetadataItem = Omit<
   Field,
-  '__typename' | 'defaultValue' | 'options' | 'relation' | 'morphRelations'
+  | '__typename'
+  | 'applicationId'
+  | 'defaultValue'
+  | 'objectMetadataId'
+  | 'options'
+  | 'relation'
+  | 'morphRelations'
 > & {
   __typename?: string;
+  applicationId?: string;
+  objectMetadataId?: string;
   defaultValue?: any;
   options?: FieldMetadataItemOption[] | null;
   relation?: FieldMetadataItemRelation | null;
   morphRelations?: FieldMetadataItemRelation[] | null;
-  settings?: FieldDateMetadataSettings;
+  settings?:
+    | FieldDateMetadataSettings
+    | FieldMetadataMultiItemSettings
+    | FieldRelationMetadataSettings
+    | null;
   isLabelSyncedWithName?: boolean | null;
+  morphId?: string | null;
 };

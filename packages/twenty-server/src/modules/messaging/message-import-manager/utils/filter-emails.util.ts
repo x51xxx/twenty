@@ -1,14 +1,20 @@
-import { isEmailBlocklisted } from 'src/modules/blocklist/utils/is-email-blocklisted.util';
+import { MessageParticipantRole } from 'twenty-shared/types';
+import { isDefined } from 'twenty-shared/utils';
+
 import { type MessageWithParticipants } from 'src/modules/messaging/message-import-manager/types/message';
-import { getDomainNameByEmail } from 'src/utils/get-domain-name-by-email';
+import { filterOutBlocklistedMessages } from 'src/modules/messaging/message-import-manager/utils/filter-out-blocklisted-messages.util';
+import { filterOutIcsAttachments } from 'src/modules/messaging/message-import-manager/utils/filter-out-ics-attachments.util';
+import { filterOutInternals } from 'src/modules/messaging/message-import-manager/utils/filter-out-internals.util';
+import { isGroupEmail } from 'src/modules/messaging/message-import-manager/utils/is-group-email';
+import { isMessageSenderMatchingHandles } from 'src/modules/messaging/message-import-manager/utils/is-message-sender-matching-handles.util';
 import { isWorkEmail } from 'src/utils/is-work-email';
 
-// Todo: refactor this into several utils
 export const filterEmails = (
   primaryHandle: string,
   handleAliases: string[],
   messages: MessageWithParticipants[],
   blocklist: string[],
+  excludeGroupEmails: boolean = true,
 ) => {
   const messagesWithoutIcsAttachments = filterOutIcsAttachments(messages);
 
@@ -22,68 +28,33 @@ export const filterEmails = (
     ? filterOutInternals(primaryHandle, messagesWithoutBlocklisted)
     : messagesWithoutBlocklisted;
 
-  return messagesWithoutInternals;
-};
+  if (!excludeGroupEmails) {
+    return messagesWithoutInternals;
+  }
 
-const filterOutBlocklistedMessages = (
-  messageChannelHandles: string[],
-  messages: MessageWithParticipants[],
-  blocklist: string[],
-) => {
-  return messages.filter((message) => {
-    if (!message.participants) {
+  const userHandles = [primaryHandle, ...handleAliases];
+
+  return messagesWithoutInternals.filter((message) => {
+    const isSentByUser = isMessageSenderMatchingHandles(message, userHandles);
+
+    if (isSentByUser) {
       return true;
     }
 
-    return message.participants.every(
-      (participant) =>
-        !isEmailBlocklisted(
-          messageChannelHandles,
-          participant.handle,
-          blocklist,
-        ),
-    );
-  });
-};
+    const senderHandle = message.participants?.find(
+      (participant) => participant.role === MessageParticipantRole.FROM,
+    )?.handle;
 
-const filterOutIcsAttachments = (messages: MessageWithParticipants[]) => {
-  return messages.filter((message) => {
-    if (!message.attachments) {
+    if (!isDefined(senderHandle)) {
       return true;
     }
 
-    return message.attachments.every(
-      (attachment) => !attachment.filename.endsWith('.ics'),
-    );
-  });
-};
+    const isSenderGroupEmail = isGroupEmail(senderHandle);
 
-const filterOutInternals = (
-  primaryHandle: string,
-  messages: MessageWithParticipants[],
-) => {
-  return messages.filter((message) => {
-    if (!message.participants) {
+    if (!isSenderGroupEmail) {
       return true;
     }
 
-    const primaryHandleDomain = getDomainNameByEmail(primaryHandle);
-
-    try {
-      const isAllHandlesFromSameDomain = message.participants
-        .filter((participant) => !!participant.handle)
-        .every(
-          (participant) =>
-            getDomainNameByEmail(participant.handle) === primaryHandleDomain,
-        );
-
-      if (isAllHandlesFromSameDomain) {
-        return false;
-      }
-    } catch {
-      return true;
-    }
-
-    return true;
+    return false;
   });
 };

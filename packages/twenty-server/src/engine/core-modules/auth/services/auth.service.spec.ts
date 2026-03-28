@@ -4,7 +4,8 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import bcrypt from 'bcrypt';
 import { type Repository } from 'typeorm';
 
-import { AppToken } from 'src/engine/core-modules/app-token/app-token.entity';
+import { AppTokenEntity } from 'src/engine/core-modules/app-token/app-token.entity';
+import { AuditService } from 'src/engine/core-modules/audit/services/audit.service';
 import {
   AuthException,
   AuthExceptionCode,
@@ -12,20 +13,26 @@ import {
 import { AuthSsoService } from 'src/engine/core-modules/auth/services/auth-sso.service';
 import { SignInUpService } from 'src/engine/core-modules/auth/services/sign-in-up.service';
 import { AccessTokenService } from 'src/engine/core-modules/auth/token/services/access-token.service';
+import { LoginTokenService } from 'src/engine/core-modules/auth/token/services/login-token.service';
 import { RefreshTokenService } from 'src/engine/core-modules/auth/token/services/refresh-token.service';
+import { WorkspaceAgnosticTokenService } from 'src/engine/core-modules/auth/token/services/workspace-agnostic-token.service';
 import { type ExistingUserOrNewUser } from 'src/engine/core-modules/auth/types/signInUp.type';
+import { DomainServerConfigService } from 'src/engine/core-modules/domain/domain-server-config/services/domain-server-config.service';
+import { WorkspaceDomainsService } from 'src/engine/core-modules/domain/workspace-domains/services/workspace-domains.service';
 import { EmailService } from 'src/engine/core-modules/email/email.service';
+import { GuardRedirectService } from 'src/engine/core-modules/guard-redirect/services/guard-redirect.service';
+import { I18nService } from 'src/engine/core-modules/i18n/i18n.service';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 import { UserWorkspaceService } from 'src/engine/core-modules/user-workspace/user-workspace.service';
 import { UserService } from 'src/engine/core-modules/user/services/user.service';
-import { User } from 'src/engine/core-modules/user/user.entity';
+import { UserEntity } from 'src/engine/core-modules/user/user.entity';
 import { WorkspaceInvitationService } from 'src/engine/core-modules/workspace-invitation/services/workspace-invitation.service';
-import { Workspace } from 'src/engine/core-modules/workspace/workspace.entity';
-import { LoginTokenService } from 'src/engine/core-modules/auth/token/services/login-token.service';
-import { GuardRedirectService } from 'src/engine/core-modules/guard-redirect/services/guard-redirect.service';
 import { AuthProviderEnum } from 'src/engine/core-modules/workspace/types/workspace.type';
-import { WorkspaceAgnosticTokenService } from 'src/engine/core-modules/auth/token/services/workspace-agnostic-token.service';
-import { DomainManagerService } from 'src/engine/core-modules/domain-manager/services/domain-manager.service';
+import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
+import { ApplicationRegistrationService } from 'src/engine/core-modules/application/application-registration/application-registration.service';
+import { CreateSSOConnectedAccountService } from 'src/engine/core-modules/auth/services/create-sso-connected-account.service';
+import { FeatureFlagService } from 'src/engine/core-modules/feature-flag/services/feature-flag.service';
+import { PermissionsService } from 'src/engine/metadata-modules/permissions/permissions.service';
 
 import { AuthService } from './auth.service';
 
@@ -36,30 +43,34 @@ const twentyConfigServiceGetMock = jest.fn();
 describe('AuthService', () => {
   let service: AuthService;
   let userService: UserService;
-  let workspaceRepository: Repository<Workspace>;
-  let userRepository: Repository<User>;
+  let workspaceRepository: Repository<WorkspaceEntity>;
+  let userRepository: Repository<UserEntity>;
   let authSsoService: AuthSsoService;
   let userWorkspaceService: UserWorkspaceService;
   let workspaceInvitationService: WorkspaceInvitationService;
+  let permissionsService: PermissionsService;
+  let signInUpServiceMock: jest.Mocked<
+    Pick<SignInUpService, 'validatePassword'>
+  >;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         {
-          provide: getRepositoryToken(Workspace),
+          provide: getRepositoryToken(WorkspaceEntity),
           useValue: {
             findOne: jest.fn(),
           },
         },
         {
-          provide: getRepositoryToken(User),
+          provide: getRepositoryToken(UserEntity),
           useValue: {
             findOne: jest.fn(),
           },
         },
         {
-          provide: getRepositoryToken(AppToken),
+          provide: getRepositoryToken(AppTokenEntity),
           useValue: {
             createQueryBuilder: jest.fn().mockReturnValue({
               leftJoin: jest.fn().mockReturnThis(),
@@ -74,7 +85,11 @@ describe('AuthService', () => {
           useValue: {},
         },
         {
-          provide: DomainManagerService,
+          provide: WorkspaceDomainsService,
+          useValue: {},
+        },
+        {
+          provide: DomainServerConfigService,
           useValue: {},
         },
         {
@@ -87,7 +102,10 @@ describe('AuthService', () => {
         },
         {
           provide: SignInUpService,
-          useValue: {},
+          useValue: {
+            validatePassword: jest.fn().mockResolvedValue(undefined),
+            generateHash: jest.fn(),
+          },
         },
         {
           provide: TwentyConfigService,
@@ -134,6 +152,44 @@ describe('AuthService', () => {
             findWorkspaceFromWorkspaceIdOrAuthProvider: jest.fn(),
           },
         },
+        {
+          provide: I18nService,
+          useValue: {
+            getI18nInstance: jest.fn().mockReturnValue({
+              _: jest.fn().mockReturnValue('mocked-translation'),
+            }),
+          },
+        },
+        {
+          provide: AuditService,
+          useValue: {},
+        },
+        {
+          provide: PermissionsService,
+          useValue: {
+            userHasWorkspaceSettingPermission: jest
+              .fn()
+              .mockResolvedValue(false),
+          },
+        },
+        {
+          provide: ApplicationRegistrationService,
+          useValue: {},
+        },
+        {
+          provide: FeatureFlagService,
+          useValue: {
+            isFeatureEnabled: jest.fn().mockResolvedValue(false),
+          },
+        },
+        {
+          provide: CreateSSOConnectedAccountService,
+          useValue: {
+            createOrUpdateSSOConnectedAccount: jest
+              .fn()
+              .mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -145,14 +201,21 @@ describe('AuthService', () => {
     authSsoService = module.get<AuthSsoService>(AuthSsoService);
     userWorkspaceService =
       module.get<UserWorkspaceService>(UserWorkspaceService);
-    workspaceRepository = module.get<Repository<Workspace>>(
-      getRepositoryToken(Workspace),
+    workspaceRepository = module.get<Repository<WorkspaceEntity>>(
+      getRepositoryToken(WorkspaceEntity),
     );
-    userRepository = module.get<Repository<User>>(getRepositoryToken(User));
+    userRepository = module.get<Repository<UserEntity>>(
+      getRepositoryToken(UserEntity),
+    );
+    permissionsService = module.get<PermissionsService>(PermissionsService);
+    signInUpServiceMock = module.get(SignInUpService) as jest.Mocked<
+      Pick<SignInUpService, 'validatePassword'>
+    >;
   });
 
   beforeEach(() => {
     twentyConfigServiceGetMock.mockReturnValue(false);
+    signInUpServiceMock.validatePassword.mockClear();
   });
 
   it('should be defined', async () => {
@@ -160,7 +223,7 @@ describe('AuthService', () => {
   });
 
   it('challenge - user already member of workspace', async () => {
-    const workspace = { isPasswordAuthEnabled: true } as Workspace;
+    const workspace = { isPasswordAuthEnabled: true } as WorkspaceEntity;
     const user = {
       email: 'email',
       password: 'password',
@@ -173,7 +236,7 @@ describe('AuthService', () => {
       email: user.email,
       passwordHash: 'passwordHash',
       captchaToken: user.captchaToken,
-    } as unknown as Promise<User>);
+    } as unknown as Promise<UserEntity>);
 
     jest
       .spyOn(userWorkspaceService, 'checkUserWorkspaceExists')
@@ -195,6 +258,92 @@ describe('AuthService', () => {
     });
   });
 
+  it('allows password login through SSO bypass when user has permission', async () => {
+    const workspace = {
+      id: 'workspace-id',
+      isPasswordAuthEnabled: false,
+      isPasswordAuthBypassEnabled: true,
+    } as WorkspaceEntity;
+
+    const userEntity = {
+      id: 'user-id',
+      email: 'email',
+      passwordHash: 'password-hash',
+      userWorkspaces: [
+        {
+          id: 'user-workspace-id',
+          workspaceId: workspace.id,
+        } as any,
+      ],
+    } as unknown as UserEntity;
+
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+    jest.spyOn(userRepository, 'findOne').mockResolvedValueOnce(userEntity);
+    jest
+      .spyOn(userWorkspaceService, 'checkUserWorkspaceExists')
+      .mockResolvedValueOnce({ id: 'user-workspace-id' } as any);
+    jest
+      .spyOn(permissionsService, 'userHasWorkspaceSettingPermission')
+      .mockResolvedValueOnce(true);
+
+    const response = await service.validateLoginWithPassword(
+      {
+        email: 'email',
+        password: 'password',
+        captchaToken: 'captcha-token',
+      },
+      workspace,
+    );
+
+    expect(response).toBe(userEntity);
+  });
+
+  it('throws when bypass permission is missing for disabled password auth', async () => {
+    const workspace = {
+      id: 'workspace-id',
+      isPasswordAuthEnabled: false,
+      isPasswordAuthBypassEnabled: true,
+    } as WorkspaceEntity;
+
+    const userEntity = {
+      id: 'user-id',
+      email: 'email',
+      passwordHash: 'password-hash',
+      userWorkspaces: [
+        {
+          id: 'user-workspace-id',
+          workspaceId: workspace.id,
+        } as any,
+      ],
+    } as unknown as UserEntity;
+
+    jest.spyOn(userRepository, 'findOne').mockResolvedValueOnce(userEntity);
+    jest
+      .spyOn(userWorkspaceService, 'checkUserWorkspaceExists')
+      .mockResolvedValueOnce(null);
+    jest
+      .spyOn(permissionsService, 'userHasWorkspaceSettingPermission')
+      .mockResolvedValueOnce(false);
+
+    await expect(
+      service.validateLoginWithPassword(
+        {
+          email: 'email',
+          password: 'password',
+          captchaToken: 'captcha-token',
+        },
+        workspace,
+      ),
+    ).rejects.toThrow(
+      new AuthException(
+        'Email/Password auth is not enabled for this workspace',
+        AuthExceptionCode.FORBIDDEN_EXCEPTION,
+      ),
+    );
+    expect(signInUpServiceMock.validatePassword).not.toHaveBeenCalled();
+  });
+
   it('challenge - user who have an invitation', async () => {
     const user = {
       email: 'email',
@@ -208,7 +357,7 @@ describe('AuthService', () => {
         email: user.email,
         passwordHash: 'passwordHash',
         captchaToken: user.captchaToken,
-      } as unknown as Promise<User>);
+      } as unknown as Promise<UserEntity>);
 
     (bcrypt.compare as jest.Mock).mockReturnValueOnce(true);
     jest
@@ -235,7 +384,7 @@ describe('AuthService', () => {
       },
       {
         isPasswordAuthEnabled: true,
-      } as Workspace,
+      } as WorkspaceEntity,
     );
 
     expect(response).toStrictEqual({
@@ -271,7 +420,7 @@ describe('AuthService', () => {
           id: 'workspace-id',
           isPublicInviteLinkEnabled: true,
           approvedAccessDomains: [],
-        } as unknown as Workspace,
+        } as unknown as WorkspaceEntity,
       });
 
       expect(spy).toHaveBeenCalledTimes(1);
@@ -296,7 +445,7 @@ describe('AuthService', () => {
             id: 'workspace-id',
             isPublicInviteLinkEnabled: true,
             approvedAccessDomains: [],
-          } as unknown as Workspace,
+          } as unknown as WorkspaceEntity,
         }),
       ).rejects.toThrow(new Error('Access denied'));
 
@@ -320,7 +469,7 @@ describe('AuthService', () => {
             id: 'workspace-id',
             isPublicInviteLinkEnabled: false,
             approvedAccessDomains: [],
-          } as unknown as Workspace,
+          } as unknown as WorkspaceEntity,
         }),
       ).rejects.toThrow(
         new AuthException(
@@ -382,9 +531,9 @@ describe('AuthService', () => {
             id: 'user-id',
           },
         } as ExistingUserOrNewUser['userData'],
-        invitation: {} as AppToken,
+        invitation: {} as AppTokenEntity,
         workspaceInviteHash: undefined,
-        workspace: { approvedAccessDomains: [] } as unknown as Workspace,
+        workspace: { approvedAccessDomains: [] } as unknown as WorkspaceEntity,
       });
 
       expect(spy).toHaveBeenCalledTimes(0);
@@ -405,7 +554,7 @@ describe('AuthService', () => {
         workspace: {
           isPublicInviteLinkEnabled: true,
           approvedAccessDomains: [],
-        } as unknown as Workspace,
+        } as unknown as WorkspaceEntity,
       });
 
       expect(spy).toHaveBeenCalledTimes(0);
@@ -427,7 +576,7 @@ describe('AuthService', () => {
             approvedAccessDomains: [
               { domain: 'domain.com', isValidated: true },
             ],
-          } as unknown as Workspace,
+          } as unknown as WorkspaceEntity,
         });
       }).not.toThrow();
     });
@@ -455,7 +604,7 @@ describe('AuthService', () => {
         .spyOn(workspaceRepository, 'findOne')
         .mockResolvedValue({
           approvedAccessDomains: [],
-        } as unknown as Workspace);
+        } as unknown as WorkspaceEntity);
       const spyAuthSsoService = jest.spyOn(
         authSsoService,
         'findWorkspaceFromWorkspaceIdOrAuthProvider',
@@ -476,7 +625,7 @@ describe('AuthService', () => {
         .spyOn(workspaceRepository, 'findOne')
         .mockResolvedValue({
           approvedAccessDomains: [],
-        } as unknown as Workspace);
+        } as unknown as WorkspaceEntity);
       const spyAuthSsoService = jest.spyOn(
         authSsoService,
         'findWorkspaceFromWorkspaceIdOrAuthProvider',
@@ -497,7 +646,7 @@ describe('AuthService', () => {
 
       const spyAuthSsoService = jest
         .spyOn(authSsoService, 'findWorkspaceFromWorkspaceIdOrAuthProvider')
-        .mockResolvedValue({} as Workspace);
+        .mockResolvedValue({} as WorkspaceEntity);
 
       const result = await service.findWorkspaceForSignInUp({
         authProvider: AuthProviderEnum.Google,
@@ -514,7 +663,7 @@ describe('AuthService', () => {
 
       const spyAuthSsoService = jest
         .spyOn(authSsoService, 'findWorkspaceFromWorkspaceIdOrAuthProvider')
-        .mockResolvedValue({} as Workspace);
+        .mockResolvedValue({} as WorkspaceEntity);
 
       const result = await service.findWorkspaceForSignInUp({
         authProvider: AuthProviderEnum.SSO,

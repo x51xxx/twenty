@@ -8,19 +8,10 @@ export class FileDTO {
   id: string;
 
   @Field()
-  name: string;
-
-  @Field()
-  fullPath: string;
+  path: string;
 
   @Field()
   size: number;
-
-  @Field()
-  type: string;
-
-  @Field(() => UUIDScalarType, { nullable: true })
-  messageId?: string;
 
   @Field(() => Date, { nullable: false })
   createdAt: Date;

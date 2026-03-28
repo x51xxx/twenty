@@ -10,6 +10,7 @@ export const CREATE_ONE_OBJECT_METADATA_ITEM = gql`
       labelPlural
       description
       icon
+      color
       isCustom
       isActive
       isSearchable
@@ -18,6 +19,71 @@ export const CREATE_ONE_OBJECT_METADATA_ITEM = gql`
       labelIdentifierFieldMetadataId
       imageIdentifierFieldMetadataId
       isLabelSyncedWithName
+      fieldsList {
+        id
+        universalIdentifier
+        type
+        name
+        label
+        description
+        icon
+        isCustom
+        isActive
+        isSystem
+        isUIReadOnly
+        isNullable
+        isUnique
+        createdAt
+        updatedAt
+        defaultValue
+        options
+        settings
+        isLabelSyncedWithName
+        morphId
+        applicationId
+        relation {
+          type
+          sourceObjectMetadata {
+            id
+            nameSingular
+            namePlural
+          }
+          targetObjectMetadata {
+            id
+            nameSingular
+            namePlural
+          }
+          sourceFieldMetadata {
+            id
+            name
+          }
+          targetFieldMetadata {
+            id
+            name
+          }
+        }
+        morphRelations {
+          type
+          sourceObjectMetadata {
+            id
+            nameSingular
+            namePlural
+          }
+          targetObjectMetadata {
+            id
+            nameSingular
+            namePlural
+          }
+          sourceFieldMetadata {
+            id
+            name
+          }
+          targetFieldMetadata {
+            id
+            name
+          }
+        }
+      }
     }
   }
 `;
@@ -41,6 +107,52 @@ export const CREATE_ONE_FIELD_METADATA_ITEM = gql`
       defaultValue
       options
       isLabelSyncedWithName
+      applicationId
+      object {
+        id
+      }
+      relation {
+        type
+        sourceObjectMetadata {
+          id
+          nameSingular
+          namePlural
+        }
+        targetObjectMetadata {
+          id
+          nameSingular
+          namePlural
+        }
+        sourceFieldMetadata {
+          id
+          name
+        }
+        targetFieldMetadata {
+          id
+          name
+        }
+      }
+      morphRelations {
+        type
+        sourceObjectMetadata {
+          id
+          nameSingular
+          namePlural
+        }
+        targetObjectMetadata {
+          id
+          nameSingular
+          namePlural
+        }
+        sourceFieldMetadata {
+          id
+          name
+        }
+        targetFieldMetadata {
+          id
+          name
+        }
+      }
     }
   }
 `;
@@ -65,6 +177,10 @@ export const UPDATE_ONE_FIELD_METADATA_ITEM = gql`
       updatedAt
       settings
       isLabelSyncedWithName
+      applicationId
+      object {
+        id
+      }
     }
   }
 `;
@@ -82,6 +198,7 @@ export const UPDATE_ONE_OBJECT_METADATA_ITEM = gql`
       labelPlural
       description
       icon
+      color
       isCustom
       isActive
       isSearchable
@@ -104,6 +221,7 @@ export const DELETE_ONE_OBJECT_METADATA_ITEM = gql`
       labelPlural
       description
       icon
+      color
       isCustom
       isActive
       isSearchable
@@ -132,6 +250,10 @@ export const DELETE_ONE_FIELD_METADATA_ITEM = gql`
       createdAt
       updatedAt
       settings
+      applicationId
+      object {
+        id
+      }
     }
   }
 `;

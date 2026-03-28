@@ -4,24 +4,20 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  JoinColumn,
-  ManyToOne,
   PrimaryGeneratedColumn,
   Unique,
   UpdateDateColumn,
 } from 'typeorm';
 
-import { Relation } from 'src/engine/workspace-manager/workspace-sync-metadata/interfaces/relation.interface';
-
-import { Workspace } from 'src/engine/core-modules/workspace/workspace.entity';
+import { WorkspaceRelatedEntity } from 'src/engine/workspace-manager/types/workspace-related-entity';
 
 @Entity({ name: 'approvedAccessDomain', schema: 'core' })
-@ObjectType()
+@ObjectType('ApprovedAccessDomain')
 @Unique('IDX_APPROVED_ACCESS_DOMAIN_DOMAIN_WORKSPACE_ID_UNIQUE', [
   'domain',
   'workspaceId',
 ])
-export class ApprovedAccessDomain {
+export class ApprovedAccessDomainEntity extends WorkspaceRelatedEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -36,13 +32,4 @@ export class ApprovedAccessDomain {
 
   @Column({ type: 'boolean', default: false, nullable: false })
   isValidated: boolean;
-
-  @Column()
-  workspaceId: string;
-
-  @ManyToOne(() => Workspace, (workspace) => workspace.approvedAccessDomains, {
-    onDelete: 'CASCADE',
-  })
-  @JoinColumn({ name: 'workspaceId' })
-  workspace: Relation<Workspace>;
 }

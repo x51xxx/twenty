@@ -5,16 +5,23 @@ import { getStandardFolderByRegex } from 'src/modules/messaging/message-import-m
 
 export function getImapSentFolderCandidatesByRegex(
   list: ListResponse[],
-): string[] {
+): { name: string; path: string }[] {
   const regexCandidateFolders: string[] = [];
 
   for (const folder of list) {
-    const standardFolder = getStandardFolderByRegex(folder.path);
+    const standardFolder = getStandardFolderByRegex(folder.name);
 
     if (standardFolder === StandardFolder.SENT) {
       regexCandidateFolders.push(folder.path);
     }
   }
 
-  return regexCandidateFolders;
+  return regexCandidateFolders.map((folderPath) => {
+    const folder = list.find((folder) => folder.path === folderPath);
+
+    return {
+      name: folder?.name ?? folderPath,
+      path: folderPath,
+    };
+  });
 }

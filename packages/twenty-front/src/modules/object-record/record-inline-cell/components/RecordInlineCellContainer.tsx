@@ -1,6 +1,6 @@
-import { useTheme } from '@emotion/react';
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import { useContext } from 'react';
+import { ThemeContext, themeCssVariables } from 'twenty-ui/theme-constants';
 
 import { FieldContext } from '@/object-record/record-field/ui/contexts/FieldContext';
 import { useFieldFocus } from '@/object-record/record-field/ui/hooks/useFieldFocus';
@@ -19,7 +19,7 @@ import { useRecordInlineCellContext } from './RecordInlineCellContext';
 
 const StyledIconContainer = styled.div`
   align-items: center;
-  color: ${({ theme }) => theme.font.color.tertiary};
+  color: ${themeCssVariables.font.color.tertiary};
   display: flex;
   width: 16px;
 
@@ -35,40 +35,34 @@ const StyledIconContainer = styled.div`
 const StyledLabelAndIconContainer = styled.div`
   align-items: center;
   align-self: flex-start;
-  color: ${({ theme }) => theme.font.color.tertiary};
+  color: ${themeCssVariables.font.color.tertiary};
   display: flex;
-  gap: ${({ theme }) => theme.spacing(1)};
+  gap: ${themeCssVariables.spacing[1]};
   height: 24px;
 `;
 
-const StyledValueContainer = styled.div<{
-  readonly: boolean;
-}>`
+const StyledValueContainer = styled.div<{ readonly: boolean }>`
   display: flex;
   min-width: 0;
   position: relative;
   width: 100%;
-
-  &:hover .record-inline-cell-value-display {
-    opacity: 0;
-  }
 `;
 
 const StyledLabelContainer = styled.div<{ width?: number }>`
-  color: ${({ theme }) => theme.font.color.tertiary};
-  font-size: ${({ theme }) => theme.font.size.sm};
-  width: ${({ width }) => width}px;
+  color: ${themeCssVariables.font.color.tertiary};
+  font-size: ${themeCssVariables.font.size.sm};
+  width: ${({ width }) => (width !== undefined ? `${width}px` : 'auto')};
 `;
 
 const StyledInlineCellBaseContainer = styled.div<{ readonly: boolean }>`
-  box-sizing: border-box;
-  width: 100%;
-  display: flex;
-  height: fit-content;
-  gap: ${({ theme }) => theme.spacing(1)};
-  user-select: none;
   align-items: center;
+  box-sizing: border-box;
   cursor: ${({ readonly }) => (readonly ? 'default' : 'pointer')};
+  display: flex;
+  gap: ${themeCssVariables.spacing[1]};
+  height: fit-content;
+  user-select: none;
+  width: 100%;
 `;
 
 export const StyledSkeletonDiv = styled.div`
@@ -78,6 +72,7 @@ export const StyledSkeletonDiv = styled.div`
 export const RecordInlineCellContainer = () => {
   const { readonly, IconLabel, label, labelWidth, showLabel } =
     useRecordInlineCellContext();
+  const { theme } = useContext(ThemeContext);
 
   const { recordId, fieldDefinition, onMouseEnter, onMouseLeave, anchorId } =
     useContext(FieldContext);
@@ -102,7 +97,6 @@ export const RecordInlineCellContainer = () => {
     onMouseLeave?.();
   };
 
-  const theme = useTheme();
   const labelId = `label-${getRecordFieldInputInstanceId({
     recordId,
     fieldName: fieldDefinition?.metadata?.fieldName,
@@ -121,13 +115,13 @@ export const RecordInlineCellContainer = () => {
               <IconLabel stroke={theme.icon.stroke.sm} />
             </StyledIconContainer>
           )}
-          {showLabel && label && (
+          {showLabel && (
             <StyledLabelContainer width={labelWidth}>
               <OverflowingTextWithTooltip text={label} displayedMaxRows={1} />
             </StyledLabelContainer>
           )}
           {/* TODO: Displaying Tooltips on the board is causing performance issues https://react-tooltip.com/docs/examples/render */}
-          {!showLabel && !fieldDefinition?.disableTooltip && (
+          {!showLabel && (
             <AppTooltip
               anchorSelect={`#${labelId}`}
               content={label}
@@ -140,9 +134,8 @@ export const RecordInlineCellContainer = () => {
           )}
         </StyledLabelAndIconContainer>
       )}
-
       <StyledValueContainer readonly={readonly ?? false} id={anchorId}>
-        <RecordInlineCellValue className="record-inline-cell-value-display" />
+        <RecordInlineCellValue />
       </StyledValueContainer>
     </StyledInlineCellBaseContainer>
   );

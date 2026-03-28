@@ -4,7 +4,7 @@ import {
   Entity,
   OneToMany,
   PrimaryGeneratedColumn,
-  Relation,
+  type Relation,
   Unique,
   UpdateDateColumn,
 } from 'typeorm';
@@ -12,16 +12,16 @@ import {
 import { FieldPermissionEntity } from 'src/engine/metadata-modules/object-permission/field-permission/field-permission.entity';
 import { ObjectPermissionEntity } from 'src/engine/metadata-modules/object-permission/object-permission.entity';
 import { PermissionFlagEntity } from 'src/engine/metadata-modules/permission-flag/permission-flag.entity';
-import { RoleTargetsEntity } from 'src/engine/metadata-modules/role/role-targets.entity';
+import { RoleTargetEntity } from 'src/engine/metadata-modules/role-target/role-target.entity';
+import { RowLevelPermissionPredicateGroupEntity } from 'src/engine/metadata-modules/row-level-permission-predicate/entities/row-level-permission-predicate-group.entity';
+import { RowLevelPermissionPredicateEntity } from 'src/engine/metadata-modules/row-level-permission-predicate/entities/row-level-permission-predicate.entity';
+import { SyncableEntity } from 'src/engine/workspace-manager/types/syncable-entity.interface';
 
 @Entity('role')
 @Unique('IDX_ROLE_LABEL_WORKSPACE_ID_UNIQUE', ['label', 'workspaceId'])
-export class RoleEntity {
+export class RoleEntity extends SyncableEntity implements Required<RoleEntity> {
   @PrimaryGeneratedColumn('uuid')
   id: string;
-
-  @Column({ nullable: true, type: 'uuid' })
-  standardId?: string;
 
   @Column({ nullable: false })
   label: string;
@@ -45,13 +45,10 @@ export class RoleEntity {
   canDestroyAllObjectRecords: boolean;
 
   @Column({ nullable: true, type: 'text' })
-  description: string;
+  description: string | null;
 
-  @Column({ nullable: true })
-  icon: string;
-
-  @Column({ nullable: false, type: 'uuid' })
-  workspaceId: string;
+  @Column({ nullable: true, type: 'varchar' })
+  icon: string | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
@@ -62,11 +59,20 @@ export class RoleEntity {
   @Column({ nullable: false, default: true })
   isEditable: boolean;
 
+  @Column({ nullable: false, default: true })
+  canBeAssignedToUsers: boolean;
+
+  @Column({ nullable: false, default: true })
+  canBeAssignedToAgents: boolean;
+
+  @Column({ nullable: false, default: true })
+  canBeAssignedToApiKeys: boolean;
+
   @OneToMany(
-    () => RoleTargetsEntity,
-    (roleTargets: RoleTargetsEntity) => roleTargets.role,
+    () => RoleTargetEntity,
+    (roleTargets: RoleTargetEntity) => roleTargets.role,
   )
-  roleTargets: Relation<RoleTargetsEntity[]>;
+  roleTargets: Relation<RoleTargetEntity[]>;
 
   @OneToMany(
     () => ObjectPermissionEntity,
@@ -85,4 +91,21 @@ export class RoleEntity {
     (fieldPermission: FieldPermissionEntity) => fieldPermission.role,
   )
   fieldPermissions: Relation<FieldPermissionEntity[]>;
+
+  @OneToMany(
+    () => RowLevelPermissionPredicateEntity,
+    (rowLevelPermissionPredicate: RowLevelPermissionPredicateEntity) =>
+      rowLevelPermissionPredicate.role,
+  )
+  rowLevelPermissionPredicates: Relation<RowLevelPermissionPredicateEntity[]>;
+
+  @OneToMany(
+    () => RowLevelPermissionPredicateGroupEntity,
+    (
+      rowLevelPermissionPredicateGroup: RowLevelPermissionPredicateGroupEntity,
+    ) => rowLevelPermissionPredicateGroup.role,
+  )
+  rowLevelPermissionPredicateGroups: Relation<
+    RowLevelPermissionPredicateGroupEntity[]
+  >;
 }

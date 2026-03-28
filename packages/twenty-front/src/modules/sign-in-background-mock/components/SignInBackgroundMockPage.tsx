@@ -1,4 +1,5 @@
-import styled from '@emotion/styled';
+import { t } from '@lingui/core/macro';
+import { styled } from '@linaria/react';
 
 import { SignInBackgroundMockContainer } from '@/sign-in-background-mock/components/SignInBackgroundMockContainer';
 import { PageBody } from '@/ui/layout/page/components/PageBody';
@@ -15,7 +16,7 @@ const StyledTableContainer = styled.div`
 export const SignInBackgroundMockPage = () => {
   return (
     <PageContainer>
-      <PageHeader title="Companies" Icon={IconBuildingSkyscraper} />
+      <PageHeader title={t`Companies`} Icon={IconBuildingSkyscraper} />
       <PageBody>
         <StyledTableContainer>
           <SignInBackgroundMockContainer />

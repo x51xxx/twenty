@@ -3,21 +3,22 @@ import { Key } from 'ts-key-enum';
 
 import { RecordBoardContext } from '@/object-record/record-board/contexts/RecordBoardContext';
 import { useFocusedRecordBoardCard } from '@/object-record/record-board/hooks/useFocusedRecordBoardCard';
-import { useRecordBoardSelection } from '@/object-record/record-board/hooks/useRecordBoardSelection';
+import { useResetRecordBoardSelection } from '@/object-record/record-board/hooks/useResetRecordBoardSelection';
 import { recordBoardSelectedRecordIdsComponentSelector } from '@/object-record/record-board/states/selectors/recordBoardSelectedRecordIdsComponentSelector';
 import { useResetFocusStackToRecordIndex } from '@/object-record/record-index/hooks/useResetFocusStackToRecordIndex';
 import { PageFocusId } from '@/types/PageFocusId';
 import { useHotkeysOnFocusedElement } from '@/ui/utilities/hotkey/hooks/useHotkeysOnFocusedElement';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentSelectorValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentSelectorValue';
 
 export const RecordBoardBodyEscapeHotkeyEffect = () => {
   const { recordBoardId } = useContext(RecordBoardContext);
 
-  const { resetRecordSelection } = useRecordBoardSelection(recordBoardId);
+  const { resetRecordBoardSelection } =
+    useResetRecordBoardSelection(recordBoardId);
   const { unfocusBoardCard } = useFocusedRecordBoardCard(recordBoardId);
   const { resetFocusStackToRecordIndex } = useResetFocusStackToRecordIndex();
 
-  const selectedRecordIds = useRecoilComponentValue(
+  const selectedRecordIds = useAtomComponentSelectorValue(
     recordBoardSelectedRecordIdsComponentSelector,
     recordBoardId,
   );
@@ -26,9 +27,11 @@ export const RecordBoardBodyEscapeHotkeyEffect = () => {
 
   const handleEscape = () => {
     unfocusBoardCard();
+
     if (isAtLeastOneRecordSelected) {
-      resetRecordSelection();
+      resetRecordBoardSelection();
     }
+
     resetFocusStackToRecordIndex();
   };
 

@@ -1,4 +1,4 @@
-import { ApolloProvider as ApolloProviderBase } from '@apollo/client';
+import { ApolloProvider as ApolloProviderBase } from '@apollo/client/react';
 
 import { useApolloFactory } from '@/apollo/hooks/useApolloFactory';
 import { createCaptchaRefreshLink } from '@/apollo/utils/captchaRefreshLink';
@@ -12,12 +12,14 @@ export const ApolloProvider = ({ children }: React.PropsWithChildren) => {
 
   const apolloClient = useApolloFactory({
     uri: `${REACT_APP_SERVER_BASE_URL}/metadata`,
-    connectToDevTools: true, // should this be default , ie dependant on IS_DEBUG_MODE?
+    devtools: { enabled: process.env.IS_DEBUG_MODE === 'true' },
     extraLinks: [captchaRefreshLink],
   });
 
-  // This will attach the right apollo client to Apollo Dev Tools
-  window.__APOLLO_CLIENT__ = apolloClient;
+  // Expose Apollo client in development to Apollo Dev Tools
+  if (process.env.NODE_ENV === 'development') {
+    window.__APOLLO_CLIENT__ = apolloClient;
+  }
 
   return (
     <ApolloProviderBase client={apolloClient}>{children}</ApolloProviderBase>

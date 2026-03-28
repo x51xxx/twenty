@@ -1,12 +1,13 @@
 import { useContext } from 'react';
 
 import { FieldInputEventContext } from '@/object-record/record-field/ui/contexts/FieldInputEventContext';
-import { useUpdateMorphRelationManyToOneFieldInput } from '@/object-record/record-field/ui/meta-types/input/hooks/useUpdateMorphRelationManyToOneFieldInput';
+import { useUpdateMorphRelationOneToManyFieldInput } from '@/object-record/record-field/ui/meta-types/input/hooks/useUpdateMorphRelationOneToManyFieldInput';
 import { RecordFieldComponentInstanceContext } from '@/object-record/record-field/ui/states/contexts/RecordFieldComponentInstanceContext';
 import { recordFieldInputLayoutDirectionComponentState } from '@/object-record/record-field/ui/states/recordFieldInputLayoutDirectionComponentState';
 import { MultipleRecordPicker } from '@/object-record/record-picker/multiple-record-picker/components/MultipleRecordPicker';
+import { GenericDropdownContentWidth } from '@/ui/layout/dropdown/constants/GenericDropdownContentWidth';
 import { useAvailableComponentInstanceIdOrThrow } from '@/ui/utilities/state/component-state/hooks/useAvailableComponentInstanceIdOrThrow';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 
 export const MorphRelationOneToManyFieldInput = () => {
   const instanceId = useAvailableComponentInstanceIdOrThrow(
@@ -15,14 +16,14 @@ export const MorphRelationOneToManyFieldInput = () => {
 
   const { onSubmit } = useContext(FieldInputEventContext);
 
-  const { updateMorphRelationManyToOne } =
-    useUpdateMorphRelationManyToOneFieldInput();
+  const { updateMorphRelationOneToMany } =
+    useUpdateMorphRelationOneToManyFieldInput();
 
   const handleSubmit = () => {
     onSubmit?.({ skipPersist: true });
   };
 
-  const layoutDirection = useRecoilComponentValue(
+  const recordFieldInputLayoutDirection = useAtomComponentStateValue(
     recordFieldInputLayoutDirectionComponentState,
   );
 
@@ -32,14 +33,15 @@ export const MorphRelationOneToManyFieldInput = () => {
       componentInstanceId={instanceId}
       onSubmit={handleSubmit}
       onChange={(morphItem) => {
-        updateMorphRelationManyToOne(morphItem);
+        updateMorphRelationOneToMany(morphItem);
       }}
       onClickOutside={handleSubmit}
       layoutDirection={
-        layoutDirection === 'downward'
+        recordFieldInputLayoutDirection === 'downward'
           ? 'search-bar-on-top'
           : 'search-bar-on-bottom'
       }
+      dropdownWidth={GenericDropdownContentWidth.ExtraLarge}
     />
   );
 };

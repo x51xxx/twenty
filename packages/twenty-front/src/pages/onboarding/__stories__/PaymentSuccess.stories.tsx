@@ -1,11 +1,11 @@
-import { getOperationName } from '@apollo/client/utilities';
-import { type Meta, type StoryObj } from '@storybook/react';
-import { within } from '@storybook/test';
+import { getOperationName } from '~/utils/getOperationName';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { HttpResponse, graphql } from 'msw';
+import { within } from 'storybook/test';
 
-import { AppPath } from '@/types/AppPath';
 import { GET_CURRENT_USER } from '@/users/graphql/queries/getCurrentUser';
-import { OnboardingStatus } from '~/generated/graphql';
+import { AppPath } from 'twenty-shared/types';
+import { OnboardingStatus } from '~/generated-metadata/graphql';
 import { PaymentSuccess } from '~/pages/onboarding/PaymentSuccess';
 import {
   PageDecorator,

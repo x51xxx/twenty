@@ -1,37 +1,43 @@
-import { t } from '@lingui/core/macro';
-import { type FieldMetadataType } from 'twenty-shared/types';
-import {
-  computeMorphRelationFieldJoinColumnName,
-  isDefined,
-} from 'twenty-shared/utils';
+import { msg } from '@lingui/core/macro';
+import { FieldMetadataType } from 'twenty-shared/types';
+import { computeMorphRelationFieldName, isDefined } from 'twenty-shared/utils';
+import { v4 } from 'uuid';
 
+import { type FlatApplication } from 'src/engine/core-modules/application/types/flat-application.type';
 import { type CreateFieldInput } from 'src/engine/metadata-modules/field-metadata/dtos/create-field.input';
 import { FieldMetadataExceptionCode } from 'src/engine/metadata-modules/field-metadata/field-metadata.exception';
-import { type MorphOrRelationFieldMetadataType } from 'src/engine/metadata-modules/field-metadata/types/morph-or-relation-field-metadata-type.type';
+import { computeMorphOrRelationFieldJoinColumnName } from 'src/engine/metadata-modules/field-metadata/utils/compute-morph-or-relation-field-join-column-name.util';
+import { type FlatEntityMaps } from 'src/engine/metadata-modules/flat-entity/types/flat-entity-maps.type';
+import { findFlatEntityByIdInFlatEntityMaps } from 'src/engine/metadata-modules/flat-entity/utils/find-flat-entity-by-id-in-flat-entity-maps.util';
 import { type FieldInputTranspilationResult } from 'src/engine/metadata-modules/flat-field-metadata/types/field-input-transpilation-result.type';
 import { type FlatFieldMetadata } from 'src/engine/metadata-modules/flat-field-metadata/types/flat-field-metadata.type';
+import { extractJunctionTargetSettingsFromSettings } from 'src/engine/metadata-modules/flat-field-metadata/utils/extract-junction-target-settings-from-settings.util';
 import { generateMorphOrRelationFlatFieldMetadataPair } from 'src/engine/metadata-modules/flat-field-metadata/utils/generate-morph-or-relation-flat-field-metadata-pair.util';
 import { validateMorphRelationCreationPayload } from 'src/engine/metadata-modules/flat-field-metadata/validators/utils/validate-morph-relation-creation-payload.util';
-import { type FlatObjectMetadataMaps } from 'src/engine/metadata-modules/flat-object-metadata-maps/types/flat-object-metadata-maps.type';
 import { type FlatObjectMetadata } from 'src/engine/metadata-modules/flat-object-metadata/types/flat-object-metadata.type';
+import { type UniversalFlatFieldMetadata } from 'src/engine/workspace-manager/workspace-migration/universal-flat-entity/types/universal-flat-field-metadata.type';
+import { type UniversalFlatIndexMetadata } from 'src/engine/workspace-manager/workspace-migration/universal-flat-entity/types/universal-flat-index-metadata.type';
 
 type FromMorphRelationCreateFieldInputToFlatFieldMetadatasArgs = {
   createFieldInput: Omit<CreateFieldInput, 'workspaceId'> & {
     type: FieldMetadataType.MORPH_RELATION;
   };
-  existingFlatObjectMetadataMaps: FlatObjectMetadataMaps;
+  existingFlatObjectMetadataMaps: FlatEntityMaps<FlatObjectMetadata>;
+  existingFlatFieldMetadataMaps: FlatEntityMaps<FlatFieldMetadata>;
   sourceFlatObjectMetadata: FlatObjectMetadata;
-  workspaceId: string;
+  flatApplication: FlatApplication;
 };
 export const fromMorphRelationCreateFieldInputToFlatFieldMetadatas = async ({
   createFieldInput,
   existingFlatObjectMetadataMaps,
+  existingFlatFieldMetadataMaps,
   sourceFlatObjectMetadata,
-  workspaceId,
+  flatApplication,
 }: FromMorphRelationCreateFieldInputToFlatFieldMetadatasArgs): Promise<
-  FieldInputTranspilationResult<
-    FlatFieldMetadata<MorphOrRelationFieldMetadataType>[]
-  >
+  FieldInputTranspilationResult<{
+    flatFieldMetadatas: UniversalFlatFieldMetadata[];
+    indexMetadatas: UniversalFlatIndexMetadata[];
+  }>
 > => {
   const rawMorphCreationPayload =
     createFieldInput.morphRelationsCreationPayload;
@@ -42,12 +48,14 @@ export const fromMorphRelationCreateFieldInputToFlatFieldMetadatas = async ({
   ) {
     return {
       status: 'fail',
-      error: {
-        code: FieldMetadataExceptionCode.INVALID_FIELD_INPUT,
-        message: `Relation creation payload is required`,
-        userFriendlyMessage: t`Relation creation payload is required`,
-        value: rawMorphCreationPayload,
-      },
+      errors: [
+        {
+          code: FieldMetadataExceptionCode.INVALID_FIELD_INPUT,
+          message: `Relation creation payload is required`,
+          userFriendlyMessage: msg`Relation creation payload is required`,
+          value: rawMorphCreationPayload,
+        },
+      ],
     };
   }
 
@@ -55,39 +63,69 @@ export const fromMorphRelationCreateFieldInputToFlatFieldMetadatas = async ({
     await validateMorphRelationCreationPayload({
       existingFlatObjectMetadataMaps,
       morphRelationCreationPayload: rawMorphCreationPayload,
+      objectMetadataUniversalIdentifier:
+        sourceFlatObjectMetadata.universalIdentifier,
     });
 
   if (morphRelationCreationPayloadValidation.status === 'fail') {
     return morphRelationCreationPayloadValidation;
   }
 
+  const { junctionTargetFieldId } = extractJunctionTargetSettingsFromSettings(
+    createFieldInput.settings,
+  );
+  const junctionTargetFlatFieldMetadata = isDefined(junctionTargetFieldId)
+    ? findFlatEntityByIdInFlatEntityMaps({
+        flatEntityId: junctionTargetFieldId,
+        flatEntityMaps: existingFlatFieldMetadataMaps,
+      })
+    : undefined;
+
   const morphRelationCreationPayload =
     morphRelationCreationPayloadValidation.result;
-
-  const flatFieldMetadatas = morphRelationCreationPayload.flatMap(
-    ({ relationCreationPayload, targetFlatObjectMetadata }) => {
+  const morphId = v4();
+  const flatFieldsAndIndexes = morphRelationCreationPayload.reduce(
+    (acc, { relationCreationPayload, targetFlatObjectMetadata }) => {
+      const currentMorphRelationFieldName = computeMorphRelationFieldName({
+        fieldName: createFieldInput.name,
+        relationType: relationCreationPayload.type,
+        targetObjectMetadataNameSingular: targetFlatObjectMetadata.nameSingular,
+        targetObjectMetadataNamePlural: targetFlatObjectMetadata.namePlural,
+      });
       const sourceFlatObjectMetadataJoinColumnName =
-        computeMorphRelationFieldJoinColumnName({
-          name: createFieldInput.name,
-          targetObjectMetadataNameSingular:
-            targetFlatObjectMetadata.nameSingular,
+        computeMorphOrRelationFieldJoinColumnName({
+          name: currentMorphRelationFieldName,
         });
 
-      return generateMorphOrRelationFlatFieldMetadataPair({
-        createFieldInput: {
-          ...createFieldInput,
-          relationCreationPayload,
-        },
-        sourceFlatObjectMetadataJoinColumnName,
-        sourceFlatObjectMetadata,
-        targetFlatObjectMetadata,
-        workspaceId,
-      });
+      const { flatFieldMetadatas, indexMetadatas } =
+        generateMorphOrRelationFlatFieldMetadataPair({
+          createFieldInput: {
+            ...createFieldInput,
+            relationCreationPayload,
+            name: currentMorphRelationFieldName,
+          },
+          sourceFlatObjectMetadataJoinColumnName,
+          sourceFlatObjectMetadata,
+          targetFlatObjectMetadata,
+          targetFlatFieldMetadataType: FieldMetadataType.RELATION,
+          morphId,
+          flatApplication,
+          junctionTargetFlatFieldMetadata,
+        });
+
+      return {
+        indexMetadatas: [...acc.indexMetadatas, ...indexMetadatas],
+        flatFieldMetadatas: [...acc.flatFieldMetadatas, ...flatFieldMetadatas],
+      };
+    },
+    {
+      indexMetadatas: [],
+      flatFieldMetadatas: [],
     },
   );
 
   return {
     status: 'success',
-    result: flatFieldMetadatas,
+    result: flatFieldsAndIndexes,
   };
 };

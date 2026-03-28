@@ -1,10 +1,7 @@
 import { renderHook } from '@testing-library/react';
-import { type ReactNode } from 'react';
-import { RecoilRoot } from 'recoil';
-
 import { useActivities } from '@/activities/hooks/useActivities';
 import { type Task } from '@/activities/types/Task';
-import { CoreObjectNameSingular } from '@/object-metadata/types/CoreObjectNameSingular';
+import { CoreObjectNameSingular } from 'twenty-shared/types';
 
 jest.mock('@/activities/hooks/useActivityTargetsForTargetableObjects', () => ({
   useActivityTargetsForTargetableObjects: jest.fn(),
@@ -15,7 +12,7 @@ jest.mock('@/object-record/hooks/useFindManyRecords', () => ({
 }));
 
 const mockActivityTarget = {
-  __typename: 'ActivityTarget',
+  __typename: 'TaskTarget',
   updatedAt: '2021-08-03T19:20:06.000Z',
   createdAt: '2021-08-03T19:20:06.000Z',
   personId: '1',
@@ -40,10 +37,6 @@ const mockActivity = {
   taskTargets: [],
 } satisfies Task;
 
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <RecoilRoot>{children}</RecoilRoot>
-);
-
 describe('useActivities', () => {
   afterEach(() => {
     jest.clearAllMocks();
@@ -55,33 +48,21 @@ describe('useActivities', () => {
     );
     useActivityTargetsForTargetableObjectsMock.useActivityTargetsForTargetableObjects.mockReturnValue(
       {
-        activityTargets: [mockActivityTarget],
+        activityTargets: [{ ...mockActivityTarget, task: mockActivity }],
         loadingActivityTargets: false,
       },
     );
 
-    const useFindManyRecordsMock = jest.requireMock(
-      '@/object-record/hooks/useFindManyRecords',
-    );
-    useFindManyRecordsMock.useFindManyRecords.mockReturnValue({
-      records: [mockActivity],
+    const { result } = renderHook(() => {
+      const activities = useActivities({
+        objectNameSingular: CoreObjectNameSingular.Task,
+        targetableObjects: [{ targetObjectNameSingular: 'company', id: '123' }],
+        skip: false,
+        limit: 10,
+        activityTargetsOrderByVariables: [{}],
+      });
+      return activities;
     });
-
-    const { result } = renderHook(
-      () => {
-        const activities = useActivities({
-          objectNameSingular: CoreObjectNameSingular.Task,
-          targetableObjects: [
-            { targetObjectNameSingular: 'company', id: '123' },
-          ],
-          activitiesFilters: {},
-          activitiesOrderByVariables: [{}],
-          skip: false,
-        });
-        return activities;
-      },
-      { wrapper: Wrapper },
-    );
 
     expect(result.current.activities).toEqual([mockActivity]);
   });

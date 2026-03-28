@@ -6,17 +6,16 @@ import { useCreateSSOIdentityProvider } from '@/settings/security/hooks/useCreat
 import { type SettingSecurityNewSSOIdentityFormValues } from '@/settings/security/types/SSOIdentityProvider';
 import { sSOIdentityProviderDefaultValues } from '@/settings/security/utils/sSOIdentityProviderDefaultValues';
 import { SSOIdentitiesProvidersParamsSchema } from '@/settings/security/validation-schemas/SSOIdentityProviderSchema';
-import { SettingsPath } from '@/types/SettingsPath';
 import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
 import { SubMenuTopBarContainer } from '@/ui/layout/page/components/SubMenuTopBarContainer';
-import { ApolloError } from '@apollo/client';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
-import pick from 'lodash.pick';
 import { FormProvider, useForm } from 'react-hook-form';
+import { SettingsPath } from 'twenty-shared/types';
+import { getSettingsPath } from 'twenty-shared/utils';
 import { useNavigateSettings } from '~/hooks/useNavigateSettings';
-import { getSettingsPath } from '~/utils/navigation/getSettingsPath';
 
 export const SettingsSecuritySSOIdentifyProvider = () => {
   const navigate = useNavigateSettings();
@@ -37,19 +36,23 @@ export const SettingsSecuritySSOIdentifyProvider = () => {
     try {
       const type = form.getValues('type');
 
+      const values = form.getValues();
+      const providerKeys = Object.keys(
+        sSOIdentityProviderDefaultValues[type](),
+      );
+
+      const filteredValues = Object.fromEntries(
+        Object.entries(values).filter(([key]) => providerKeys.includes(key)),
+      );
+
       await createSSOIdentityProvider(
-        SSOIdentitiesProvidersParamsSchema.parse(
-          pick(
-            form.getValues(),
-            Object.keys(sSOIdentityProviderDefaultValues[type]()),
-          ),
-        ),
+        SSOIdentitiesProvidersParamsSchema.parse(filteredValues),
       );
 
       navigate(SettingsPath.Security);
     } catch (error) {
       enqueueErrorSnackBar({
-        apolloError: error instanceof ApolloError ? error : undefined,
+        apolloError: CombinedGraphQLErrors.is(error) ? error : undefined,
       });
     }
   };
@@ -57,7 +60,7 @@ export const SettingsSecuritySSOIdentifyProvider = () => {
   return (
     <form onSubmit={form.handleSubmit(handleSave)}>
       <FormProvider
-        // eslint-disable-next-line react/jsx-props-no-spreading
+        // oxlint-disable-next-line react/jsx-props-no-spreading
         {...form}
       >
         <SubMenuTopBarContainer

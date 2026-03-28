@@ -1,10 +1,8 @@
 import { type OnDragEndResponder } from '@hello-pangea/dnd';
 import { useCallback, useMemo } from 'react';
-import { useRecoilState } from 'recoil';
 
-import { useColumnDefinitionsFromFieldMetadata } from '@/object-metadata/hooks/useColumnDefinitionsFromFieldMetadata';
+import { useColumnDefinitionsFromObjectMetadata } from '@/object-metadata/hooks/useColumnDefinitionsFromObjectMetadata';
 import { useObjectMetadataItem } from '@/object-metadata/hooks/useObjectMetadataItem';
-import { isRecordBoardCompactModeActiveComponentState } from '@/object-record/record-board/states/isRecordBoardCompactModeActiveComponentState';
 import { useReorderVisibleRecordFields } from '@/object-record/record-field/hooks/useReorderVisibleRecordFields';
 import { useUpdateRecordField } from '@/object-record/record-field/hooks/useUpdateRecordField';
 import { useUpsertRecordField } from '@/object-record/record-field/hooks/useUpsertRecordField';
@@ -13,11 +11,9 @@ import { type RecordField } from '@/object-record/record-field/types/RecordField
 import { type FieldMetadata } from '@/object-record/record-field/ui/types/FieldMetadata';
 import { recordIndexFieldDefinitionsState } from '@/object-record/record-index/states/recordIndexFieldDefinitionsState';
 import { type ColumnDefinition } from '@/object-record/record-table/types/ColumnDefinition';
-import { useRecoilComponentState } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentState';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+import { useAtomState } from '@/ui/utilities/state/jotai/hooks/useAtomState';
 import { useSaveCurrentViewFields } from '@/views/hooks/useSaveCurrentViewFields';
-import { useUpdateCurrentView } from '@/views/hooks/useUpdateCurrentView';
-import { type GraphQLView } from '@/views/types/GraphQLView';
 import { mapRecordFieldToViewField } from '@/views/utils/mapRecordFieldToViewField';
 import { produce } from 'immer';
 import { findByProperty, isDefined } from 'twenty-shared/utils';
@@ -36,22 +32,16 @@ export const useObjectOptionsForBoard = ({
   recordBoardId,
 }: useObjectOptionsForBoardParams) => {
   const [recordIndexFieldDefinitions, setRecordIndexFieldDefinitions] =
-    useRecoilState(recordIndexFieldDefinitionsState);
+    useAtomState(recordIndexFieldDefinitionsState);
 
   const { saveViewFields } = useSaveCurrentViewFields();
-  const { updateCurrentView } = useUpdateCurrentView();
-
-  const [isCompactModeActive, setIsCompactModeActive] = useRecoilComponentState(
-    isRecordBoardCompactModeActiveComponentState,
-    recordBoardId,
-  );
 
   const { objectMetadataItem } = useObjectMetadataItem({
     objectNameSingular,
   });
 
   const { columnDefinitions } =
-    useColumnDefinitionsFromFieldMetadata(objectMetadataItem);
+    useColumnDefinitionsFromObjectMetadata(objectMetadataItem);
 
   const availableColumnDefinitions = useMemo(
     () =>
@@ -95,7 +85,7 @@ export const useObjectOptionsForBoard = ({
             recordIndexFieldDefinitionsByKey[fieldMetadataId];
 
           return {
-            ...(existingBoardField || availableColumnDefinition),
+            ...(existingBoardField ?? availableColumnDefinition),
             isVisible: false,
           };
         }),
@@ -140,7 +130,7 @@ export const useObjectOptionsForBoard = ({
     ],
   );
 
-  const currentRecordFields = useRecoilComponentValue(
+  const currentRecordFields = useAtomComponentStateValue(
     currentRecordFieldsComponentState,
     recordBoardId,
   );
@@ -252,23 +242,10 @@ export const useObjectOptionsForBoard = ({
     ],
   );
 
-  const setAndPersistIsCompactModeActive = useCallback(
-    (isCompactModeActive: boolean, view: GraphQLView | undefined) => {
-      if (!view) return;
-      setIsCompactModeActive(isCompactModeActive);
-      updateCurrentView({
-        isCompact: isCompactModeActive,
-      });
-    },
-    [setIsCompactModeActive, updateCurrentView],
-  );
-
   return {
     handleReorderBoardFields,
     handleBoardFieldVisibilityChange,
     visibleBoardFields,
     hiddenBoardFields,
-    isCompactModeActive,
-    setAndPersistIsCompactModeActive,
   };
 };

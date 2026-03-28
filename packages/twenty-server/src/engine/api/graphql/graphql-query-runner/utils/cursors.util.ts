@@ -1,16 +1,16 @@
-import {
-  type ObjectRecord,
-  type ObjectRecordOrderBy,
-} from 'src/engine/api/graphql/workspace-query-builder/interfaces/object-record.interface';
+import { type ObjectRecord } from 'twenty-shared/types';
+
+import { type ObjectRecordOrderBy } from 'src/engine/api/graphql/workspace-query-builder/interfaces/object-record.interface';
 import { type FindManyResolverArgs } from 'src/engine/api/graphql/workspace-resolver-builder/interfaces/workspace-resolvers-builder.interface';
 
 import {
-  GraphqlQueryRunnerException,
-  GraphqlQueryRunnerExceptionCode,
-} from 'src/engine/api/graphql/graphql-query-runner/errors/graphql-query-runner.exception';
+  CommonQueryRunnerException,
+  CommonQueryRunnerExceptionCode,
+} from 'src/engine/api/common/common-query-runners/errors/common-query-runner.exception';
+import { STANDARD_ERROR_MESSAGE } from 'src/engine/api/common/common-query-runners/errors/standard-error-message.constant';
 
 export interface CursorData {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   [key: string]: any;
 }
 
@@ -18,9 +18,10 @@ export const decodeCursor = <T = CursorData>(cursor: string): T => {
   try {
     return JSON.parse(Buffer.from(cursor, 'base64').toString());
   } catch {
-    throw new GraphqlQueryRunnerException(
+    throw new CommonQueryRunnerException(
       `Invalid cursor: ${cursor}`,
-      GraphqlQueryRunnerExceptionCode.INVALID_CURSOR,
+      CommonQueryRunnerExceptionCode.INVALID_CURSOR,
+      { userFriendlyMessage: STANDARD_ERROR_MESSAGE },
     );
   }
 };
@@ -29,7 +30,7 @@ export const encodeCursor = <T extends ObjectRecord = ObjectRecord>(
   objectRecord: T,
   order: ObjectRecordOrderBy | undefined,
 ): string => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   const orderByValues: Record<string, any> = {};
 
   const orderBy = order?.reduce((acc, orderBy) => ({ ...acc, ...orderBy }), {});
@@ -53,9 +54,9 @@ export const encodeCursorData = (cursorData: CursorData) => {
 };
 
 export const getCursor = (
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   args: FindManyResolverArgs<any, any>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
 ): Record<string, any> | undefined => {
   if (args.after) return decodeCursor(args.after);
   if (args.before) return decodeCursor(args.before);
@@ -64,8 +65,7 @@ export const getCursor = (
 };
 
 export const getPaginationInfo = (
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  objectRecords: any[],
+  objectRecords: ObjectRecord[],
   limit: number,
   isForwardPagination: boolean,
 ) => {
@@ -74,5 +74,6 @@ export const getPaginationInfo = (
   return {
     hasNextPage: isForwardPagination && hasMoreRecords,
     hasPreviousPage: !isForwardPagination && hasMoreRecords,
+    hasMoreRecords,
   };
 };

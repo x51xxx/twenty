@@ -1,15 +1,16 @@
 import { useApolloCoreClient } from '@/object-metadata/hooks/useApolloCoreClient';
-import { CoreObjectNameSingular } from '@/object-metadata/types/CoreObjectNameSingular';
+import { CoreObjectNameSingular } from 'twenty-shared/types';
 import { useFindManyRecordsQuery } from '@/object-record/hooks/useFindManyRecordsQuery';
+import { useMutation } from '@apollo/client/react';
 import {
   type CreateDraftFromWorkflowVersionInput,
-  useCreateDraftFromWorkflowVersionMutation,
-} from '~/generated-metadata/graphql';
+  CreateDraftFromWorkflowVersionDocument,
+} from '~/generated/graphql';
 
 export const useCreateDraftFromWorkflowVersion = () => {
   const apolloCoreClient = useApolloCoreClient();
 
-  const [mutate] = useCreateDraftFromWorkflowVersionMutation({
+  const [mutate] = useMutation(CreateDraftFromWorkflowVersionDocument, {
     client: apolloCoreClient,
   });
 
@@ -21,7 +22,12 @@ export const useCreateDraftFromWorkflowVersion = () => {
         name: true,
         statuses: true,
         lastPublishedVersionId: true,
-        versions: true,
+        versions: {
+          id: true,
+          status: true,
+          name: true,
+          createdAt: true,
+        },
       },
     });
 

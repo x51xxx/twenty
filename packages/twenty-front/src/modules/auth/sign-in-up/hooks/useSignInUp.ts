@@ -3,29 +3,40 @@ import { type SubmitHandler, type UseFormReturn } from 'react-hook-form';
 import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 
 import { type Form } from '@/auth/sign-in-up/hooks/useSignInUpForm';
+import { lastAuthenticatedMethodState } from '@/auth/states/lastAuthenticatedMethodState';
 import { signInUpModeState } from '@/auth/states/signInUpModeState';
 import {
   SignInUpStep,
   signInUpStepState,
 } from '@/auth/states/signInUpStepState';
+import { AuthenticatedMethod } from '@/auth/types/AuthenticatedMethod.enum';
 import { SignInUpMode } from '@/auth/types/signInUpMode';
 import { useReadCaptchaToken } from '@/captcha/hooks/useReadCaptchaToken';
+import { useCaptcha } from '@/client-config/hooks/useCaptcha';
 import { useBuildSearchParamsFromUrlSyncedStates } from '@/domain-manager/hooks/useBuildSearchParamsFromUrlSyncedStates';
 import { useIsCurrentLocationOnAWorkspace } from '@/domain-manager/hooks/useIsCurrentLocationOnAWorkspace';
-import { AppPath } from '@/types/AppPath';
 import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
-import { ApolloError } from '@apollo/client';
-import { useRecoilState } from 'recoil';
+import { isErrorLike } from '@apollo/client/errors';
+import { useLingui } from '@lingui/react/macro';
+import { AppPath } from 'twenty-shared/types';
+import { isDefined } from 'twenty-shared/utils';
 import { buildAppPathWithQueryParams } from '~/utils/buildAppPathWithQueryParams';
 import { isMatchingLocation } from '~/utils/isMatchingLocation';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '@/auth/hooks/useAuth';
+import { useAtomState } from '@/ui/utilities/state/jotai/hooks/useAtomState';
+import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
 
 export const useSignInUp = (form: UseFormReturn<Form>) => {
   const { enqueueErrorSnackBar } = useSnackBar();
+  const { t } = useLingui();
 
-  const [signInUpStep, setSignInUpStep] = useRecoilState(signInUpStepState);
-  const [signInUpMode, setSignInUpMode] = useRecoilState(signInUpModeState);
+  const [signInUpStep, setSignInUpStep] = useAtomState(signInUpStepState);
+  const [signInUpMode, setSignInUpMode] = useAtomState(signInUpModeState);
   const { isOnAWorkspace } = useIsCurrentLocationOnAWorkspace();
+  const { isCaptchaReady } = useCaptcha();
+  const setLastAuthenticatedMethod = useSetAtomState(
+    lastAuthenticatedMethodState,
+  );
 
   const location = useLocation();
 
@@ -55,44 +66,68 @@ export const useSignInUp = (form: UseFormReturn<Form>) => {
     setSignInUpStep(SignInUpStep.Email);
   }, [setSignInUpStep]);
 
+  const errorMsgUserAlreadyExist = t`An error occurred while checking user existence`;
   const continueWithCredentials = useCallback(async () => {
-    const token = await readCaptchaToken();
     if (!form.getValues('email')) {
-      return;
+      return enqueueErrorSnackBar({
+        message: t`Email is required`,
+      });
     }
-    checkUserExistsQuery({
-      variables: {
-        email: form.getValues('email').toLowerCase().trim(),
-        captchaToken: token,
-      },
-      onError: (error) => {
-        enqueueErrorSnackBar({ apolloError: error });
-      },
-      onCompleted: (data) => {
-        setSignInUpMode(
-          data?.checkUserExists.exists
-            ? SignInUpMode.SignIn
-            : SignInUpMode.SignUp,
-        );
-        setSignInUpStep(SignInUpStep.Password);
-      },
-    });
+    if (!isCaptchaReady) {
+      return enqueueErrorSnackBar({
+        message: t`Captcha (anti-bot check) is still loading, try again`,
+      });
+    }
+    try {
+      const token = readCaptchaToken();
+
+      const { data, error } = await checkUserExistsQuery({
+        variables: {
+          email: form.getValues('email').toLowerCase().trim(),
+          captchaToken: token,
+        },
+      });
+
+      if (isDefined(error)) {
+        return enqueueErrorSnackBar({ apolloError: error });
+      }
+
+      setSignInUpMode(
+        data?.checkUserExists.exists
+          ? SignInUpMode.SignIn
+          : SignInUpMode.SignUp,
+      );
+      setSignInUpStep(SignInUpStep.Password);
+    } catch {
+      enqueueErrorSnackBar({ message: errorMsgUserAlreadyExist });
+    }
   }, [
     readCaptchaToken,
     form,
-    checkUserExistsQuery,
+    isCaptchaReady,
     enqueueErrorSnackBar,
-    setSignInUpStep,
+    t,
+    checkUserExistsQuery,
     setSignInUpMode,
+    setSignInUpStep,
+    errorMsgUserAlreadyExist,
   ]);
 
   const submitCredentials: SubmitHandler<Form> = useCallback(
     async (data) => {
-      const token = await readCaptchaToken();
+      if (!data.email || !data.password) {
+        throw new Error('Email and password are required');
+      }
+
+      if (!isCaptchaReady) {
+        return enqueueErrorSnackBar({
+          message: t`Captcha (anti-bot check) is still loading, try again`,
+        });
+      }
+
+      const token = readCaptchaToken();
       try {
-        if (!data.email || !data.password) {
-          throw new Error('Email and password are required');
-        }
+        setLastAuthenticatedMethod(AuthenticatedMethod.EMAIL);
 
         if (
           !isInviteMode &&
@@ -143,13 +178,14 @@ export const useSignInUp = (form: UseFormReturn<Form>) => {
           captchaToken: token,
           verifyEmailRedirectPath,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         enqueueErrorSnackBar({
-          ...(error instanceof ApolloError ? { apolloError: error } : {}),
+          ...(isErrorLike(error) ? { apolloError: error } : {}),
         });
       }
     },
     [
+      isCaptchaReady,
       readCaptchaToken,
       signInUpMode,
       isInviteMode,
@@ -162,6 +198,8 @@ export const useSignInUp = (form: UseFormReturn<Form>) => {
       enqueueErrorSnackBar,
       buildSearchParamsFromUrlSyncedStates,
       isOnAWorkspace,
+      setLastAuthenticatedMethod,
+      t,
     ],
   );
 

@@ -1,26 +1,45 @@
 import { type ApolloCache, type StoreObject } from '@apollo/client';
 
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import { type RecordGqlRefEdge } from '@/object-record/cache/types/RecordGqlRefEdge';
+import { getRecordFromCache } from '@/object-record/cache/utils/getRecordFromCache';
+import { getRecordFromRecordNode } from '@/object-record/cache/utils/getRecordFromRecordNode';
 import { isObjectRecordConnectionWithRefs } from '@/object-record/cache/utils/isObjectRecordConnectionWithRefs';
+import { type ObjectRecord } from '@/object-record/types/ObjectRecord';
+import { type ObjectPermissions } from 'twenty-shared/types';
 import { capitalize, isDefined } from 'twenty-shared/utils';
 
 export const triggerAttachRelationOptimisticEffect = ({
   cache,
   sourceObjectNameSingular,
   sourceRecordId,
-  targetObjectNameSingular,
+  targetObjectMetadataItem,
   fieldNameOnTargetRecord,
   targetRecordId,
+  upsertRecordsInStore,
+  objectMetadataItems,
+  objectPermissionsByObjectMetadataId,
 }: {
-  cache: ApolloCache<unknown>;
+  cache: ApolloCache;
   sourceObjectNameSingular: string;
   sourceRecordId: string;
-  targetObjectNameSingular: string;
+  targetObjectMetadataItem: Pick<
+    EnrichedObjectMetadataItem,
+    'fields' | 'nameSingular' | 'id' | 'readableFields'
+  >;
   fieldNameOnTargetRecord: string;
   targetRecordId: string;
+  objectMetadataItems: EnrichedObjectMetadataItem[];
+  objectPermissionsByObjectMetadataId: Record<
+    string,
+    ObjectPermissions & { objectMetadataId: string }
+  >;
+  upsertRecordsInStore: (props: { partialRecords: ObjectRecord[] }) => void;
 }) => {
   const sourceRecordTypeName = capitalize(sourceObjectNameSingular);
-  const targetRecordTypeName = capitalize(targetObjectNameSingular);
+  const targetRecordTypeName = capitalize(
+    targetObjectMetadataItem.nameSingular,
+  );
 
   const targetRecordCacheId = cache.identify({
     id: targetRecordId,
@@ -65,6 +84,21 @@ export const triggerAttachRelationOptimisticEffect = ({
             },
           ];
 
+          upsertRecordsInStore({
+            partialRecords: [
+              getRecordFromRecordNode({
+                recordNode: {
+                  id: targetRecordId,
+                  [fieldNameOnTargetRecord]: {
+                    ...targetRecordFieldValue,
+                    edges: nextEdges,
+                  },
+                  __typename: targetRecordTypeName,
+                },
+              }),
+            ],
+          });
+
           return {
             ...targetRecordFieldValue,
             edges: nextEdges,
@@ -76,4 +110,18 @@ export const triggerAttachRelationOptimisticEffect = ({
       },
     },
   });
+
+  const newCachedRecord = getRecordFromCache({
+    cache,
+    objectMetadataItem: targetObjectMetadataItem,
+    objectMetadataItems,
+    recordId: targetRecordId,
+    objectPermissionsByObjectMetadataId,
+  });
+
+  if (!isDefined(newCachedRecord)) {
+    return;
+  }
+
+  upsertRecordsInStore({ partialRecords: [newCachedRecord] });
 };

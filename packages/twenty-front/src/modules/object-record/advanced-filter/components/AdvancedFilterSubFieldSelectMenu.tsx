@@ -1,6 +1,8 @@
 import { DropdownMenuItemsContainer } from '@/ui/layout/dropdown/components/DropdownMenuItemsContainer';
 
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentState } from '@/ui/utilities/state/jotai/hooks/useAtomComponentState';
+import { useAtomComponentSelectorValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentSelectorValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 import { isDefined } from 'twenty-shared/utils';
 
 import { type FieldMetadataItem } from '@/object-metadata/types/FieldMetadataItem';
@@ -22,7 +24,7 @@ import { GenericDropdownContentWidth } from '@/ui/layout/dropdown/constants/Gene
 import { SelectableList } from '@/ui/layout/selectable-list/components/SelectableList';
 import { SelectableListItem } from '@/ui/layout/selectable-list/components/SelectableListItem';
 import { selectedItemIdComponentState } from '@/ui/layout/selectable-list/states/selectedItemIdComponentState';
-import { useRecoilComponentState } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentState';
+import { t } from '@lingui/core/macro';
 import { IconChevronLeft, useIcons } from 'twenty-ui/display';
 import { MenuItem } from 'twenty-ui/navigation';
 
@@ -35,21 +37,19 @@ export const AdvancedFilterSubFieldSelectMenu = ({
 }: AdvancedFilterSubFieldSelectMenuProps) => {
   const { getIcon } = useIcons();
 
-  const fieldMetadataItemUsedInDropdown = useRecoilComponentValue(
+  const fieldMetadataItemUsedInDropdown = useAtomComponentSelectorValue(
     fieldMetadataItemUsedInDropdownComponentSelector,
   );
 
   const [, setObjectFilterDropdownIsSelectingCompositeField] =
-    useRecoilComponentState(
+    useAtomComponentState(
       objectFilterDropdownIsSelectingCompositeFieldComponentState,
     );
 
   const [
     objectFilterDropdownSubMenuFieldType,
     setObjectFilterDropdownSubMenuFieldType,
-  ] = useRecoilComponentState(
-    objectFilterDropdownSubMenuFieldTypeComponentState,
-  );
+  ] = useAtomComponentState(objectFilterDropdownSubMenuFieldTypeComponentState);
 
   const { closeAdvancedFilterFieldSelectDropdown } =
     useAdvancedFilterFieldSelectDropdown(recordFilterId);
@@ -82,7 +82,7 @@ export const AdvancedFilterSubFieldSelectMenu = ({
   const { advancedFilterFieldSelectDropdownId } =
     useAdvancedFilterFieldSelectDropdown(recordFilterId);
 
-  const selectedItemId = useRecoilComponentValue(
+  const selectedItemId = useAtomComponentStateValue(
     selectedItemIdComponentState,
     advancedFilterFieldSelectDropdownId,
   );
@@ -112,6 +112,8 @@ export const AdvancedFilterSubFieldSelectMenu = ({
     ...subFieldNames.map((subFieldName) => subFieldName),
   ];
 
+  const fieldLabel = fieldMetadataItemUsedInDropdown?.label;
+
   return (
     <DropdownContent widthInPixels={GenericDropdownContentWidth.ExtraLarge}>
       <DropdownMenuHeader
@@ -132,7 +134,7 @@ export const AdvancedFilterSubFieldSelectMenu = ({
         >
           {compositeFieldTypeIsFilterableByAnySubField && (
             <SelectableListItem
-              itemId={'-1'}
+              itemId="-1"
               key={`select-filter-${-1}`}
               onEnter={() => {
                 handleSelectFilter(fieldMetadataItemUsedInDropdown);
@@ -146,7 +148,7 @@ export const AdvancedFilterSubFieldSelectMenu = ({
                   handleSelectFilter(fieldMetadataItemUsedInDropdown);
                 }}
                 LeftIcon={getIcon(fieldMetadataItemUsedInDropdown.icon)}
-                text={`Any ${fieldMetadataItemUsedInDropdown.label} field`}
+                text={t`Any ${fieldLabel} field`}
               />
             </SelectableListItem>
           )}

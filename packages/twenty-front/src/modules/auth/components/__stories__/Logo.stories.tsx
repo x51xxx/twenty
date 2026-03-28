@@ -1,18 +1,14 @@
-import { type Meta, type StoryObj } from '@storybook/react';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
 
-import {
-  ComponentDecorator,
-  RecoilRootDecorator,
-  RouterDecorator,
-} from 'twenty-ui/testing';
-import { Logo } from '../Logo';
+import { Logo } from '@/auth/components/Logo';
+import { ComponentDecorator, RouterDecorator } from 'twenty-ui/testing';
 
 const logoUrl = 'https://picsum.photos/192/192';
 
 const meta: Meta<typeof Logo> = {
   title: 'Modules/Auth/Logo',
   component: Logo,
-  decorators: [ComponentDecorator, RecoilRootDecorator, RouterDecorator],
+  decorators: [ComponentDecorator, RouterDecorator],
 };
 
 export default meta;

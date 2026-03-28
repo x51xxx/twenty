@@ -1,27 +1,58 @@
-import { objectRecordChangedValues } from 'src/engine/core-modules/event-emitter/utils/object-record-changed-values';
-import { getMockObjectMetadataItemWithFieldsMaps } from 'src/utils/__test__/get-object-metadata-item-with-fields-maps.mock';
+import { FieldMetadataType } from 'twenty-shared/types';
 
-const mockObjectMetadata = getMockObjectMetadataItemWithFieldsMaps({
+import { objectRecordChangedValues } from 'src/engine/core-modules/event-emitter/utils/object-record-changed-values';
+import { type FlatEntityMaps } from 'src/engine/metadata-modules/flat-entity/types/flat-entity-maps.type';
+import { type FlatFieldMetadata } from 'src/engine/metadata-modules/flat-field-metadata/types/flat-field-metadata.type';
+import { type FlatObjectMetadata } from 'src/engine/metadata-modules/flat-object-metadata/types/flat-object-metadata.type';
+
+const mockObjectMetadata: FlatObjectMetadata = {
   id: '1',
   icon: 'Icon123',
+  color: null,
   nameSingular: 'Object',
   namePlural: 'Objects',
   labelSingular: 'Object',
   labelPlural: 'Objects',
-  description: 'Test object metadata',
   targetTableName: 'test_table',
   workspaceId: '1',
-  fieldsById: {},
-  fieldIdByName: {},
+  universalIdentifier: '1',
   isSystem: false,
   isCustom: false,
   isActive: true,
   isRemote: false,
   isAuditLogged: true,
   isSearchable: true,
-  indexMetadatas: [],
-  fieldIdByJoinColumnName: {},
-});
+  indexMetadataIds: [],
+  objectPermissionIds: [],
+  fieldPermissionIds: [],
+  fieldIds: [],
+  viewIds: [],
+  applicationId: 'test-application-id',
+  isLabelSyncedWithName: false,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  shortcut: null,
+  description: null,
+  standardOverrides: null,
+  isUIReadOnly: false,
+  labelIdentifierFieldMetadataId: null,
+  imageIdentifierFieldMetadataId: null,
+  duplicateCriteria: null,
+  applicationUniversalIdentifier: 'test-application-id',
+  fieldUniversalIdentifiers: [],
+  objectPermissionUniversalIdentifiers: [],
+  fieldPermissionUniversalIdentifiers: [],
+  viewUniversalIdentifiers: [],
+  indexMetadataUniversalIdentifiers: [],
+  labelIdentifierFieldMetadataUniversalIdentifier: null,
+  imageIdentifierFieldMetadataUniversalIdentifier: null,
+};
+
+const mockFlatFieldMetadataMaps: FlatEntityMaps<FlatFieldMetadata> = {
+  byUniversalIdentifier: {},
+  universalIdentifierById: {},
+  universalIdentifiersByApplicationId: {},
+};
 
 describe('objectRecordChangedValues', () => {
   it('detects changes in scalar values correctly', () => {
@@ -40,6 +71,7 @@ describe('objectRecordChangedValues', () => {
       oldRecord,
       newRecord,
       mockObjectMetadata,
+      mockFlatFieldMetadataMaps,
     );
 
     expect(result).toEqual({
@@ -61,6 +93,7 @@ describe('objectRecordChangedValues', () => {
       oldRecord,
       newRecord,
       mockObjectMetadata,
+      mockFlatFieldMetadataMaps,
     );
 
     expect(result).toEqual({});
@@ -82,6 +115,7 @@ describe('objectRecordChangedValues', () => {
       oldRecord,
       newRecord,
       mockObjectMetadata,
+      mockFlatFieldMetadataMaps,
     );
 
     expect(result).toEqual({});
@@ -111,8 +145,58 @@ describe('objectRecordChangedValues', () => {
       oldRecord,
       newRecord,
       mockObjectMetadata,
+      mockFlatFieldMetadataMaps,
     );
 
     expect(result).toEqual(expectedChanges);
+  });
+
+  it('ignores changes to POSITION fields', () => {
+    const positionFieldId = 'position-field-id';
+    const positionUniversalId = 'position-universal-id';
+
+    const objectMetadataWithPosition: FlatObjectMetadata = {
+      ...mockObjectMetadata,
+      fieldIds: [positionFieldId],
+    };
+
+    const flatFieldMetadataMapsWithPosition: FlatEntityMaps<FlatFieldMetadata> =
+      {
+        byUniversalIdentifier: {
+          [positionUniversalId]: {
+            id: positionFieldId,
+            name: 'position',
+            type: FieldMetadataType.POSITION,
+            universalIdentifier: positionUniversalId,
+          } as FlatFieldMetadata,
+        },
+        universalIdentifierById: {
+          [positionFieldId]: positionUniversalId,
+        },
+        universalIdentifiersByApplicationId: {},
+      };
+
+    const oldRecord = {
+      id: '74316f58-29b0-4a6a-b8fa-d2b506d5516n',
+      position: 1,
+      name: 'Original',
+    };
+    const newRecord = {
+      id: '74316f58-29b0-4a6a-b8fa-d2b506d5516n',
+      position: 5,
+      name: 'Updated',
+    };
+
+    const result = objectRecordChangedValues(
+      oldRecord,
+      newRecord,
+      objectMetadataWithPosition,
+      flatFieldMetadataMapsWithPosition,
+    );
+
+    expect(result).toEqual({
+      name: { before: 'Original', after: 'Updated' },
+    });
+    expect(result).not.toHaveProperty('position');
   });
 });

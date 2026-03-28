@@ -1,11 +1,11 @@
-import { useSetRecoilState } from 'recoil';
 import { currentWorkspaceState } from '@/auth/states/currentWorkspaceState';
-import { mockCurrentWorkspace } from '~/testing/mock-data/users';
+import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
+import { type Decorator } from '@storybook/react-vite';
 import { useEffect } from 'react';
-import { type Decorator } from '@storybook/react';
+import { mockCurrentWorkspace } from '~/testing/mock-data/users';
 
 export const WorkspaceDecorator: Decorator = (Story) => {
-  const setCurrentWorkspace = useSetRecoilState(currentWorkspaceState);
+  const setCurrentWorkspace = useSetAtomState(currentWorkspaceState);
 
   useEffect(() => {
     setCurrentWorkspace(mockCurrentWorkspace);

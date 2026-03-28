@@ -1,5 +1,9 @@
-import { InputField, Node, NodeField } from '../utils/data.types';
 import { FieldMetadataType } from 'twenty-shared/types';
+import {
+  type InputField,
+  type Node,
+  type NodeField,
+} from 'src/utils/data.types';
 
 const getListFromFieldMetadataType = (fieldMetadataType: FieldMetadataType) => {
   return fieldMetadataType === FieldMetadataType.ARRAY;
@@ -11,7 +15,6 @@ const getTypeFromFieldMetadataType = (
   switch (fieldMetadataType) {
     case FieldMetadataType.UUID:
     case FieldMetadataType.TEXT:
-    case FieldMetadataType.RICH_TEXT:
     case FieldMetadataType.ARRAY:
     case FieldMetadataType.RATING:
       return 'string';
@@ -206,7 +209,7 @@ const get_subfieldsFromField = (nodeField: NodeField): NodeField[] => {
 };
 
 const isFieldRequired = (nodeField: NodeField): boolean => {
-  return !nodeField.isNullable && !nodeField.defaultValue;
+  return !nodeField.isNullable && nodeField.defaultValue === null;
 };
 
 export const computeInputFields = (
@@ -238,13 +241,11 @@ export const computeInputFields = (
         break;
       case FieldMetadataType.UUID:
       case FieldMetadataType.TEXT:
-      case FieldMetadataType.RICH_TEXT:
       case FieldMetadataType.DATE_TIME:
       case FieldMetadataType.DATE:
       case FieldMetadataType.BOOLEAN:
       case FieldMetadataType.NUMBER:
       case FieldMetadataType.NUMERIC:
-      case FieldMetadataType.POSITION:
       case FieldMetadataType.ARRAY:
       case FieldMetadataType.RATING: {
         const nodeFieldType = getTypeFromFieldMetadataType(nodeField.type);

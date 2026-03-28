@@ -1,4 +1,4 @@
-import { getActivitySummary } from '../getActivitySummary';
+import { getActivitySummary } from '@/activities/utils/getActivitySummary';
 
 describe('getActivitySummary', () => {
   it('should work for empty body ""', () => {
@@ -107,7 +107,7 @@ describe('getActivitySummary', () => {
 
     const res = getActivitySummary(JSON.stringify(activityBody));
 
-    expect(res).toEqual('');
+    expect(res).toEqual('TEST');
   });
 
   it('should work for table as first block', () => {

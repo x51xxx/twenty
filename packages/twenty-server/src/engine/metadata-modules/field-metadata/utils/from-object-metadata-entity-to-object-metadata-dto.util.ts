@@ -9,9 +9,11 @@ export const fromObjectMetadataEntityToObjectMetadataDto = (
     updatedAt,
     description,
     icon,
+    color,
     standardOverrides,
     shortcut,
     duplicateCriteria,
+    applicationId,
     ...rest
   } = objectMetadataEntity;
 
@@ -21,8 +23,10 @@ export const fromObjectMetadataEntityToObjectMetadataDto = (
     updatedAt: new Date(updatedAt),
     description: description ?? undefined,
     icon: icon ?? undefined,
+    color: color ?? undefined,
     standardOverrides: standardOverrides ?? undefined,
     shortcut: shortcut ?? undefined,
     duplicateCriteria: duplicateCriteria ?? undefined,
+    applicationId: applicationId ?? undefined,
   };
 };

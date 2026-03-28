@@ -1,11 +1,14 @@
-import { CAPTURE_ALL_VARIABLE_TAG_INNER_REGEX } from '@/workflow/workflow-variables/constants/CaptureAllVariableTagInnerRegex';
 import { type VariableSearchResult } from '@/workflow/workflow-variables/hooks/useSearchVariable';
 import type { FindRecordsOutputSchema } from '@/workflow/workflow-variables/types/FindRecordsOutputSchema';
 import { searchRecordOutputSchema as searchRecordOutputSchemaUtil } from '@/workflow/workflow-variables/utils/searchVariableThroughRecordOutputSchema';
 import { FieldMetadataType } from 'twenty-shared/types';
 import { isDefined } from 'twenty-shared/utils';
+import {
+  CAPTURE_ALL_VARIABLE_TAG_INNER_REGEX,
+  parseVariablePath,
+} from 'twenty-shared/workflow';
 
-type SearchResultKey = 'first' | 'last' | 'totalCount';
+type SearchResultKey = 'first' | 'all' | 'totalCount';
 
 /**
  * Parses a variable name to extract its components for SearchRecord outputs
@@ -18,7 +21,7 @@ const parseVariableName = (rawVariableName: string) => {
     (_, variableName) => variableName,
   );
 
-  const parts = variableWithoutBrackets.split('.');
+  const parts = parseVariablePath(variableWithoutBrackets);
   const stepId = parts.at(0);
   const searchResultKey = parts.at(1) as SearchResultKey;
   const remainingParts = parts.slice(2);
@@ -45,11 +48,13 @@ export const searchVariableThroughFindRecordsOutputSchema = ({
   searchRecordOutputSchema,
   rawVariableName,
   isFullRecord = false,
+  stepNameLabel,
 }: {
   stepName: string;
   searchRecordOutputSchema: FindRecordsOutputSchema;
   rawVariableName: string;
   isFullRecord?: boolean;
+  stepNameLabel?: string;
 }): VariableSearchResult => {
   if (!isDefined(searchRecordOutputSchema)) {
     return {
@@ -68,15 +73,7 @@ export const searchVariableThroughFindRecordsOutputSchema = ({
     };
   }
 
-  if (searchResultKey === 'totalCount') {
-    return {
-      variableLabel: 'Total Count',
-      variablePathLabel: `${stepName} > Total Count`,
-      variableType: FieldMetadataType.NUMBER,
-    };
-  }
-
-  if (searchResultKey === 'first' || searchResultKey === 'last') {
+  if (searchResultKey === 'first') {
     const recordSchema = searchRecordOutputSchema[searchResultKey]?.value;
 
     if (!isDefined(recordSchema) || !isDefined(fieldName)) {
@@ -87,12 +84,40 @@ export const searchVariableThroughFindRecordsOutputSchema = ({
     }
 
     return searchRecordOutputSchemaUtil({
-      stepName: `${stepName} > ${searchResultKey === 'first' ? 'First' : 'Last'}`,
+      stepName: `${stepName} > ${searchRecordOutputSchema[searchResultKey]?.label ?? 'First'}`,
       recordOutputSchema: recordSchema,
       selectedField: fieldName,
       path: pathSegments,
       isFullRecord,
+      stepNameLabel,
     });
+  }
+
+  if (searchResultKey === 'totalCount') {
+    const label =
+      searchRecordOutputSchema[searchResultKey]?.label ?? 'Total Count';
+    const basePath = `${stepName} > ${label}`;
+    return {
+      variableLabel: label,
+      variablePathLabel: stepNameLabel
+        ? `${basePath} (${stepNameLabel})`
+        : basePath,
+      variableType: FieldMetadataType.NUMBER,
+    };
+  }
+
+  if (searchResultKey === 'all') {
+    const label =
+      searchRecordOutputSchema[searchResultKey]?.label ?? 'All Records';
+    const basePath = `${stepName} > ${label}`;
+    return {
+      variableLabel:
+        searchRecordOutputSchema[searchResultKey]?.label ?? 'All Records',
+      variablePathLabel: stepNameLabel
+        ? `${basePath} (${stepNameLabel})`
+        : basePath,
+      variableType: FieldMetadataType.ARRAY,
+    };
   }
 
   return {

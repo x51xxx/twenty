@@ -8,27 +8,31 @@ import { SettingsDataModelFieldAddressSettingsFormCard } from '@/settings/data-m
 import { settingsDataModelFieldBooleanFormSchema } from '@/settings/data-model/fields/forms/boolean/components/SettingsDataModelFieldBooleanForm';
 import { SettingsDataModelFieldBooleanSettingsFormCard } from '@/settings/data-model/fields/forms/boolean/components/SettingsDataModelFieldBooleanSettingsFormCard';
 import { SettingsDataModelFieldIsUniqueForm } from '@/settings/data-model/fields/forms/components/SettingsDataModelFieldIsUniqueForm';
+import { SettingsDataModelFieldMaxValuesForm } from '@/settings/data-model/fields/forms/components/SettingsDataModelFieldMaxValuesForm';
 import { settingsDataModelFieldTextFormSchema } from '@/settings/data-model/fields/forms/components/text/SettingsDataModelFieldTextForm';
 import { SettingsDataModelFieldTextSettingsFormCard } from '@/settings/data-model/fields/forms/components/text/SettingsDataModelFieldTextSettingsFormCard';
 import { settingsDataModelFieldCurrencyFormSchema } from '@/settings/data-model/fields/forms/currency/components/SettingsDataModelFieldCurrencyForm';
 import { SettingsDataModelFieldCurrencySettingsFormCard } from '@/settings/data-model/fields/forms/currency/components/SettingsDataModelFieldCurrencySettingsFormCard';
 import { settingsDataModelFieldDateFormSchema } from '@/settings/data-model/fields/forms/date/components/SettingsDataModelFieldDateForm';
 import { SettingsDataModelFieldDateSettingsFormCard } from '@/settings/data-model/fields/forms/date/components/SettingsDataModelFieldDateSettingsFormCard';
-import { settingsDataModelFieldMorphRelationFormSchema } from '@/settings/data-model/fields/forms/morph-relation/components/SettingsDataModelFieldMorphRelationForm';
-
-import { SettingsDataModelFieldMorphRelationFormCard } from '@/settings/data-model/fields/forms/morph-relation/components/SettingsDataModelFieldMorphRelationFormCard';
+import { settingsDataModelFieldMorphRelationFormSchema } from '@/settings/data-model/fields/forms/morph-relation/components/SettingsDataModelFieldRelationForm';
 import { settingsDataModelFieldNumberFormSchema } from '@/settings/data-model/fields/forms/number/components/SettingsDataModelFieldNumberForm';
 import { SettingsDataModelFieldNumberSettingsFormCard } from '@/settings/data-model/fields/forms/number/components/SettingsDataModelFieldNumberSettingsFormCard';
 import { settingsDataModelFieldPhonesFormSchema } from '@/settings/data-model/fields/forms/phones/components/SettingsDataModelFieldPhonesForm';
 import { SettingsDataModelFieldPhonesSettingsFormCard } from '@/settings/data-model/fields/forms/phones/components/SettingsDataModelFieldPhonesSettingsFormCard';
-import { settingsDataModelFieldRelationFormSchema } from '@/settings/data-model/fields/forms/relation/components/SettingsDataModelFieldRelationForm';
-import { SettingsDataModelFieldRelationSettingsFormCard } from '@/settings/data-model/fields/forms/relation/components/SettingsDataModelFieldRelationSettingsFormCard';
 import {
   settingsDataModelFieldMultiSelectFormSchema,
   settingsDataModelFieldSelectFormSchema,
 } from '@/settings/data-model/fields/forms/select/components/SettingsDataModelFieldSelectForm';
 import { SettingsDataModelFieldSelectSettingsFormCard } from '@/settings/data-model/fields/forms/select/components/SettingsDataModelFieldSelectSettingsFormCard';
 import { SettingsDataModelFieldPreviewWidget } from '@/settings/data-model/fields/preview/components/SettingsDataModelFieldPreviewWidget';
+
+import { Separator } from '@/settings/components/Separator';
+import { SettingsDataModelFieldOnClickActionForm } from '@/settings/data-model/fields/forms/components/SettingsDataModelFieldOnClickActionForm';
+import { SettingsDataModelFieldRelationFormCard } from '@/settings/data-model/fields/forms/morph-relation/components/SettingsDataModelFieldRelationFormCard';
+import { mergeSettingsSchemas } from '@/settings/data-model/fields/forms/utils/mergeSettingsSchema';
+import { settingsDataModelFieldMaxValuesSchema } from '@/settings/data-model/fields/forms/utils/settingsDataModelFieldMaxValuesSchema';
+import { settingsDataModelFieldOnClickActionSchema } from '@/settings/data-model/fields/forms/utils/settingsDataModelFieldOnClickActionSchema';
 import { useFormContext } from 'react-hook-form';
 import { FieldMetadataType } from '~/generated-metadata/graphql';
 import { type SettingsDataModelFieldEditFormValues } from '~/pages/settings/data-model/SettingsObjectFieldEdit';
@@ -39,56 +43,89 @@ const isUniqueFieldFormSchema = z.object({
 
 const booleanFieldFormSchema = z
   .object({ type: z.literal(FieldMetadataType.BOOLEAN) })
-  .merge(settingsDataModelFieldBooleanFormSchema);
+  .extend(settingsDataModelFieldBooleanFormSchema.shape);
 
 const currencyFieldFormSchema = z
   .object({ type: z.literal(FieldMetadataType.CURRENCY) })
-  .merge(settingsDataModelFieldCurrencyFormSchema);
+  .extend(settingsDataModelFieldCurrencyFormSchema.shape);
 
 const dateFieldFormSchema = z
   .object({ type: z.literal(FieldMetadataType.DATE) })
-  .merge(settingsDataModelFieldDateFormSchema)
-  .merge(isUniqueFieldFormSchema);
+  .extend(settingsDataModelFieldDateFormSchema.shape)
+  .extend(isUniqueFieldFormSchema.shape);
 
 const dateTimeFieldFormSchema = z
   .object({ type: z.literal(FieldMetadataType.DATE_TIME) })
-  .merge(settingsDataModelFieldDateFormSchema)
-  .merge(isUniqueFieldFormSchema);
+  .extend(settingsDataModelFieldDateFormSchema.shape)
+  .extend(isUniqueFieldFormSchema.shape);
 
 const relationFieldFormSchema = z
-  .object({ type: z.literal(FieldMetadataType.RELATION) })
-  .merge(settingsDataModelFieldRelationFormSchema);
+  .object({
+    type: z.literal(FieldMetadataType.RELATION),
+  })
+  .extend(settingsDataModelFieldMorphRelationFormSchema.shape);
 
 const morphRelationFieldFormSchema = z
-  .object({ type: z.literal(FieldMetadataType.MORPH_RELATION) })
-  .merge(settingsDataModelFieldMorphRelationFormSchema);
+  .object({
+    type: z.literal(FieldMetadataType.MORPH_RELATION),
+  })
+  .extend(settingsDataModelFieldMorphRelationFormSchema.shape);
 
 const selectFieldFormSchema = z
   .object({ type: z.literal(FieldMetadataType.SELECT) })
-  .merge(settingsDataModelFieldSelectFormSchema);
+  .extend(settingsDataModelFieldSelectFormSchema.shape);
 
 const multiSelectFieldFormSchema = z
   .object({ type: z.literal(FieldMetadataType.MULTI_SELECT) })
-  .merge(settingsDataModelFieldMultiSelectFormSchema);
+  .extend(settingsDataModelFieldMultiSelectFormSchema.shape);
 
 const numberFieldFormSchema = z
   .object({ type: z.literal(FieldMetadataType.NUMBER) })
-  .merge(settingsDataModelFieldNumberFormSchema)
-  .merge(isUniqueFieldFormSchema);
+  .extend(settingsDataModelFieldNumberFormSchema.shape)
+  .extend(isUniqueFieldFormSchema.shape);
 
 const textFieldFormSchema = z
   .object({ type: z.literal(FieldMetadataType.TEXT) })
-  .merge(settingsDataModelFieldTextFormSchema)
-  .merge(isUniqueFieldFormSchema);
+  .extend(settingsDataModelFieldTextFormSchema.shape)
+  .extend(isUniqueFieldFormSchema.shape);
 
 const addressFieldFormSchema = z
   .object({ type: z.literal(FieldMetadataType.ADDRESS) })
-  .merge(settingsDataModelFieldAddressFormSchema);
+  .extend(settingsDataModelFieldAddressFormSchema.shape);
 
 const phonesFieldFormSchema = z
   .object({ type: z.literal(FieldMetadataType.PHONES) })
-  .merge(settingsDataModelFieldPhonesFormSchema)
-  .merge(isUniqueFieldFormSchema);
+  .extend(settingsDataModelFieldPhonesFormSchema.shape)
+  .extend(isUniqueFieldFormSchema.shape);
+
+const emailsFieldFormSchema = z
+  .object({ type: z.literal(FieldMetadataType.EMAILS) })
+  .merge(
+    mergeSettingsSchemas(
+      settingsDataModelFieldMaxValuesSchema,
+      settingsDataModelFieldOnClickActionSchema,
+    ),
+  )
+  .extend(isUniqueFieldFormSchema.shape);
+
+const linksFieldFormSchema = z
+  .object({ type: z.literal(FieldMetadataType.LINKS) })
+  .merge(
+    mergeSettingsSchemas(
+      settingsDataModelFieldMaxValuesSchema,
+      settingsDataModelFieldOnClickActionSchema,
+    ),
+  )
+  .extend(isUniqueFieldFormSchema.shape);
+
+const arrayFieldFormSchema = z
+  .object({ type: z.literal(FieldMetadataType.ARRAY) })
+  .merge(mergeSettingsSchemas(settingsDataModelFieldMaxValuesSchema))
+  .extend(isUniqueFieldFormSchema.shape);
+
+const filesFieldFormSchema = z
+  .object({ type: z.literal(FieldMetadataType.FILES) })
+  .merge(mergeSettingsSchemas(settingsDataModelFieldMaxValuesSchema));
 
 const otherFieldsFormSchema = z
   .object({
@@ -107,11 +144,15 @@ const otherFieldsFormSchema = z
           FieldMetadataType.ADDRESS,
           FieldMetadataType.PHONES,
           FieldMetadataType.TEXT,
+          FieldMetadataType.EMAILS,
+          FieldMetadataType.LINKS,
+          FieldMetadataType.ARRAY,
+          FieldMetadataType.FILES,
         ]),
       ) as [FieldMetadataType, ...FieldMetadataType[]],
     ),
   })
-  .merge(isUniqueFieldFormSchema);
+  .extend(isUniqueFieldFormSchema.shape);
 
 export const settingsDataModelFieldSettingsFormSchema = z.discriminatedUnion(
   'type',
@@ -128,6 +169,10 @@ export const settingsDataModelFieldSettingsFormSchema = z.discriminatedUnion(
     textFieldFormSchema,
     addressFieldFormSchema,
     phonesFieldFormSchema,
+    emailsFieldFormSchema,
+    linksFieldFormSchema,
+    arrayFieldFormSchema,
+    filesFieldFormSchema,
     otherFieldsFormSchema,
   ],
 );
@@ -136,6 +181,7 @@ type SettingsDataModelFieldSettingsFormCardProps = {
   existingFieldMetadataId: string;
   fieldType: FieldMetadataType;
   objectNameSingular: string;
+  disabled?: boolean;
 };
 
 const previewableTypes = [
@@ -146,6 +192,7 @@ const previewableTypes = [
   FieldMetadataType.DATE,
   FieldMetadataType.DATE_TIME,
   FieldMetadataType.EMAILS,
+  FieldMetadataType.FILES,
   FieldMetadataType.FULL_NAME,
   FieldMetadataType.LINKS,
   FieldMetadataType.MULTI_SELECT,
@@ -155,6 +202,7 @@ const previewableTypes = [
   FieldMetadataType.RAW_JSON,
   FieldMetadataType.RELATION,
   FieldMetadataType.MORPH_RELATION,
+  FieldMetadataType.RICH_TEXT,
   FieldMetadataType.SELECT,
   FieldMetadataType.TEXT,
   FieldMetadataType.UUID,
@@ -164,6 +212,7 @@ export const SettingsDataModelFieldSettingsFormCard = ({
   existingFieldMetadataId,
   fieldType,
   objectNameSingular,
+  disabled = false,
 }: SettingsDataModelFieldSettingsFormCardProps) => {
   const { watch } = useFormContext<SettingsDataModelFieldEditFormValues>();
 
@@ -176,6 +225,7 @@ export const SettingsDataModelFieldSettingsFormCard = ({
       <SettingsDataModelFieldBooleanSettingsFormCard
         existingFieldMetadataId={existingFieldMetadataId}
         objectNameSingular={objectNameSingular}
+        disabled={disabled}
       />
     );
   }
@@ -185,6 +235,7 @@ export const SettingsDataModelFieldSettingsFormCard = ({
       <SettingsDataModelFieldCurrencySettingsFormCard
         existingFieldMetadataId={existingFieldMetadataId}
         objectNameSingular={objectNameSingular}
+        disabled={disabled}
       />
     );
   }
@@ -198,24 +249,20 @@ export const SettingsDataModelFieldSettingsFormCard = ({
         existingFieldMetadataId={existingFieldMetadataId}
         fieldType={fieldType}
         objectNameSingular={objectNameSingular}
+        disabled={disabled}
       />
     );
   }
 
-  if (fieldType === FieldMetadataType.RELATION) {
+  if (
+    fieldType === FieldMetadataType.RELATION ||
+    fieldType === FieldMetadataType.MORPH_RELATION
+  ) {
     return (
-      <SettingsDataModelFieldRelationSettingsFormCard
+      <SettingsDataModelFieldRelationFormCard
         existingFieldMetadataId={existingFieldMetadataId}
         objectNameSingular={objectNameSingular}
-      />
-    );
-  }
-
-  if (fieldType === FieldMetadataType.MORPH_RELATION) {
-    return (
-      <SettingsDataModelFieldMorphRelationFormCard
-        existingFieldMetadataId={existingFieldMetadataId}
-        objectNameSingular={objectNameSingular}
+        disabled={disabled}
       />
     );
   }
@@ -225,6 +272,7 @@ export const SettingsDataModelFieldSettingsFormCard = ({
       <SettingsDataModelFieldNumberSettingsFormCard
         existingFieldMetadataId={existingFieldMetadataId}
         objectNameSingular={objectNameSingular}
+        disabled={disabled}
       />
     );
   }
@@ -234,6 +282,7 @@ export const SettingsDataModelFieldSettingsFormCard = ({
       <SettingsDataModelFieldTextSettingsFormCard
         existingFieldMetadataId={existingFieldMetadataId}
         objectNameSingular={objectNameSingular}
+        disabled={disabled}
       />
     );
   }
@@ -243,6 +292,7 @@ export const SettingsDataModelFieldSettingsFormCard = ({
       <SettingsDataModelFieldAddressSettingsFormCard
         existingFieldMetadataId={existingFieldMetadataId}
         objectNameSingular={objectNameSingular}
+        disabled={disabled}
       />
     );
   }
@@ -252,6 +302,7 @@ export const SettingsDataModelFieldSettingsFormCard = ({
       <SettingsDataModelFieldPhonesSettingsFormCard
         existingFieldMetadataId={existingFieldMetadataId}
         objectNameSingular={objectNameSingular}
+        disabled={disabled}
       />
     );
   }
@@ -265,6 +316,7 @@ export const SettingsDataModelFieldSettingsFormCard = ({
         existingFieldMetadataId={existingFieldMetadataId}
         fieldType={fieldType}
         objectNameSingular={objectNameSingular}
+        disabled={disabled}
       />
     );
   }
@@ -284,11 +336,45 @@ export const SettingsDataModelFieldSettingsFormCard = ({
         />
       }
       form={
-        <SettingsDataModelFieldIsUniqueForm
-          fieldType={fieldType}
-          existingFieldMetadataId={existingFieldMetadataId}
-          objectNameSingular={objectNameSingular}
-        />
+        <>
+          {[
+            FieldMetadataType.EMAILS,
+            FieldMetadataType.LINKS,
+            FieldMetadataType.ARRAY,
+            FieldMetadataType.FILES,
+          ].includes(fieldType) && (
+            <>
+              <SettingsDataModelFieldMaxValuesForm
+                existingFieldMetadataId={existingFieldMetadataId}
+                fieldType={fieldType}
+                disabled={disabled}
+              />
+              <Separator />
+            </>
+          )}
+          {[FieldMetadataType.EMAILS, FieldMetadataType.LINKS].includes(
+            fieldType,
+          ) && (
+            <>
+              <SettingsDataModelFieldOnClickActionForm
+                existingFieldMetadataId={existingFieldMetadataId}
+                fieldType={
+                  fieldType as
+                    | FieldMetadataType.EMAILS
+                    | FieldMetadataType.LINKS
+                }
+                disabled={disabled}
+              />
+              <Separator />
+            </>
+          )}
+          <SettingsDataModelFieldIsUniqueForm
+            fieldType={fieldType}
+            existingFieldMetadataId={existingFieldMetadataId}
+            objectNameSingular={objectNameSingular}
+            disabled={disabled}
+          />
+        </>
       }
     />
   );

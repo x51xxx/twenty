@@ -1,22 +1,25 @@
-import { Trans, useLingui } from '@lingui/react/macro';
-
+import { currentWorkspaceMemberState } from '@/auth/states/currentWorkspaceMemberState';
 import { SettingsCard } from '@/settings/components/SettingsCard';
 import { SettingsPageContainer } from '@/settings/components/SettingsPageContainer';
-import { ChangePassword } from '@/settings/profile/components/ChangePassword';
+import { SetOrChangePassword } from '@/settings/profile/components/SetOrChangePassword';
 import { DeleteAccount } from '@/settings/profile/components/DeleteAccount';
 import { EmailField } from '@/settings/profile/components/EmailField';
 import { NameFields } from '@/settings/profile/components/NameFields';
-import { ProfilePictureUploader } from '@/settings/profile/components/ProfilePictureUploader';
+import { WorkspaceMemberPictureUploader } from '@/settings/workspace-member/components/WorkspaceMemberPictureUploader';
+import { useCanChangePassword } from '@/settings/profile/hooks/useCanChangePassword';
 import { useCurrentUserWorkspaceTwoFactorAuthentication } from '@/settings/two-factor-authentication/hooks/useCurrentUserWorkspaceTwoFactorAuthentication';
-import { SettingsPath } from '@/types/SettingsPath';
 import { SubMenuTopBarContainer } from '@/ui/layout/page/components/SubMenuTopBarContainer';
+import { Trans, useLingui } from '@lingui/react/macro';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
+import { SettingsPath } from 'twenty-shared/types';
+import { getSettingsPath } from 'twenty-shared/utils';
 import { H2Title, IconShield, Status } from 'twenty-ui/display';
 import { Section } from 'twenty-ui/layout';
 import { UndecoratedLink } from 'twenty-ui/navigation';
-import { getSettingsPath } from '~/utils/navigation/getSettingsPath';
 
 export const SettingsProfile = () => {
   const { t } = useLingui();
+  const currentWorkspaceMember = useAtomStateValue(currentWorkspaceMemberState);
 
   const { currentUserWorkspaceTwoFactorAuthenticationMethods } =
     useCurrentUserWorkspaceTwoFactorAuthentication();
@@ -24,6 +27,12 @@ export const SettingsProfile = () => {
   const has2FAMethod =
     currentUserWorkspaceTwoFactorAuthenticationMethods['TOTP']?.status ===
     'VERIFIED';
+
+  const { canChangePassword } = useCanChangePassword();
+
+  if (!currentWorkspaceMember?.id) {
+    return null;
+  }
 
   return (
     <SubMenuTopBarContainer
@@ -39,7 +48,9 @@ export const SettingsProfile = () => {
       <SettingsPageContainer>
         <Section>
           <H2Title title={t`Picture`} />
-          <ProfilePictureUploader />
+          <WorkspaceMemberPictureUploader
+            workspaceMemberId={currentWorkspaceMember.id}
+          />
         </Section>
         <Section>
           <H2Title
@@ -71,17 +82,19 @@ export const SettingsProfile = () => {
               Icon={<IconShield />}
               Status={
                 has2FAMethod ? (
-                  <Status text={'Active'} color={'turquoise'} />
+                  <Status text={t`Active`} color="turquoise" />
                 ) : (
-                  <Status text={'Deactivated'} color={'gray'} />
+                  <Status text={t`Deactivated`} color="gray" />
                 )
               }
             />
           </UndecoratedLink>
         </Section>
-        <Section>
-          <ChangePassword />
-        </Section>
+        {canChangePassword && (
+          <Section>
+            <SetOrChangePassword />
+          </Section>
+        )}
         <Section>
           <DeleteAccount />
         </Section>

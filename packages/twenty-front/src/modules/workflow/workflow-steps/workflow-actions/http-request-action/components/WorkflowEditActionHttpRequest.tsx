@@ -3,35 +3,34 @@ import { FormTextFieldInput } from '@/object-record/record-field/ui/form-types/c
 import { Select } from '@/ui/input/components/Select';
 import { type WorkflowHttpRequestAction } from '@/workflow/types/Workflow';
 import { WorkflowStepBody } from '@/workflow/workflow-steps/components/WorkflowStepBody';
-import { WorkflowStepHeader } from '@/workflow/workflow-steps/components/WorkflowStepHeader';
-import { useWorkflowActionHeader } from '@/workflow/workflow-steps/workflow-actions/hooks/useWorkflowActionHeader';
 
-import { CmdEnterActionButton } from '@/action-menu/components/CmdEnterActionButton';
+import { WorkflowStepCmdEnterButton } from '@/workflow/workflow-steps/components/WorkflowStepCmdEnterButton';
 import { GenericDropdownContentWidth } from '@/ui/layout/dropdown/constants/GenericDropdownContentWidth';
-import { RightDrawerFooter } from '@/ui/layout/right-drawer/components/RightDrawerFooter';
 import { TabList } from '@/ui/layout/tab-list/components/TabList';
 import { activeTabIdComponentState } from '@/ui/layout/tab-list/states/activeTabIdComponentState';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+import { WorkflowStepFooter } from '@/workflow/workflow-steps/components/WorkflowStepFooter';
+import { getBodyTypeFromHeaders } from '@/workflow/workflow-steps/workflow-actions/http-request-action/utils/getBodyTypeFromHeaders';
 import { isMethodWithBody } from '@/workflow/workflow-steps/workflow-actions/http-request-action/utils/isMethodWithBody';
 import { WorkflowVariablePicker } from '@/workflow/workflow-variables/components/WorkflowVariablePicker';
-import { useTheme } from '@emotion/react';
-import styled from '@emotion/styled';
-import { useEffect } from 'react';
-import { IconPlayerPlay, IconSettings, useIcons } from 'twenty-ui/display';
+import { styled } from '@linaria/react';
+import { useLingui } from '@lingui/react/macro';
+import { useContext, useEffect } from 'react';
+import { IconPlayerPlay, IconSettings } from 'twenty-ui/display';
 import {
   HTTP_METHODS,
   JSON_RESPONSE_PLACEHOLDER,
-} from '../constants/HttpRequest';
-import { WORKFLOW_HTTP_REQUEST_TAB_LIST_COMPONENT_ID } from '../constants/WorkflowHttpRequestTabListComponentId';
-import { useHttpRequestForm } from '../hooks/useHttpRequestForm';
-import { useHttpRequestOutputSchema } from '../hooks/useHttpRequestOutputSchema';
-import { useTestHttpRequest } from '../hooks/useTestHttpRequest';
-import { WorkflowHttpRequestTabId } from '../types/WorkflowHttpRequestTabId';
+} from '@/workflow/workflow-steps/workflow-actions/http-request-action/constants/HttpRequest';
+import { WORKFLOW_HTTP_REQUEST_TAB_LIST_COMPONENT_ID } from '@/workflow/workflow-steps/workflow-actions/http-request-action/constants/WorkflowHttpRequestTabListComponentId';
+import { useHttpRequestForm } from '@/workflow/workflow-steps/workflow-actions/http-request-action/hooks/useHttpRequestForm';
+import { useHttpRequestOutputSchema } from '@/workflow/workflow-steps/workflow-actions/http-request-action/hooks/useHttpRequestOutputSchema';
+import { useTestHttpRequest } from '@/workflow/workflow-steps/workflow-actions/http-request-action/hooks/useTestHttpRequest';
+import { WorkflowHttpRequestTabId } from '@/workflow/workflow-steps/workflow-actions/http-request-action/types/WorkflowHttpRequestTabId';
 import { BodyInput } from './BodyInput';
 import { HttpRequestExecutionResult } from './HttpRequestExecutionResult';
 import { HttpRequestTestVariableInput } from './HttpRequestTestVariableInput';
 import { KeyValuePairInput } from './KeyValuePairInput';
-
+import { themeCssVariables, ThemeContext } from 'twenty-ui/theme-constants';
 type WorkflowEditActionHttpRequestProps = {
   action: WorkflowHttpRequestAction;
   actionOptions: {
@@ -40,42 +39,42 @@ type WorkflowEditActionHttpRequestProps = {
   };
 };
 
-const StyledTabList = styled(TabList)`
-  background-color: ${({ theme }) => theme.background.secondary};
-  padding-left: ${({ theme }) => theme.spacing(2)};
+const StyledTabListContainer = styled.div`
+  background-color: ${themeCssVariables.background.secondary};
+  padding-left: ${themeCssVariables.spacing[2]};
 `;
 
 const StyledTestTabContent = styled.div`
   display: flex;
-  flex-direction: column;
   flex: 1;
-  gap: ${({ theme }) => theme.spacing(4)};
+  flex-direction: column;
+  gap: ${themeCssVariables.spacing[4]};
   height: 100%;
   min-height: 400px;
 `;
 
 const StyledConfigurationTabContent = styled.div`
   display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.spacing(4)};
-  height: 100%;
   flex: 1;
+  flex-direction: column;
+  gap: ${themeCssVariables.spacing[4]};
+  height: 100%;
 `;
 
-const StyledFullHeightFormRawJsonFieldInput = styled(FormRawJsonFieldInput)`
-  flex: 1;
+const StyledFullHeightFormRawJsonFieldInputContainer = styled.div`
   display: flex;
+  flex: 1;
   flex-direction: column;
 
   & > div:last-child {
-    flex: 1;
     display: flex;
+    flex: 1;
     flex-direction: column;
 
     & > div {
       flex: 1;
-      max-height: none !important;
       height: 100%;
+      max-height: none !important;
 
       & > div {
         height: 100%;
@@ -88,31 +87,24 @@ export const WorkflowEditActionHttpRequest = ({
   action,
   actionOptions,
 }: WorkflowEditActionHttpRequestProps) => {
-  const theme = useTheme();
-  const { getIcon } = useIcons();
-  const activeTabId = useRecoilComponentValue(
+  const { t } = useLingui();
+  const { theme } = useContext(ThemeContext);
+  const activeTabId = useAtomComponentStateValue(
     activeTabIdComponentState,
     WORKFLOW_HTTP_REQUEST_TAB_LIST_COMPONENT_ID,
   );
-  const { headerTitle, headerIcon, headerIconColor, headerType } =
-    useWorkflowActionHeader({
-      action,
-      defaultTitle: 'HTTP Request',
-    });
 
   const { formData, handleFieldChange, saveAction } = useHttpRequestForm({
     action,
     onActionUpdate: actionOptions.onActionUpdate,
     readonly: actionOptions.readonly === true,
   });
-
   const { outputSchema, handleOutputSchemaChange, error } =
     useHttpRequestOutputSchema({
       action,
       onActionUpdate: actionOptions.onActionUpdate,
       readonly: actionOptions.readonly === true,
     });
-
   const { testHttpRequest, isTesting, httpRequestTestData } =
     useTestHttpRequest(action.id);
 
@@ -126,81 +118,78 @@ export const WorkflowEditActionHttpRequest = ({
   const tabs = [
     {
       id: WorkflowHttpRequestTabId.CONFIGURATION,
-      title: 'Configuration',
+      title: t`Configuration`,
       Icon: IconSettings,
     },
-    { id: WorkflowHttpRequestTabId.TEST, title: 'Test', Icon: IconPlayerPlay },
+    { id: WorkflowHttpRequestTabId.TEST, title: t`Test`, Icon: IconPlayerPlay },
   ];
 
   useEffect(() => () => saveAction.flush(), [saveAction]);
 
   return (
     <>
-      <StyledTabList
-        tabs={tabs}
-        behaveAsLinks={false}
-        componentInstanceId={WORKFLOW_HTTP_REQUEST_TAB_LIST_COMPONENT_ID}
-      />
-      <WorkflowStepHeader
-        onTitleChange={(newName: string) => {
-          if (actionOptions.readonly === true) {
-            return;
-          }
-          actionOptions.onActionUpdate?.({ ...action, name: newName });
-        }}
-        Icon={getIcon(headerIcon)}
-        iconColor={headerIconColor}
-        initialTitle={headerTitle}
-        headerType={headerType}
-        disabled={actionOptions.readonly}
-      />
+      <StyledTabListContainer>
+        <TabList
+          tabs={tabs}
+          behaveAsLinks={false}
+          componentInstanceId={WORKFLOW_HTTP_REQUEST_TAB_LIST_COMPONENT_ID}
+        />
+      </StyledTabListContainer>
       <WorkflowStepBody>
         {activeTabId === WorkflowHttpRequestTabId.CONFIGURATION && (
           <StyledConfigurationTabContent>
             <FormTextFieldInput
-              label="URL"
-              placeholder="https://api.example.com/endpoint"
+              label={t`URL`}
+              placeholder={t`https://api.example.com/endpoint`}
               readonly={actionOptions.readonly}
               defaultValue={formData.url}
               onChange={(value) => handleFieldChange('url', value)}
               VariablePicker={WorkflowVariablePicker}
             />
             <Select
-              label="HTTP Method"
+              label={t`HTTP Method`}
               dropdownId="http-method"
               options={[...HTTP_METHODS]}
               value={formData.method}
               onChange={(value) => handleFieldChange('method', value)}
               disabled={actionOptions.readonly}
-              dropdownOffset={{ y: parseInt(theme.spacing(1), 10) }}
+              dropdownOffset={{
+                y: parseInt(theme.spacing[1], 10),
+              }}
               dropdownWidth={GenericDropdownContentWidth.ExtraLarge}
             />
 
             <KeyValuePairInput
-              label="Headers Input"
+              key={getBodyTypeFromHeaders(formData.headers) || 'none'}
+              label={t`Headers Input`}
               defaultValue={formData.headers}
               onChange={(value) => handleFieldChange('headers', value)}
               readonly={actionOptions.readonly}
-              keyPlaceholder="Header name"
-              valuePlaceholder="Header value"
+              keyPlaceholder={t`Header name`}
+              valuePlaceholder={t`Header value`}
             />
 
             {isMethodWithBody(formData.method) && (
               <BodyInput
                 defaultValue={formData.body}
-                onChange={(value) => handleFieldChange('body', value)}
+                onChange={(value, type = 'body') =>
+                  handleFieldChange(type, value)
+                }
                 readonly={actionOptions.readonly}
+                headers={formData.headers}
               />
             )}
 
-            <StyledFullHeightFormRawJsonFieldInput
-              label="Expected Response Body"
-              placeholder={JSON_RESPONSE_PLACEHOLDER}
-              defaultValue={outputSchema}
-              onChange={handleOutputSchemaChange}
-              readonly={actionOptions.readonly}
-              error={error}
-            />
+            <StyledFullHeightFormRawJsonFieldInputContainer>
+              <FormRawJsonFieldInput
+                label={t`Expected Response Body`}
+                placeholder={JSON_RESPONSE_PLACEHOLDER}
+                defaultValue={outputSchema}
+                onChange={handleOutputSchemaChange}
+                readonly={actionOptions.readonly}
+                error={error}
+              />
+            </StyledFullHeightFormRawJsonFieldInputContainer>
           </StyledConfigurationTabContent>
         )}
         {activeTabId === WorkflowHttpRequestTabId.TEST && (
@@ -217,15 +206,20 @@ export const WorkflowEditActionHttpRequest = ({
           </StyledTestTabContent>
         )}
       </WorkflowStepBody>
-      {activeTabId === WorkflowHttpRequestTabId.TEST && (
-        <RightDrawerFooter
-          actions={[
-            <CmdEnterActionButton
-              title="Test"
-              onClick={handleTestRequest}
-              disabled={isTesting || actionOptions.readonly}
-            />,
-          ]}
+      {!actionOptions.readonly && (
+        <WorkflowStepFooter
+          stepId={action.id}
+          additionalActions={
+            activeTabId === WorkflowHttpRequestTabId.TEST
+              ? [
+                  <WorkflowStepCmdEnterButton
+                    title={t`Test`}
+                    onClick={handleTestRequest}
+                    disabled={isTesting}
+                  />,
+                ]
+              : []
+          }
         />
       )}
     </>

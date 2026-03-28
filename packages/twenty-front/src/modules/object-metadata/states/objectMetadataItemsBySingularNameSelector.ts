@@ -1,27 +1,22 @@
-import { selectorFamily } from 'recoil';
+import { objectMetadataItemsWithFieldsSelector } from '@/object-metadata/states/objectMetadataItemsWithFieldsSelector';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
+import { createAtomFamilySelector } from '@/ui/utilities/state/jotai/utils/createAtomFamilySelector';
 
-import { objectMetadataItemsState } from '@/object-metadata/states/objectMetadataItemsState';
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
-import { isDefined } from 'twenty-shared/utils';
+export const objectMetadataItemsBySingularNameSelector =
+  createAtomFamilySelector<EnrichedObjectMetadataItem[], string[]>({
+    key: 'objectMetadataItemsSelector',
+    get:
+      (objectNameSingulars: string[]) =>
+      ({ get }) => {
+        const objectMetadataItems = get(objectMetadataItemsWithFieldsSelector);
 
-export const objectMetadataItemsBySingularNameSelector = selectorFamily<
-  ObjectMetadataItem[],
-  string[]
->({
-  key: 'objectMetadataItemsSelector',
-  get:
-    (objectNameSingulars: string[]) =>
-    ({ get }) => {
-      const objectMetadataItems = get(objectMetadataItemsState);
+        return objectNameSingulars.flatMap((objectNameSingular) => {
+          const found = objectMetadataItems.find(
+            (objectMetadataItem) =>
+              objectMetadataItem.nameSingular === objectNameSingular,
+          );
 
-      return objectNameSingulars
-        .map(
-          (objectNameSingular) =>
-            objectMetadataItems.find(
-              (objectMetadataItem) =>
-                objectMetadataItem.nameSingular === objectNameSingular,
-            ) ?? null,
-        )
-        .filter(isDefined);
-    },
-});
+          return found !== undefined ? [found] : [];
+        });
+      },
+  });

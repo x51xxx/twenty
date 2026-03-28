@@ -1,14 +1,16 @@
-import styled from '@emotion/styled';
-import { Button } from 'twenty-ui/input';
+import { styled } from '@linaria/react';
+import { t } from '@lingui/core/macro';
 import { IconArrowBackUp, IconUserCircle } from 'twenty-ui/display';
+import { Button } from 'twenty-ui/input';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 const StyledThreadBottomBar = styled.div`
   align-items: center;
   display: flex;
-  gap: ${({ theme }) => theme.spacing(2)};
-  padding-left: ${({ theme }) => theme.spacing(6)};
-  padding-right: ${({ theme }) => theme.spacing(6)};
-  padding-top: ${({ theme }) => theme.spacing(4)};
+  gap: ${themeCssVariables.spacing[2]};
+  padding-left: ${themeCssVariables.spacing[6]};
+  padding-right: ${themeCssVariables.spacing[6]};
+  padding-top: ${themeCssVariables.spacing[4]};
 `;
 
 export const ThreadBottomBar = () => {
@@ -16,19 +18,19 @@ export const ThreadBottomBar = () => {
     <StyledThreadBottomBar>
       <Button
         Icon={IconArrowBackUp}
-        title="Reply"
+        title={t`Reply`}
         variant="secondary"
         accent="default"
       />
       <Button
         Icon={IconArrowBackUp}
-        title="Reply to all"
+        title={t`Reply to all`}
         variant="secondary"
         accent="default"
       />
       <Button
         Icon={IconUserCircle}
-        title="Share"
+        title={t`Share`}
         variant="secondary"
         accent="default"
       />

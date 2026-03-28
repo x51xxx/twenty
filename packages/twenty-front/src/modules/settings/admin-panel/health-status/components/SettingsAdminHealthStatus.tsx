@@ -1,14 +1,18 @@
 import { SettingsAdminTabSkeletonLoader } from '@/settings/admin-panel/components/SettingsAdminTabSkeletonLoader';
-import { SettingsHealthStatusListCard } from '@/settings/admin-panel/health-status/components/SettingsHealthStatusListCard';
+import { SettingsAdminHealthStatusListCard } from '@/settings/admin-panel/health-status/components/SettingsAdminHealthStatusListCard';
 import { t } from '@lingui/core/macro';
 import { H2Title } from 'twenty-ui/display';
 import { Section } from 'twenty-ui/layout';
-import { useGetSystemHealthStatusQuery } from '~/generated-metadata/graphql';
+import { useQuery } from '@apollo/client/react';
+import { GetSystemHealthStatusDocument } from '~/generated-metadata/graphql';
 
 export const SettingsAdminHealthStatus = () => {
-  const { data, loading: loadingHealthStatus } = useGetSystemHealthStatusQuery({
-    fetchPolicy: 'network-only',
-  });
+  const { data, loading: loadingHealthStatus } = useQuery(
+    GetSystemHealthStatusDocument,
+    {
+      fetchPolicy: 'network-only',
+    },
+  );
 
   const services = data?.getSystemHealthStatus.services ?? [];
 
@@ -23,7 +27,7 @@ export const SettingsAdminHealthStatus = () => {
           title={t`Health Status`}
           description={t`How your system is doing`}
         />
-        <SettingsHealthStatusListCard
+        <SettingsAdminHealthStatusListCard
           services={services}
           loading={loadingHealthStatus}
         />

@@ -1,25 +1,29 @@
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import { Droppable } from '@hello-pangea/dnd';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 import { RecordBoardColumnCardsContainer } from '@/object-record/record-board/record-board-column/components/RecordBoardColumnCardsContainer';
 import { RecordBoardColumnContext } from '@/object-record/record-board/record-board-column/contexts/RecordBoardColumnContext';
+import { useShouldHideRecordGroup } from '@/object-record/record-group/hooks/useShouldHideRecordGroup';
 import { recordGroupDefinitionFamilyState } from '@/object-record/record-group/states/recordGroupDefinitionFamilyState';
 import { recordIndexRecordIdsByGroupComponentFamilyState } from '@/object-record/record-index/states/recordIndexRecordIdsByGroupComponentFamilyState';
-import { useRecoilComponentFamilyValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentFamilyValue';
-import { useRecoilValue } from 'recoil';
+import { DragAndDropLibraryLegacyReRenderBreaker } from '@/ui/drag-and-drop/components/DragAndDropReRenderBreaker';
+import { useAtomFamilyStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomFamilyStateValue';
+import { useAtomComponentFamilyStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentFamilyStateValue';
+import { isDefined } from 'twenty-shared/utils';
 
 const StyledColumn = styled.div`
-  background-color: ${({ theme }) => theme.background.primary};
+  background-color: ${themeCssVariables.background.primary};
   display: flex;
-  flex-direction: column;
-  max-width: 200px;
-  min-width: 200px;
-  min-height: 100%;
   flex: 1;
-  padding: ${({ theme }) => theme.spacing(2)};
+  flex-direction: column;
+  height: 100%;
+  max-width: 200px;
+  min-height: 100%;
+  min-width: 200px;
+  padding: ${themeCssVariables.spacing[2]};
   padding-top: 0px;
   position: relative;
-  height: 100%;
 `;
 
 type RecordBoardColumnProps = {
@@ -31,16 +35,22 @@ export const RecordBoardColumn = ({
   recordBoardColumnId,
   recordBoardColumnIndex,
 }: RecordBoardColumnProps) => {
-  const recordGroupDefinition = useRecoilValue(
-    recordGroupDefinitionFamilyState(recordBoardColumnId),
+  const recordGroupDefinition = useAtomFamilyStateValue(
+    recordGroupDefinitionFamilyState,
+    recordBoardColumnId,
   );
-
-  const recordIdsByGroup = useRecoilComponentFamilyValue(
+  const recordIndexRecordIdsByGroup = useAtomComponentFamilyStateValue(
     recordIndexRecordIdsByGroupComponentFamilyState,
     recordBoardColumnId,
   );
 
-  if (!recordGroupDefinition) {
+  const shouldHide = useShouldHideRecordGroup(recordBoardColumnId);
+
+  if (shouldHide) {
+    return null;
+  }
+
+  if (!isDefined(recordGroupDefinition)) {
     return null;
   }
 
@@ -49,17 +59,22 @@ export const RecordBoardColumn = ({
       value={{
         columnDefinition: recordGroupDefinition,
         columnId: recordBoardColumnId,
-        recordIds: recordIdsByGroup,
+        recordIds: recordIndexRecordIdsByGroup,
         columnIndex: recordBoardColumnIndex,
       }}
     >
       <Droppable droppableId={recordBoardColumnId}>
         {(droppableProvided) => (
           <StyledColumn>
-            <RecordBoardColumnCardsContainer
-              droppableProvided={droppableProvided}
-              recordIds={recordIdsByGroup}
-            />
+            <DragAndDropLibraryLegacyReRenderBreaker
+              memoizationId={recordBoardColumnId}
+            >
+              <RecordBoardColumnCardsContainer
+                droppableProvided={droppableProvided}
+                recordBoardColumnId={recordBoardColumnId}
+              />
+            </DragAndDropLibraryLegacyReRenderBreaker>
+            {droppableProvided.placeholder}
           </StyledColumn>
         )}
       </Droppable>

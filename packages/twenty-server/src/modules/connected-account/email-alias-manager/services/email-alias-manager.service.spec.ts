@@ -1,50 +1,50 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 
-import { type Repository } from 'typeorm';
 import { ConnectedAccountProvider } from 'twenty-shared/types';
 
-import { TwentyORMManager } from 'src/engine/twenty-orm/twenty-orm.manager';
-import { GoogleEmailAliasManagerService } from 'src/modules/connected-account/email-alias-manager/drivers/google/google-email-alias-manager.service';
-import { MicrosoftEmailAliasManagerService } from 'src/modules/connected-account/email-alias-manager/drivers/microsoft/microsoft-email-alias-manager.service';
+import { ConnectedAccountDataAccessService } from 'src/engine/metadata-modules/connected-account/data-access/services/connected-account-data-access.service';
+import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
+import { GoogleEmailAliasManagerService } from 'src/modules/connected-account/email-alias-manager/drivers/google/services/google-email-alias-manager.service';
 import { microsoftGraphMeResponseWithProxyAddresses } from 'src/modules/connected-account/email-alias-manager/drivers/microsoft/mocks/microsoft-api-examples';
+import { MicrosoftEmailAliasManagerService } from 'src/modules/connected-account/email-alias-manager/drivers/microsoft/services/microsoft-email-alias-manager.service';
+import { OAuth2ClientManagerService } from 'src/modules/connected-account/oauth2-client-manager/services/oauth2-client-manager.service';
 import { type ConnectedAccountWorkspaceEntity } from 'src/modules/connected-account/standard-objects/connected-account.workspace-entity';
-import { MicrosoftClientProvider } from 'src/modules/messaging/message-import-manager/drivers/microsoft/providers/microsoft-client.provider';
 
 import { EmailAliasManagerService } from './email-alias-manager.service';
 
 describe('Email Alias Manager Service', () => {
   let emailAliasManagerService: EmailAliasManagerService;
   let microsoftEmailAliasManagerService: MicrosoftEmailAliasManagerService;
-  let connectedAccountRepository: Partial<
-    Repository<ConnectedAccountWorkspaceEntity>
-  >;
+  const mockConnectedAccountDataAccessService = {
+    // @ts-expect-error legacy noImplicitAny
+    update: jest.fn().mockResolvedValue((arg) => arg),
+  };
 
   beforeEach(async () => {
-    connectedAccountRepository = {
-      // @ts-expect-error legacy noImplicitAny
-      update: jest.fn().mockResolvedValue((arg) => arg),
-    };
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         {
-          provide: TwentyORMManager,
+          provide: GlobalWorkspaceOrmManager,
           useValue: {
-            getRepository: jest
+            executeInWorkspaceContext: jest
               .fn()
-              .mockResolvedValue(connectedAccountRepository),
+              .mockImplementation((fn: () => any, _authContext?: any) => fn()),
           },
         },
         EmailAliasManagerService,
+        {
+          provide: ConnectedAccountDataAccessService,
+          useValue: mockConnectedAccountDataAccessService,
+        },
         {
           provide: GoogleEmailAliasManagerService,
           useValue: {},
         },
         MicrosoftEmailAliasManagerService,
         {
-          provide: MicrosoftClientProvider,
+          provide: OAuth2ClientManagerService,
           useValue: {
-            getMicrosoftClient: jest.fn().mockResolvedValue({
+            getMicrosoftOAuth2Client: jest.fn().mockResolvedValue({
               api: jest.fn().mockReturnValue({
                 get: jest
                   .fn()
@@ -86,13 +86,15 @@ describe('Email Alias Manager Service', () => {
 
       await emailAliasManagerService.refreshHandleAliases(
         mockConnectedAccount as ConnectedAccountWorkspaceEntity,
+        'test-workspace-id',
       );
 
       expect(
         microsoftEmailAliasManagerService.getHandleAliases,
       ).toHaveBeenCalledWith(mockConnectedAccount);
 
-      expect(connectedAccountRepository.update).toHaveBeenCalledWith(
+      expect(mockConnectedAccountDataAccessService.update).toHaveBeenCalledWith(
+        'test-workspace-id',
         { id: mockConnectedAccount.id },
         {
           handleAliases: expectedAliases,

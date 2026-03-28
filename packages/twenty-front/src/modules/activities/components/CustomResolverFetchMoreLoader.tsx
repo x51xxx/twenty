@@ -1,20 +1,25 @@
+import { styled } from '@linaria/react';
+import { t } from '@lingui/core/macro';
 import { useInView } from 'react-intersection-observer';
-import styled from '@emotion/styled';
-import { GRAY_SCALE } from 'twenty-ui/theme';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 type CustomResolverFetchMoreLoaderProps = {
   loading: boolean;
   onLastRowVisible: (...args: any[]) => any;
 };
 
+const StyledContainer = styled.div`
+  min-height: 1px;
+`;
+
 const StyledText = styled.div`
   align-items: center;
   box-shadow: none;
-  color: ${GRAY_SCALE.gray40};
+  color: ${themeCssVariables.grayScale.gray9};
   display: flex;
   height: 32px;
-  margin-left: ${({ theme }) => theme.spacing(8)};
-  padding-left: ${({ theme }) => theme.spacing(2)};
+  margin-left: ${themeCssVariables.spacing[8]};
+  padding-left: ${themeCssVariables.spacing[2]};
 `;
 
 export const CustomResolverFetchMoreLoader = ({
@@ -22,12 +27,16 @@ export const CustomResolverFetchMoreLoader = ({
   onLastRowVisible,
 }: CustomResolverFetchMoreLoaderProps) => {
   const { ref: tbodyRef } = useInView({
-    onChange: onLastRowVisible,
+    onChange: (inView) => {
+      if (inView) {
+        onLastRowVisible();
+      }
+    },
   });
 
   return (
-    <div ref={tbodyRef}>
-      {loading && <StyledText>Loading more...</StyledText>}
-    </div>
+    <StyledContainer ref={tbodyRef}>
+      {loading && <StyledText>{t`Loading more...`}</StyledText>}
+    </StyledContainer>
   );
 };

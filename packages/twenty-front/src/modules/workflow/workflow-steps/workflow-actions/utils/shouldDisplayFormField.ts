@@ -1,9 +1,10 @@
-import { CustomError } from '@/error-handler/CustomError';
 import { type FieldMetadataItem } from '@/object-metadata/types/FieldMetadataItem';
+import { isHiddenSystemField } from '@/object-metadata/utils/isHiddenSystemField';
 import { type WorkflowActionType } from '@/workflow/types/Workflow';
+import { CustomError } from 'twenty-shared/utils';
 import { FieldMetadataType } from '~/generated-metadata/graphql';
 
-const COMMON_DISPLAYABLE_FIELD_TYPES = [
+const SUPPORTED_FORM_FIELD_TYPES = [
   FieldMetadataType.TEXT,
   FieldMetadataType.NUMBER,
   FieldMetadataType.DATE,
@@ -19,12 +20,9 @@ const COMMON_DISPLAYABLE_FIELD_TYPES = [
   FieldMetadataType.DATE_TIME,
   FieldMetadataType.RAW_JSON,
   FieldMetadataType.UUID,
-];
-
-const FIND_RECORDS_DISPLAYABLE_FIELD_TYPES = [
-  ...COMMON_DISPLAYABLE_FIELD_TYPES,
   FieldMetadataType.ARRAY,
   FieldMetadataType.RELATION,
+  FieldMetadataType.RICH_TEXT,
 ];
 
 export const shouldDisplayFormField = ({
@@ -34,35 +32,36 @@ export const shouldDisplayFormField = ({
   fieldMetadataItem: FieldMetadataItem;
   actionType: WorkflowActionType;
 }) => {
-  let isTypeAllowedForAction = false;
+  if (!SUPPORTED_FORM_FIELD_TYPES.includes(fieldMetadataItem.type)) {
+    return false;
+  }
+
   const isIdField = fieldMetadataItem.name === 'id';
+  const isNotSupportedRelation =
+    fieldMetadataItem.type === FieldMetadataType.RELATION &&
+    fieldMetadataItem.settings?.['relationType'] !== 'MANY_TO_ONE';
 
   switch (actionType) {
     case 'CREATE_RECORD':
-      isTypeAllowedForAction =
-        fieldMetadataItem.type !== FieldMetadataType.RELATION ||
-        fieldMetadataItem.settings?.['relationType'] === 'MANY_TO_ONE';
+    case 'UPDATE_RECORD':
       return (
-        isTypeAllowedForAction &&
-        !fieldMetadataItem.isSystem &&
+        !isNotSupportedRelation &&
+        !fieldMetadataItem.isUIReadOnly &&
+        !isHiddenSystemField(fieldMetadataItem) &&
         fieldMetadataItem.isActive
       );
-    case 'UPDATE_RECORD':
-      isTypeAllowedForAction =
-        COMMON_DISPLAYABLE_FIELD_TYPES.includes(fieldMetadataItem.type) ||
-        fieldMetadataItem.settings?.['relationType'] === 'MANY_TO_ONE';
+    case 'UPSERT_RECORD':
       return (
-        isTypeAllowedForAction &&
-        !fieldMetadataItem.isSystem &&
-        fieldMetadataItem.isActive
+        (!isNotSupportedRelation &&
+          !fieldMetadataItem.isUIReadOnly &&
+          !isHiddenSystemField(fieldMetadataItem) &&
+          fieldMetadataItem.isActive) ||
+        isIdField
       );
     case 'FIND_RECORDS':
-      isTypeAllowedForAction = FIND_RECORDS_DISPLAYABLE_FIELD_TYPES.includes(
-        fieldMetadataItem.type,
-      );
       return (
-        isTypeAllowedForAction &&
-        (!fieldMetadataItem.isSystem || isIdField) &&
+        !isNotSupportedRelation &&
+        (!isHiddenSystemField(fieldMetadataItem) || isIdField) &&
         fieldMetadataItem.isActive
       );
     default:

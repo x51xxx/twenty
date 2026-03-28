@@ -1,34 +1,12 @@
-import { type FlatFieldMetadata } from 'src/engine/metadata-modules/flat-field-metadata/types/flat-field-metadata.type';
-import { type FlatIndexMetadata } from 'src/engine/metadata-modules/flat-index-metadata/types/flat-index-metadata.type';
+import { type FlatEntityFrom } from 'src/engine/metadata-modules/flat-entity/types/flat-entity-from.type';
 import { type ObjectMetadataEntity } from 'src/engine/metadata-modules/object-metadata/object-metadata.entity';
-import { type ExtractRecordTypeOrmRelationProperties } from 'src/engine/workspace-manager/workspace-migration-v2/types/extract-record-typeorm-relation-properties.type';
-import { type MetadataEntitiesRelationTarget } from 'src/engine/workspace-manager/workspace-migration-v2/types/metadata-entities-relation-targets.type';
 
-export const objectMetadataEntityRelationProperties = [
-  'fields',
-  'indexMetadatas',
-  'targetRelationFields',
-  'dataSource',
-  'objectPermissions',
-  'fieldPermissions',
-] as const satisfies ObjectMetadataRelationProperties[];
-
-type ObjectMetadataRelationProperties = ExtractRecordTypeOrmRelationProperties<
-  ObjectMetadataEntity,
-  MetadataEntitiesRelationTarget
+type BaseFlatObjectMetadata = FlatEntityFrom<
+  Omit<ObjectMetadataEntity, 'dataSourceId'>
 >;
-
-export type FlatObjectMetadata = Omit<
-  ObjectMetadataEntity,
-  ObjectMetadataRelationProperties | 'dataSourceId'
-> & {
-  uniqueIdentifier: string;
-  flatIndexMetadatas: FlatIndexMetadata[];
-  flatFieldMetadatas: FlatFieldMetadata[];
+export type FlatObjectMetadata = BaseFlatObjectMetadata & {
+  // NOTE: below fields are not reflected on the final UniversalFlatEntity either they should we should define a common source
+  // TODO remove once https://github.com/twentyhq/core-team-issues/issues/2172 has been resolved
+  labelIdentifierFieldMetadataUniversalIdentifier: string | null;
+  imageIdentifierFieldMetadataUniversalIdentifier: string | null;
 };
-
-// Could be renamed
-export type FlatObjectMetadataWithoutFields = Omit<
-  FlatObjectMetadata,
-  'flatFieldMetadatas' | 'flatIndexMetadatas'
->;

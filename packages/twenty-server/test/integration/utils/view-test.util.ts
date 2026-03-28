@@ -1,15 +1,12 @@
-import { type ViewFieldEntity } from 'src/engine/core-modules/view/entities/view-field.entity';
-import { type ViewFilterGroupEntity } from 'src/engine/core-modules/view/entities/view-filter-group.entity';
-import { type ViewFilterEntity } from 'src/engine/core-modules/view/entities/view-filter.entity';
-import { type ViewGroupEntity } from 'src/engine/core-modules/view/entities/view-group.entity';
-import { type ViewSortEntity } from 'src/engine/core-modules/view/entities/view-sort.entity';
-import { type ViewEntity } from 'src/engine/core-modules/view/entities/view.entity';
-import { ViewFilterGroupLogicalOperator } from 'src/modules/view/standard-objects/view-filter-group.workspace-entity';
+import { ViewFilterGroupLogicalOperator } from 'twenty-shared/types';
 
-export const cleanupViewRecords = async (): Promise<void> => {
-  // @ts-expect-error legacy noImplicitAny
-  await global.testDataSource.query(`DELETE from "core"."view"`);
-};
+import { type ViewFieldGroupDTO } from 'src/engine/metadata-modules/view-field-group/dtos/view-field-group.dto';
+import { type ViewFieldEntity } from 'src/engine/metadata-modules/view-field/entities/view-field.entity';
+import { type ViewFilterGroupEntity } from 'src/engine/metadata-modules/view-filter-group/entities/view-filter-group.entity';
+import { type ViewFilterEntity } from 'src/engine/metadata-modules/view-filter/entities/view-filter.entity';
+import { type ViewGroupEntity } from 'src/engine/metadata-modules/view-group/entities/view-group.entity';
+import { type ViewSortEntity } from 'src/engine/metadata-modules/view-sort/entities/view-sort.entity';
+import { type ViewEntity } from 'src/engine/metadata-modules/view/entities/view.entity';
 
 export const assertViewStructure = (
   view: ViewEntity,
@@ -25,6 +22,22 @@ export const assertViewStructure = (
 
   if (expectedFields) {
     expect(view).toMatchObject(expectedFields);
+  }
+};
+
+export const assertViewFieldGroupStructure = (
+  viewFieldGroup: ViewFieldGroupDTO,
+  expectedFields?: Partial<ViewFieldGroupDTO>,
+) => {
+  expect(viewFieldGroup).toBeDefined();
+  expect(viewFieldGroup.id).toBeDefined();
+  expect(viewFieldGroup.name).toBeDefined();
+  expect(viewFieldGroup.viewId).toBeDefined();
+  expect(typeof viewFieldGroup.position).toBe('number');
+  expect(typeof viewFieldGroup.isVisible).toBe('boolean');
+
+  if (expectedFields) {
+    expect(viewFieldGroup).toMatchObject(expectedFields);
   }
 };
 
@@ -83,7 +96,6 @@ export const assertViewGroupStructure = (
 ) => {
   expect(viewGroup).toBeDefined();
   expect(viewGroup.id).toBeDefined();
-  expect(viewGroup.fieldMetadataId).toBeDefined();
   expect(viewGroup.viewId).toBeDefined();
   expect(viewGroup.fieldValue).toBeDefined();
   expect(typeof viewGroup.isVisible).toBe('boolean');

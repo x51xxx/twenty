@@ -27,10 +27,10 @@ export class AuditService {
     workspaceId?: string | null | undefined;
     userId?: string | null | undefined;
   }) {
-    const userIdAndWorkspaceId = context
+    const contextFields = context
       ? {
-          ...(context.userId ? { userId: context.userId } : {}),
           ...(context.workspaceId ? { workspaceId: context.workspaceId } : {}),
+          ...(context.userId ? { userId: context.userId } : {}),
         }
       : {};
 
@@ -41,7 +41,7 @@ export class AuditService {
       ) =>
         this.preventIfDisabled(() =>
           this.clickHouseService.insert('workspaceEvent', [
-            { ...userIdAndWorkspaceId, ...makeTrackEvent(event, properties) },
+            { ...contextFields, ...makeTrackEvent(event, properties) },
           ]),
         ),
       createObjectEvent: <T extends TrackEventName>(
@@ -49,20 +49,34 @@ export class AuditService {
         properties: TrackEventProperties<T> & {
           recordId: string;
           objectMetadataId: string;
+          isCustom?: boolean;
         },
-      ) =>
-        this.preventIfDisabled(() =>
+      ) => {
+        const { recordId, objectMetadataId, isCustom, ...restProperties } =
+          properties;
+
+        return this.preventIfDisabled(() =>
           this.clickHouseService.insert('objectEvent', [
-            { ...userIdAndWorkspaceId, ...makeTrackEvent(event, properties) },
+            {
+              ...contextFields,
+              ...makeTrackEvent(
+                event,
+                restProperties as unknown as TrackEventProperties<T>,
+              ),
+              recordId,
+              objectMetadataId,
+              isCustom,
+            },
           ]),
-        ),
+        );
+      },
       createPageviewEvent: (
         name: string,
         properties: Partial<PageviewProperties>,
       ) =>
         this.preventIfDisabled(() =>
           this.clickHouseService.insert('pageview', [
-            { ...userIdAndWorkspaceId, ...makePageview(name, properties) },
+            { ...contextFields, ...makePageview(name, properties) },
           ]),
         ),
     };

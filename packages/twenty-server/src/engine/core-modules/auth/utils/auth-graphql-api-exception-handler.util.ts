@@ -1,4 +1,4 @@
-import { t } from '@lingui/core/macro';
+import { msg } from '@lingui/core/macro';
 import { assertUnreachable } from 'twenty-shared/utils';
 
 import {
@@ -26,18 +26,20 @@ export const authGraphqlApiExceptionHandler = (exception: AuthException) => {
     case AuthExceptionCode.SIGNUP_DISABLED:
     case AuthExceptionCode.MISSING_ENVIRONMENT_VARIABLE:
     case AuthExceptionCode.INVALID_JWT_TOKEN_TYPE:
+    case AuthExceptionCode.USER_ALREADY_EXISTS:
+    case AuthExceptionCode.ENTERPRISE_VALIDITY_TOKEN_NOT_VALID:
       throw new ForbiddenError(exception);
     case AuthExceptionCode.GOOGLE_API_AUTH_DISABLED:
     case AuthExceptionCode.MICROSOFT_API_AUTH_DISABLED:
       throw new ForbiddenError(exception.message, {
-        userFriendlyMessage: t`Authentication is not enabled with this provider.`,
+        userFriendlyMessage: msg`Authentication is not enabled with this provider.`,
         subCode: exception.code,
       });
     case AuthExceptionCode.EMAIL_NOT_VERIFIED:
     case AuthExceptionCode.INVALID_DATA:
       throw new ForbiddenError(exception.message, {
         subCode: AuthExceptionCode.EMAIL_NOT_VERIFIED,
-        userFriendlyMessage: t`Email is not verified.`,
+        userFriendlyMessage: msg`Email is not verified.`,
       });
     case AuthExceptionCode.TWO_FACTOR_AUTHENTICATION_PROVISION_REQUIRED:
     case AuthExceptionCode.TWO_FACTOR_AUTHENTICATION_VERIFICATION_REQUIRED:
@@ -45,12 +47,14 @@ export const authGraphqlApiExceptionHandler = (exception: AuthException) => {
         subCode: exception.code,
       });
     case AuthExceptionCode.UNAUTHENTICATED:
+    case AuthExceptionCode.APPLICATION_REFRESH_TOKEN_INVALID_OR_EXPIRED:
       throw new AuthenticationError(exception.message, {
-        userFriendlyMessage: t`You must be authenticated to perform this action.`,
+        userFriendlyMessage: msg`You must be authenticated to perform this action.`,
         subCode: exception.code,
       });
     case AuthExceptionCode.USER_NOT_FOUND:
     case AuthExceptionCode.WORKSPACE_NOT_FOUND:
+    case AuthExceptionCode.APPLICATION_NOT_FOUND:
     case AuthExceptionCode.USER_WORKSPACE_NOT_FOUND:
       throw new AuthenticationError(exception);
     case AuthExceptionCode.INTERNAL_SERVER_ERROR:

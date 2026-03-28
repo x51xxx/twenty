@@ -2,6 +2,7 @@ import process from 'process';
 
 import opentelemetry from '@opentelemetry/api';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
+import { PrometheusExporter } from '@opentelemetry/exporter-prometheus';
 import {
   AggregationTemporality,
   ConsoleMetricExporter,
@@ -15,7 +16,6 @@ import { NodeEnvironment } from 'src/engine/core-modules/twenty-config/interface
 
 import { ExceptionHandlerDriver } from 'src/engine/core-modules/exception-handler/interfaces';
 import { MeterDriver } from 'src/engine/core-modules/metrics/types/meter-driver.type';
-import { WorkspaceCacheKeys } from 'src/engine/workspace-cache-storage/workspace-cache-storage.service';
 import { parseArrayEnvVar } from 'src/utils/parse-array-env-var';
 
 const meterDrivers = parseArrayEnvVar(
@@ -30,26 +30,29 @@ if (process.env.EXCEPTION_HANDLER_DRIVER === ExceptionHandlerDriver.SENTRY) {
     release: process.env.APP_VERSION,
     dsn: process.env.SENTRY_DSN,
     integrations: [
-      // TODO: Redis integration doesn't seem to work - investigate why
-      Sentry.redisIntegration({
-        cachePrefixes: Object.values(WorkspaceCacheKeys).map(
-          (key) => `engine:${key}:`,
-        ),
-      }),
+      Sentry.redisIntegration(),
       Sentry.httpIntegration(),
       Sentry.expressIntegration(),
       Sentry.graphqlIntegration(),
       Sentry.postgresIntegration(),
-      Sentry.vercelAIIntegration(),
+      Sentry.vercelAIIntegration({
+        recordInputs: true,
+        recordOutputs: true,
+      }),
       nodeProfilingIntegration(),
     ],
     tracesSampleRate: 0.1,
     profilesSampleRate: 0.3,
+    sendDefaultPii: true,
     debug: process.env.NODE_ENV === NodeEnvironment.DEVELOPMENT,
   });
 }
 
 // Meter setup
+
+const prometheusExporter = meterDrivers.includes(MeterDriver.Prometheus)
+  ? new PrometheusExporter({ port: 9464 })
+  : null;
 
 const meterProvider = new MeterProvider({
   readers: [
@@ -72,6 +75,7 @@ const meterProvider = new MeterProvider({
           }),
         ]
       : []),
+    ...(prometheusExporter ? [prometheusExporter] : []),
   ],
 });
 

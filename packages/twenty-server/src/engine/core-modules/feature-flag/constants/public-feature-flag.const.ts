@@ -1,9 +1,9 @@
-import { FeatureFlagKey } from 'src/engine/core-modules/feature-flag/enums/feature-flag-key.enum';
+import { FeatureFlagKey } from 'twenty-shared/types';
 
 type FeatureFlagMetadata = {
   label: string;
   description: string;
-  imagePath: string;
+  imagePath?: string;
 };
 
 export type PublicFeatureFlag = {
@@ -13,30 +13,20 @@ export type PublicFeatureFlag = {
 
 export const PUBLIC_FEATURE_FLAGS: PublicFeatureFlag[] = [
   {
-    key: FeatureFlagKey.IS_IMAP_SMTP_CALDAV_ENABLED,
+    key: FeatureFlagKey.IS_JUNCTION_RELATIONS_ENABLED,
     metadata: {
-      label: 'IMAP, SMTP, CalDAV',
+      label: 'Junction Relations',
       description:
-        'Easily add email accounts from any provider that supports IMAP, send emails with SMTP (and soon, sync calendars with CalDAV)',
-      imagePath:
-        'https://twenty.com/images/lab/is-imap-smtp-caldav-enabled.png',
+        'Enable many-to-many relations through junction tables configuration',
     },
   },
   {
-    key: FeatureFlagKey.IS_WORKFLOW_BRANCH_ENABLED,
+    key: FeatureFlagKey.IS_ROW_LEVEL_PERMISSION_PREDICATES_ENABLED,
     metadata: {
-      label: 'Workflow Branches',
-      description: 'Create multiple branches on your workflows',
-      imagePath: 'https://twenty.com/images/lab/is-workflow-branch-enabled.png',
-    },
-  },
-  {
-    key: FeatureFlagKey.IS_MESSAGE_FOLDER_CONTROL_ENABLED,
-    metadata: {
-      label: 'Message Folder Control',
-      description: 'Control which folders are synced',
+      label: 'Row Level Permissions',
+      description: 'Enable row level permission',
       imagePath:
-        'https://twenty.com/images/lab/is-message-folder-control-enabled.png',
+        'https://twenty.com/images/lab/is-row-level-permission-predicates-enabled.png',
     },
   },
   ...(process.env.CLOUDFLARE_API_KEY

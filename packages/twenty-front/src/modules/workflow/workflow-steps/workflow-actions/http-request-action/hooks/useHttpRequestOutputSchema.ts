@@ -1,10 +1,10 @@
 import { type WorkflowHttpRequestAction } from '@/workflow/types/Workflow';
+import { type BaseOutputSchemaV2 } from 'twenty-shared/workflow';
 import { parseAndValidateVariableFriendlyStringifiedJson } from '@/workflow/utils/parseAndValidateVariableFriendlyStringifiedJson';
-import { type BaseOutputSchema } from '@/workflow/workflow-variables/types/StepOutputSchema';
 import { isNonEmptyString } from '@sniptt/guards';
 import { useState } from 'react';
-import { convertOutputSchemaToJson } from '../utils/convertOutputSchemaToJson';
-import { getHttpRequestOutputSchema } from '../utils/getHttpRequestOutputSchema';
+import { convertOutputSchemaToJson } from '@/workflow/workflow-steps/workflow-actions/http-request-action/utils/convertOutputSchemaToJson';
+import { getHttpRequestOutputSchema } from '@/workflow/workflow-steps/workflow-actions/http-request-action/utils/getHttpRequestOutputSchema';
 
 type UseHttpRequestOutputSchemaProps = {
   action: WorkflowHttpRequestAction;
@@ -21,7 +21,7 @@ export const useHttpRequestOutputSchema = ({
     Object.keys(action.settings.outputSchema).length
       ? JSON.stringify(
           convertOutputSchemaToJson(
-            action.settings.outputSchema as BaseOutputSchema,
+            action.settings.outputSchema as BaseOutputSchemaV2,
           ),
           null,
           2,

@@ -22,7 +22,7 @@ export const CalendarEventParticipantsResponseStatus = ({
     }
   });
 
-  const responseStatusOrder: ('Yes' | 'Maybe' | 'No')[] = [
+  const responseStatusOrder: Array<'Yes' | 'Maybe' | 'No'> = [
     'Yes',
     'Maybe',
     'No',
@@ -34,7 +34,7 @@ export const CalendarEventParticipantsResponseStatus = ({
         <CalendarEventParticipantsResponseStatusField
           key={responseStatus}
           responseStatus={responseStatus}
-          participants={groupedParticipants[responseStatus] || []}
+          participants={groupedParticipants[responseStatus] ?? []}
         />
       ))}
     </>

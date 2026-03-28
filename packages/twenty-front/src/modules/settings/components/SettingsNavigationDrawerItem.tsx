@@ -4,8 +4,7 @@ import { AdvancedSettingsWrapper } from '@/settings/components/AdvancedSettingsW
 import { type SettingsNavigationItem } from '@/settings/hooks/useSettingsNavigationItems';
 import { NavigationDrawerItem } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerItem';
 import { type NavigationDrawerSubItemState } from '@/ui/navigation/navigation-drawer/types/NavigationDrawerSubItemState';
-import { isDefined } from 'twenty-shared/utils';
-import { getSettingsPath } from '~/utils/navigation/getSettingsPath';
+import { getSettingsPath, isDefined } from 'twenty-shared/utils';
 
 type SettingsNavigationDrawerItemProps = {
   item: SettingsNavigationItem;
@@ -25,7 +24,7 @@ export const SettingsNavigationDrawerItem = ({
     end: item.matchSubPages === false,
   });
 
-  const isActive = !!matchResult && !hasActiveSubItem;
+  const isActive = !!item.path && !!matchResult && !hasActiveSubItem;
 
   if (isDefined(item.isHidden) && item.isHidden) {
     return null;
@@ -41,8 +40,7 @@ export const SettingsNavigationDrawerItem = ({
           to={href}
           Icon={item.Icon}
           active={isActive}
-          soon={item.soon}
-          isNew={item.isNew}
+          modifier={item.modifier}
           onClick={item.onClick}
         />
       </AdvancedSettingsWrapper>
@@ -54,11 +52,10 @@ export const SettingsNavigationDrawerItem = ({
       indentationLevel={item.indentationLevel}
       subItemState={subItemState}
       label={item.label}
-      to={href}
+      to={href || undefined}
       Icon={item.Icon}
       active={isActive}
-      soon={item.soon}
-      isNew={item.isNew}
+      modifier={item.modifier}
       onClick={item.onClick}
     />
   );

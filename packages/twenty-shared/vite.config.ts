@@ -1,11 +1,14 @@
+// @ts-expect-error: no type declarations for path in this config
 import path from 'path';
 import { defineConfig } from 'vite';
-import dts from 'vite-plugin-dts';
 import tsconfigPaths from 'vite-tsconfig-paths';
+// @ts-expect-error: importing JSON without resolveJsonModule
 import packageJson from './package.json';
 
 const moduleEntries = Object.keys((packageJson as any).exports || {})
-  .filter((key) => key !== './style.css' && key !== '.' && !key.startsWith('./src/'))
+  .filter(
+    (key) => key !== './style.css' && key !== '.' && !key.startsWith('./src/'),
+  )
   .map((module) => `src/${module.replace(/^\.\//, '')}/index.ts`);
 
 const entries = ['src/index.ts', ...moduleEntries];
@@ -32,17 +35,28 @@ const entryFileNames = (chunk: any, extension: 'cjs' | 'mjs') => {
 };
 
 export default defineConfig(() => {
-  const tsConfigPath = path.resolve(__dirname, './tsconfig.lib.json');
-
   return {
     root: __dirname,
     cacheDir: '../../node_modules/.vite/packages/twenty-shared',
-    plugins: [tsconfigPaths(), dts({ entryRoot: 'src', tsconfigPath: tsConfigPath })],
+    resolve: {
+      alias: {
+        '@/': path.resolve(__dirname, 'src') + '/',
+      },
+    },
+    plugins: [
+      tsconfigPaths({
+        root: __dirname,
+      }),
+    ],
     build: {
+      emptyOutDir: false,
       outDir: 'dist',
       lib: { entry: entries, name: 'twenty-shared' },
       rollupOptions: {
-        external: Object.keys((packageJson as any).dependencies || {}),
+        external: [
+          ...Object.keys((packageJson as any).dependencies || {}),
+          'typescript',
+        ],
         output: [
           {
             format: 'es',
@@ -58,8 +72,6 @@ export default defineConfig(() => {
         ],
       },
     },
-    logLevel: 'warn'
+    logLevel: 'warn',
   };
 });
-
-

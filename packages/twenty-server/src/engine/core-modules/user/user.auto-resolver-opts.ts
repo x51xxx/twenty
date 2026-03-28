@@ -4,23 +4,23 @@ import {
   type ReadResolverOpts,
 } from '@ptc-org/nestjs-query-graphql';
 
-import { User } from 'src/engine/core-modules/user/user.entity';
+import { UserEntity } from 'src/engine/core-modules/user/user.entity';
 import { WorkspaceAuthGuard } from 'src/engine/guards/workspace-auth.guard';
 
 export const userAutoResolverOpts: AutoResolverOpts<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   any,
   unknown,
   unknown,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   ReadResolverOpts<any>,
   PagingStrategies
 >[] = [
   {
-    EntityClass: User,
-    DTOClass: User,
+    EntityClass: UserEntity,
+    DTOClass: UserEntity,
     enableTotalCount: true,
     pagingStrategy: PagingStrategies.CURSOR,
     read: {

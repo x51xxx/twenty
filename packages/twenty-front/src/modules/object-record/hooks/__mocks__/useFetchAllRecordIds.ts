@@ -1,7 +1,9 @@
-import { RecordGqlConnection } from '@/object-record/graphql/types/RecordGqlConnection';
+import { type RecordGqlConnectionEdgesRequired } from '@/object-record/graphql/types/RecordGqlConnectionEdgesRequired';
 import { gql } from '@apollo/client';
 
-import { peopleQueryResult } from '~/testing/mock-data/people';
+import { getRecordFromRecordNode } from '@/object-record/cache/utils/getRecordFromRecordNode';
+import { mockedPersonRecords } from '~/testing/mock-data/generated/data/people/mock-people-data';
+import { generateMockRecordConnection } from '~/testing/utils/generateMockRecordConnection';
 
 export const query = gql`
   query FindManyPeople(
@@ -36,11 +38,20 @@ export const query = gql`
 
 export const mockPageSize = 2;
 
-export const peopleMockWithIdsOnly: RecordGqlConnection = {
-  ...peopleQueryResult.people,
-  edges: peopleQueryResult.people.edges.map((edge) => ({
+const flatPersonRecords = mockedPersonRecords.map((record) =>
+  getRecordFromRecordNode({ recordNode: record }),
+);
+
+const baseConnection = generateMockRecordConnection({
+  objectNameSingular: 'person',
+  records: flatPersonRecords,
+});
+
+export const peopleMockWithIdsOnly: RecordGqlConnectionEdgesRequired = {
+  ...baseConnection,
+  edges: baseConnection.edges.map((edge, index) => ({
     ...edge,
-    node: { __typename: 'Person', id: edge.node.id },
+    cursor: `cursor-${index}`,
   })),
 };
 
@@ -72,7 +83,7 @@ export const variablesThirdRequest = {
 };
 
 const paginateRequestResponse = (
-  response: RecordGqlConnection,
+  response: RecordGqlConnectionEdgesRequired,
   start: number,
   end: number,
   hasNextPage: boolean,
@@ -86,7 +97,7 @@ const paginateRequestResponse = (
       startCursor: response.edges[start].cursor,
       endCursor: response.edges[end].cursor,
       hasNextPage,
-    } satisfies RecordGqlConnection['pageInfo'],
+    } satisfies RecordGqlConnectionEdgesRequired['pageInfo'],
     totalCount,
   };
 };

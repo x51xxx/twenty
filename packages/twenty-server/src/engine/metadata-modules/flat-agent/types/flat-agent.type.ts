@@ -1,18 +1,6 @@
-import { type AgentEntity } from 'src/engine/metadata-modules/agent/agent.entity';
+import { type AgentEntity } from 'src/engine/metadata-modules/ai/ai-agent/entities/agent.entity';
+import { type FlatEntityFrom } from 'src/engine/metadata-modules/flat-entity/types/flat-entity-from.type';
 
-export const agentEntityRelationProperties = [
-  'workspace',
-  'chatThreads',
-  'outgoingHandoffs',
-  'incomingHandoffs',
-] as const;
+export type FlatAgent = FlatEntityFrom<AgentEntity>;
 
-export type AgentEntityRelationProperties =
-  (typeof agentEntityRelationProperties)[number];
-
-export type FlatAgent = Omit<
-  AgentEntity,
-  AgentEntityRelationProperties | 'createdAt' | 'updatedAt' | 'deletedAt'
-> & {
-  uniqueIdentifier: string;
-};
+export type FlatAgentWithRoleId = FlatAgent & { roleId: string | null };

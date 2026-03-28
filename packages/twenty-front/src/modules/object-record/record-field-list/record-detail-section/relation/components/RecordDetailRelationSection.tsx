@@ -1,10 +1,9 @@
 import { useContext } from 'react';
-import { useRecoilValue } from 'recoil';
 
 import { useObjectMetadataItem } from '@/object-metadata/hooks/useObjectMetadataItem';
 import { useObjectMetadataItems } from '@/object-metadata/hooks/useObjectMetadataItems';
-import { type RecordGqlOperationFilter } from '@/object-record/graphql/types/RecordGqlOperationFilter';
 import { useAggregateRecords } from '@/object-record/hooks/useAggregateRecords';
+import { useRecordFieldsScopeContextOrThrow } from '@/object-record/record-field-list/contexts/RecordFieldsScopeContext';
 import { RecordDetailSectionContainer } from '@/object-record/record-field-list/record-detail-section/components/RecordDetailSectionContainer';
 import { RecordDetailRelationRecordsList } from '@/object-record/record-field-list/record-detail-section/relation/components/RecordDetailRelationRecordsList';
 import { RecordDetailRelationSectionDropdown } from '@/object-record/record-field-list/record-detail-section/relation/components/RecordDetailRelationSectionDropdown';
@@ -19,15 +18,25 @@ import { getRecordFieldCardRelationPickerDropdownId } from '@/object-record/reco
 import { recordStoreFamilySelector } from '@/object-record/record-store/states/selectors/recordStoreFamilySelector';
 import { AggregateOperations } from '@/object-record/record-table/constants/AggregateOperations';
 import { type ObjectRecord } from '@/object-record/types/ObjectRecord';
-import { prefetchIndexViewIdFromObjectMetadataItemFamilySelector } from '@/prefetch/states/selector/prefetchIndexViewIdFromObjectMetadataItemFamilySelector';
-import { AppPath } from '@/types/AppPath';
 import { isDropdownOpenComponentState } from '@/ui/layout/dropdown/states/isDropdownOpenComponentState';
 import { useIsMobile } from '@/ui/utilities/responsive/hooks/useIsMobile';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomFamilySelectorValue } from '@/ui/utilities/state/jotai/hooks/useAtomFamilySelectorValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+import { indexViewIdFromObjectMetadataItemFamilySelector } from '@/views/states/selectors/indexViewIdFromObjectMetadataItemFamilySelector';
 import { useLingui } from '@lingui/react/macro';
-import { ViewFilterOperand } from 'twenty-shared/types';
+import {
+  AppPath,
+  FieldMetadataType,
+  ViewFilterOperand,
+  type RecordGqlOperationFilter,
+} from 'twenty-shared/types';
+import {
+  computeMorphRelationFieldName,
+  CustomError,
+  getAppPath,
+  isDefined,
+} from 'twenty-shared/utils';
 import { RelationType } from '~/generated-metadata/graphql';
-import { getAppPath } from '~/utils/navigation/getAppPath';
 
 type RecordDetailRelationSectionProps = {
   loading: boolean;
@@ -38,6 +47,7 @@ export const RecordDetailRelationSection = ({
 }: RecordDetailRelationSectionProps) => {
   const { t } = useLingui();
 
+  const { scopeInstanceId } = useRecordFieldsScopeContextOrThrow();
   const { recordId, fieldDefinition } = useContext(FieldContext);
 
   const {
@@ -58,9 +68,23 @@ export const RecordDetailRelationSection = ({
     ({ id }) => id === relationFieldMetadataId,
   );
 
-  const fieldValue = useRecoilValue<
-    ({ id: string } & Record<string, any>) | ObjectRecord[] | null
-  >(recordStoreFamilySelector({ recordId, fieldName }));
+  const { objectMetadataItems } = useObjectMetadataItems();
+  const objectMetadataItem = objectMetadataItems.find(
+    (objectMetadataItemToFind) =>
+      objectMetadataItemToFind.nameSingular === objectMetadataNameSingular,
+  );
+
+  if (!objectMetadataItem) {
+    throw new CustomError(
+      'Object metadata item not found',
+      'OBJECT_METADATA_ITEM_NOT_FOUND',
+    );
+  }
+
+  const fieldValue = useAtomFamilySelectorValue(recordStoreFamilySelector, {
+    recordId,
+    fieldName,
+  }) as ({ id: string } & Record<string, unknown>) | ObjectRecord[] | null;
 
   // TODO: use new relation type
   const isToOneObject = relationType === RelationType.MANY_TO_ONE;
@@ -74,23 +98,23 @@ export const RecordDetailRelationSection = ({
   const dropdownId = getRecordFieldCardRelationPickerDropdownId({
     fieldDefinition,
     recordId,
+    instanceId: scopeInstanceId,
   });
 
-  const isDropdownOpen = useRecoilComponentValue(
+  const isDropdownOpen = useAtomComponentStateValue(
     isDropdownOpenComponentState,
     dropdownId,
   );
 
-  const indexViewId = useRecoilValue(
-    prefetchIndexViewIdFromObjectMetadataItemFamilySelector({
-      objectMetadataItemId: relationObjectMetadataItem.id,
-    }),
+  const indexViewId = useAtomFamilySelectorValue(
+    indexViewIdFromObjectMetadataItemFamilySelector,
+    { objectMetadataItemId: relationObjectMetadataItem.id },
   );
 
   const filterQueryParams = {
     filter: {
       [relationFieldMetadataItem?.name || '']: {
-        [ViewFilterOperand.Is]: {
+        [ViewFilterOperand.IS]: {
           selectedRecordIds: [recordId],
         },
       },
@@ -106,9 +130,29 @@ export const RecordDetailRelationSection = ({
     filterQueryParams,
   );
 
+  const persistField = usePersistField({
+    objectMetadataItemId: objectMetadataItem?.id ?? '',
+  });
+
+  const relationFieldMetadataIsMorphRelation =
+    relationFieldMetadataItem?.type === FieldMetadataType.MORPH_RELATION;
+
+  const computedName = isDefined(relationFieldMetadataItem)
+    ? computeMorphRelationFieldName({
+        fieldName: relationFieldMetadataItem.name,
+        relationType: relationFieldMetadataItem.settings.relationType,
+        targetObjectMetadataNameSingular: objectMetadataItem.nameSingular,
+        targetObjectMetadataNamePlural: objectMetadataItem.namePlural,
+      })
+    : undefined;
+
+  const gqlFieldName = relationFieldMetadataIsMorphRelation
+    ? computedName
+    : relationFieldMetadataItem?.name;
+
   const filtersForAggregate = isToManyObjects
     ? ({
-        [`${relationFieldMetadataItem?.name}Id`]: {
+        [`${gqlFieldName}Id`]: {
           in: [recordId],
         },
       } satisfies RecordGqlOperationFilter)
@@ -123,19 +167,6 @@ export const RecordDetailRelationSection = ({
     recordGqlFieldsAggregate: {
       id: [AggregateOperations.COUNT],
     },
-  });
-
-  // TODO: refactor this when we have refactored columnDefinitions and field definitions because
-  //    we should be able to get the objectMetadataItem from a context way more easily
-  const { objectMetadataItems } = useObjectMetadataItems();
-
-  const objectMetadataItem = objectMetadataItems.find(
-    (objectMetadataItemToFind) =>
-      objectMetadataItemToFind.nameSingular === objectMetadataNameSingular,
-  );
-
-  const persistField = usePersistField({
-    objectMetadataItemId: objectMetadataItem?.id ?? '',
   });
 
   const handleSubmit: FieldInputEvent = ({ newValue }) => {
@@ -157,6 +188,7 @@ export const RecordDetailRelationSection = ({
       }}
     >
       <RecordDetailSectionContainer
+        dataTestId={`${fieldDefinition.label.toLowerCase().replace(' ', '-')}-relation`}
         title={fieldDefinition.label}
         link={
           isToManyObjects
@@ -176,7 +208,15 @@ export const RecordDetailRelationSection = ({
         }
       >
         {relationRecords.length > 0 && (
-          <RecordDetailRelationRecordsList relationRecords={relationRecords} />
+          <RecordDetailRelationRecordsList
+            recordsWithObjectNameSingular={relationRecords.map(
+              (relationRecord) => ({
+                value: relationRecord,
+                objectNameSingular: relationObjectMetadataNameSingular,
+                fieldMetadataId: relationFieldMetadataId,
+              }),
+            )}
+          />
         )}
       </RecordDetailSectionContainer>
     </FieldInputEventContext.Provider>

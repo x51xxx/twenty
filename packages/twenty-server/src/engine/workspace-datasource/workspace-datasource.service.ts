@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 
+import { msg } from '@lingui/core/macro';
 import { type DataSource, type EntityManager } from 'typeorm';
 
 import { DataSourceService } from 'src/engine/metadata-modules/data-source/data-source.service';
@@ -36,14 +37,15 @@ export class WorkspaceDataSourceService {
    */
   public async createWorkspaceDBSchema(workspaceId: string): Promise<string> {
     const schemaName = getWorkspaceSchemaName(workspaceId);
-
     const queryRunner = this.coreDataSource.createQueryRunner();
 
-    await queryRunner.createSchema(schemaName, true);
+    try {
+      await queryRunner.createSchema(schemaName, true);
 
-    await queryRunner.release();
-
-    return schemaName;
+      return schemaName;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   /**
@@ -55,28 +57,28 @@ export class WorkspaceDataSourceService {
    */
   public async deleteWorkspaceDBSchema(workspaceId: string): Promise<void> {
     const schemaName = getWorkspaceSchemaName(workspaceId);
-
     const queryRunner = this.coreDataSource.createQueryRunner();
 
-    await queryRunner.dropSchema(schemaName, true, true);
-
-    await queryRunner.release();
+    try {
+      await queryRunner.dropSchema(schemaName, true, true);
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   public async executeRawQuery(
     _query: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line @typescripttypescript/no-explicit-any
     _parameters: any[] = [],
     _workspaceId: string,
     _transactionManager?: EntityManager,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   ): Promise<any> {
     throw new PermissionsException(
       'Method not allowed as permissions are not handled at datasource level.',
       PermissionsExceptionCode.METHOD_NOT_ALLOWED,
       {
-        userFriendlyMessage:
-          'This operation is not allowed. Please try a different approach or contact support if you need assistance.',
+        userFriendlyMessage: msg`This operation is not allowed. Please try a different approach or contact support if you need assistance.`,
       },
     );
   }

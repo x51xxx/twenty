@@ -1,4 +1,4 @@
-import { type ObjectsPermissionsDeprecated } from 'twenty-shared/types';
+import { type ObjectsPermissions } from 'twenty-shared/types';
 import {
   type EntityTarget,
   type InsertQueryBuilder,
@@ -6,12 +6,13 @@ import {
   type UpdateResult,
 } from 'typeorm';
 import { SoftDeleteQueryBuilder } from 'typeorm/query-builder/SoftDeleteQueryBuilder';
+import { type WhereClause } from 'typeorm/query-builder/WhereClause';
 
 import { type FeatureFlagMap } from 'src/engine/core-modules/feature-flag/interfaces/feature-flag-map.interface';
 import { type WorkspaceInternalContext } from 'src/engine/twenty-orm/interfaces/workspace-internal-context.interface';
 
 import { DatabaseEventAction } from 'src/engine/api/graphql/graphql-query-runner/enums/database-event-action';
-import { type AuthContext } from 'src/engine/core-modules/auth/types/auth-context.type';
+import { type WorkspaceAuthContext } from 'src/engine/core-modules/auth/types/workspace-auth-context.type';
 import { computeTwentyORMException } from 'src/engine/twenty-orm/error-handling/compute-twenty-orm-exception';
 import {
   TwentyORMException,
@@ -21,25 +22,30 @@ import { validateQueryIsPermittedOrThrow } from 'src/engine/twenty-orm/repositor
 import { type WorkspaceDeleteQueryBuilder } from 'src/engine/twenty-orm/repository/workspace-delete-query-builder';
 import { type WorkspaceSelectQueryBuilder } from 'src/engine/twenty-orm/repository/workspace-select-query-builder';
 import { type WorkspaceUpdateQueryBuilder } from 'src/engine/twenty-orm/repository/workspace-update-query-builder';
+import { applyRowLevelPermissionPredicates } from 'src/engine/twenty-orm/utils/apply-row-level-permission-predicates.util';
+import { applyTableAliasOnWhereCondition } from 'src/engine/twenty-orm/utils/apply-table-alias-on-where-condition';
+import { computeEventSelectQueryBuilder } from 'src/engine/twenty-orm/utils/compute-event-select-query-builder.util';
 import { formatResult } from 'src/engine/twenty-orm/utils/format-result.util';
+import { formatTwentyOrmEventToDatabaseBatchEvent } from 'src/engine/twenty-orm/utils/format-twenty-orm-event-to-database-batch-event.util';
 import { getObjectMetadataFromEntityTarget } from 'src/engine/twenty-orm/utils/get-object-metadata-from-entity-target.util';
+import { computeTableName } from 'src/engine/utils/compute-table-name.util';
 
 export class WorkspaceSoftDeleteQueryBuilder<
   T extends ObjectLiteral,
 > extends SoftDeleteQueryBuilder<T> {
-  private objectRecordsPermissions: ObjectsPermissionsDeprecated;
+  private objectRecordsPermissions: ObjectsPermissions;
   private shouldBypassPermissionChecks: boolean;
   private internalContext: WorkspaceInternalContext;
-  private authContext?: AuthContext;
-  private featureFlagMap?: FeatureFlagMap;
+  private authContext: WorkspaceAuthContext;
+  private featureFlagMap: FeatureFlagMap;
 
   constructor(
     queryBuilder: SoftDeleteQueryBuilder<T>,
-    objectRecordsPermissions: ObjectsPermissionsDeprecated,
+    objectRecordsPermissions: ObjectsPermissions,
     internalContext: WorkspaceInternalContext,
     shouldBypassPermissionChecks: boolean,
-    authContext?: AuthContext,
-    featureFlagMap?: FeatureFlagMap,
+    authContext: WorkspaceAuthContext,
+    featureFlagMap: FeatureFlagMap,
   ) {
     super(queryBuilder);
     this.objectRecordsPermissions = objectRecordsPermissions;
@@ -52,21 +58,27 @@ export class WorkspaceSoftDeleteQueryBuilder<
   override clone(): this {
     const clonedQueryBuilder = super.clone();
 
-    return new WorkspaceSoftDeleteQueryBuilder(
+    const workspaceSoftDeleteQueryBuilder = new WorkspaceSoftDeleteQueryBuilder(
       clonedQueryBuilder,
       this.objectRecordsPermissions,
       this.internalContext,
       this.shouldBypassPermissionChecks,
       this.authContext,
+      this.featureFlagMap,
     ) as this;
+
+    return workspaceSoftDeleteQueryBuilder;
   }
 
   override async execute(): Promise<UpdateResult> {
     try {
+      this.applyRowLevelPermissionPredicates();
       validateQueryIsPermittedOrThrow({
         expressionMap: this.expressionMap,
         objectsPermissions: this.objectRecordsPermissions,
-        objectMetadataMaps: this.internalContext.objectMetadataMaps,
+        flatObjectMetadataMaps: this.internalContext.flatObjectMetadataMaps,
+        flatFieldMetadataMaps: this.internalContext.flatFieldMetadataMaps,
+        objectIdByNameSingular: this.internalContext.objectIdByNameSingular,
         shouldBypassPermissionChecks: this.shouldBypassPermissionChecks,
       });
 
@@ -77,29 +89,68 @@ export class WorkspaceSoftDeleteQueryBuilder<
         this.internalContext,
       );
 
-      const after = await super.execute();
-
-      const formattedAfter = formatResult<T[]>(
-        after.raw,
-        objectMetadata,
-        this.internalContext.objectMetadataMaps,
-      );
-
-      await this.internalContext.eventEmitterService.emitMutationEvent({
-        action: DatabaseEventAction.DELETED,
-        objectMetadataItem: objectMetadata,
-        workspaceId: this.internalContext.workspaceId,
-        entities: formattedAfter,
+      const beforeEventSelectQueryBuilder = computeEventSelectQueryBuilder<T>({
+        queryBuilder: this,
         authContext: this.authContext,
+        internalContext: this.internalContext,
+        featureFlagMap: this.featureFlagMap,
+        expressionMap: this.expressionMap,
+        objectRecordsPermissions: this.objectRecordsPermissions,
       });
 
+      const tableName = computeTableName(
+        objectMetadata.nameSingular,
+        objectMetadata.isCustom,
+      );
+
+      const before = await beforeEventSelectQueryBuilder.getMany();
+
+      this.expressionMap.wheres = applyTableAliasOnWhereCondition({
+        condition: this.expressionMap.wheres,
+        tableName,
+        aliasName: objectMetadata.nameSingular,
+      }) as WhereClause[];
+
+      const typeORMSoftRemoveResultWithOnlyIdColumn = await super.execute();
+
+      const afterWithAllFields = await beforeEventSelectQueryBuilder.getMany();
+
+      const formattedAfter = formatResult<T[]>(
+        afterWithAllFields,
+        objectMetadata,
+        this.internalContext.flatObjectMetadataMaps,
+        this.internalContext.flatFieldMetadataMaps,
+      );
+
+      const formattedBefore = formatResult<T[]>(
+        before,
+        objectMetadata,
+        this.internalContext.flatObjectMetadataMaps,
+        this.internalContext.flatFieldMetadataMaps,
+      );
+
+      this.internalContext.eventEmitterService.emitDatabaseBatchEvent(
+        formatTwentyOrmEventToDatabaseBatchEvent({
+          action:
+            this.expressionMap.queryType === 'restore'
+              ? DatabaseEventAction.RESTORED
+              : DatabaseEventAction.DELETED,
+          objectMetadataItem: objectMetadata,
+          flatFieldMetadataMaps: this.internalContext.flatFieldMetadataMaps,
+          workspaceId: this.internalContext.workspaceId,
+          recordsBefore: formattedBefore,
+          recordsAfter: formattedAfter,
+          authContext: this.authContext,
+        }),
+      );
+
       return {
-        raw: after.raw,
+        raw: typeORMSoftRemoveResultWithOnlyIdColumn.raw,
         generatedMaps: formattedAfter,
-        affected: after.affected,
+        affected: typeORMSoftRemoveResultWithOnlyIdColumn.affected,
       };
     } catch (error) {
-      throw computeTwentyORMException(error);
+      throw await computeTwentyORMException(error);
     }
   }
 
@@ -142,5 +193,26 @@ export class WorkspaceSoftDeleteQueryBuilder<
     }
 
     return mainAliasTarget;
+  }
+
+  private applyRowLevelPermissionPredicates(): void {
+    if (this.shouldBypassPermissionChecks) {
+      return;
+    }
+
+    const mainAliasTarget = this.getMainAliasTarget();
+
+    const objectMetadata = getObjectMetadataFromEntityTarget(
+      mainAliasTarget,
+      this.internalContext,
+    );
+
+    applyRowLevelPermissionPredicates({
+      queryBuilder: this as unknown as WorkspaceSelectQueryBuilder<T>,
+      objectMetadata,
+      internalContext: this.internalContext,
+      authContext: this.authContext,
+      featureFlagMap: this.featureFlagMap,
+    });
   }
 }

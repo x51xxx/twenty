@@ -1,105 +1,143 @@
+import { FieldMetadataType } from 'twenty-shared/types';
+import { isDefined, removePropertiesFromRecord } from 'twenty-shared/utils';
+
+import { isFieldMetadataSettingsOfType } from 'src/engine/metadata-modules/field-metadata/utils/is-field-metadata-settings-of-type.util';
 import {
-  FieldMetadataType,
-  type RelationAndMorphRelationFieldMetadataType,
-} from 'twenty-shared/types';
-import { removePropertiesFromRecord } from 'twenty-shared/utils';
+  FlatEntityMapsException,
+  FlatEntityMapsExceptionCode,
+} from 'src/engine/metadata-modules/flat-entity/exceptions/flat-entity-maps.exception';
+import { getMetadataEntityRelationProperties } from 'src/engine/metadata-modules/flat-entity/utils/get-metadata-entity-relation-properties.util';
+import { type FlatFieldMetadata } from 'src/engine/metadata-modules/flat-field-metadata/types/flat-field-metadata.type';
+import { type FromEntityToFlatEntityArgs } from 'src/engine/workspace-cache/types/from-entity-to-flat-entity-args.type';
 
-import { type FieldMetadataEntity } from 'src/engine/metadata-modules/field-metadata/field-metadata.entity';
-import {
-  FieldMetadataException,
-  FieldMetadataExceptionCode,
-} from 'src/engine/metadata-modules/field-metadata/field-metadata.exception';
-import {
-  type FieldMetadataEntityRelationProperties,
-  type FlatFieldMetadata,
-  fieldMetadataRelationProperties,
-} from 'src/engine/metadata-modules/flat-field-metadata/types/flat-field-metadata.type';
-import { type FlatRelationTargetFieldMetadata } from 'src/engine/metadata-modules/flat-field-metadata/types/flat-relation-target-field-metadata.type';
-import { isFieldMetadataEntityOfType } from 'src/engine/utils/is-field-metadata-of-type.util';
-import { fromObjectMetadataEntityToFlatObjectMetadataWithoutFields } from 'src/engine/workspace-manager/workspace-migration-v2/workspace-migration-builder-v2/utils/from-object-metadata-entity-to-flat-object-metadata-without-fields.util';
-
-export const fromFieldMetadataEntityToFlatRelationTargetFieldMetadata = (
-  fieldMetadataEntity: FieldMetadataEntity<RelationAndMorphRelationFieldMetadataType>,
-): FlatRelationTargetFieldMetadata => {
-  return {
-    uniqueIdentifier: fieldMetadataEntity.standardId ?? fieldMetadataEntity.id,
-    ...removePropertiesFromRecord(fieldMetadataEntity, [
-      'relationTargetObjectMetadata',
-      'relationTargetFieldMetadata',
-    ]),
-  };
-};
-
-// TODO refactor this method should not be recursive but depth 1
-export const fromFieldMetadataEntityToFlatFieldMetadata = <
-  T extends FieldMetadataType,
->(
-  fieldMetadataEntity: FieldMetadataEntity<T>,
-  // This is intended to be abstract
-): FlatFieldMetadata => {
-  if (
-    isFieldMetadataEntityOfType(
-      fieldMetadataEntity,
-      FieldMetadataType.RELATION,
-    ) ||
-    isFieldMetadataEntityOfType(
-      fieldMetadataEntity,
-      FieldMetadataType.MORPH_RELATION,
-    )
-  ) {
-    const fieldMetadataWithoutRelations = removePropertiesFromRecord<
-      FieldMetadataEntity<
-        FieldMetadataType.RELATION | FieldMetadataType.MORPH_RELATION
-      >,
-      FieldMetadataEntityRelationProperties
-    >(fieldMetadataEntity, fieldMetadataRelationProperties);
-
-    if (
-      !isFieldMetadataEntityOfType(
-        fieldMetadataEntity.relationTargetFieldMetadata,
-        FieldMetadataType.RELATION,
-      )
-    ) {
-      throw new FieldMetadataException(
-        'Relation target field is not a field metadata type relation',
-        FieldMetadataExceptionCode.FIELD_METADATA_RELATION_MALFORMED,
-      );
-    }
-
-    const flatRelationTargetFieldMetadata =
-      fromFieldMetadataEntityToFlatRelationTargetFieldMetadata(
-        fieldMetadataEntity.relationTargetFieldMetadata,
-      );
-
-    const flatRelationTargetObjectMetadata =
-      fromObjectMetadataEntityToFlatObjectMetadataWithoutFields(
-        fieldMetadataEntity.relationTargetObjectMetadata,
-      );
-
-    return {
-      ...fieldMetadataWithoutRelations,
-      uniqueIdentifier:
-        fieldMetadataWithoutRelations.standardId ??
-        fieldMetadataWithoutRelations.id,
-      flatRelationTargetFieldMetadata,
-      flatRelationTargetObjectMetadata,
-      type: fieldMetadataEntity.type,
-    } satisfies FlatFieldMetadata<
-      FieldMetadataType.RELATION | FieldMetadataType.MORPH_RELATION
-    >;
-  }
-
+export const fromFieldMetadataEntityToFlatFieldMetadata = ({
+  entity: fieldMetadataEntity,
+  fieldMetadataIdToUniversalIdentifierMap,
+  objectMetadataIdToUniversalIdentifierMap,
+  applicationIdToUniversalIdentifierMap,
+}: FromEntityToFlatEntityArgs<'fieldMetadata'>): FlatFieldMetadata => {
   const fieldMetadataWithoutRelations = removePropertiesFromRecord(
     fieldMetadataEntity,
-    fieldMetadataRelationProperties,
+    getMetadataEntityRelationProperties('fieldMetadata'),
   );
+  const applicationUniversalIdentifier =
+    applicationIdToUniversalIdentifierMap.get(
+      fieldMetadataEntity.applicationId,
+    );
+
+  if (!isDefined(applicationUniversalIdentifier)) {
+    throw new FlatEntityMapsException(
+      `Application with id ${fieldMetadataEntity.applicationId} not found when building flat field metadata for field ${fieldMetadataEntity.id}`,
+      FlatEntityMapsExceptionCode.ENTITY_NOT_FOUND,
+    );
+  }
+
+  const objectMetadataUniversalIdentifier =
+    objectMetadataIdToUniversalIdentifierMap.get(
+      fieldMetadataEntity.objectMetadataId,
+    );
+
+  if (!isDefined(objectMetadataUniversalIdentifier)) {
+    throw new FlatEntityMapsException(
+      `Object metadata with id ${fieldMetadataEntity.objectMetadataId} not found when building flat field metadata for field ${fieldMetadataEntity.id}`,
+      FlatEntityMapsExceptionCode.ENTITY_NOT_FOUND,
+    );
+  }
+
+  let relationTargetObjectMetadataUniversalIdentifier: string | null = null;
+
+  if (isDefined(fieldMetadataEntity.relationTargetObjectMetadataId)) {
+    relationTargetObjectMetadataUniversalIdentifier =
+      objectMetadataIdToUniversalIdentifierMap.get(
+        fieldMetadataEntity.relationTargetObjectMetadataId,
+      ) ?? null;
+
+    if (!isDefined(relationTargetObjectMetadataUniversalIdentifier)) {
+      throw new FlatEntityMapsException(
+        `Relation target object metadata with id ${fieldMetadataEntity.relationTargetObjectMetadataId} not found when building flat field metadata for field ${fieldMetadataEntity.id}`,
+        FlatEntityMapsExceptionCode.ENTITY_NOT_FOUND,
+      );
+    }
+  }
+
+  let relationTargetFieldMetadataUniversalIdentifier: string | null = null;
+
+  if (isDefined(fieldMetadataEntity.relationTargetFieldMetadataId)) {
+    relationTargetFieldMetadataUniversalIdentifier =
+      fieldMetadataIdToUniversalIdentifierMap.get(
+        fieldMetadataEntity.relationTargetFieldMetadataId,
+      ) ?? null;
+
+    if (!isDefined(relationTargetFieldMetadataUniversalIdentifier)) {
+      throw new FlatEntityMapsException(
+        `Relation target field metadata with id ${fieldMetadataEntity.relationTargetFieldMetadataId} not found when building flat field metadata for field ${fieldMetadataEntity.id}`,
+        FlatEntityMapsExceptionCode.ENTITY_NOT_FOUND,
+      );
+    }
+  }
+
+  const settings = fieldMetadataEntity.settings;
+  const isRelationSettings =
+    isFieldMetadataSettingsOfType(settings, FieldMetadataType.RELATION) ||
+    isFieldMetadataSettingsOfType(settings, FieldMetadataType.MORPH_RELATION);
+
+  const settingsWithUniversalIdentifiers = isRelationSettings
+    ? {
+        ...settings,
+        ...(isDefined(settings.junctionTargetFieldId) && {
+          junctionTargetFieldUniversalIdentifier:
+            fieldMetadataIdToUniversalIdentifierMap.get(
+              settings.junctionTargetFieldId,
+            ),
+        }),
+      }
+    : settings;
 
   return {
     ...fieldMetadataWithoutRelations,
-    uniqueIdentifier:
-      fieldMetadataWithoutRelations.standardId ??
-      fieldMetadataWithoutRelations.id,
-    flatRelationTargetFieldMetadata: null,
-    flatRelationTargetObjectMetadata: null,
+    universalIdentifier: fieldMetadataWithoutRelations.universalIdentifier,
+    createdAt: fieldMetadataWithoutRelations.createdAt.toISOString(),
+    updatedAt: fieldMetadataWithoutRelations.updatedAt.toISOString(),
+    kanbanAggregateOperationViewIds:
+      fieldMetadataEntity.kanbanAggregateOperationViews.map(({ id }) => id),
+    calendarViewIds: fieldMetadataEntity.calendarViews.map(({ id }) => id),
+    mainGroupByFieldMetadataViewIds:
+      fieldMetadataEntity.mainGroupByFieldMetadataViews?.map(({ id }) => id) ??
+      [],
+    viewFieldIds: fieldMetadataEntity.viewFields.map(({ id }) => id),
+    viewFilterIds: fieldMetadataEntity.viewFilters.map(({ id }) => id),
+    fieldPermissionIds:
+      fieldMetadataEntity.fieldPermissions?.map(({ id }) => id) ?? [],
+    applicationUniversalIdentifier,
+    objectMetadataUniversalIdentifier,
+    relationTargetObjectMetadataUniversalIdentifier,
+    relationTargetFieldMetadataUniversalIdentifier,
+    viewFieldUniversalIdentifiers: fieldMetadataEntity.viewFields.map(
+      ({ universalIdentifier }) => universalIdentifier,
+    ),
+    viewFilterUniversalIdentifiers: fieldMetadataEntity.viewFilters.map(
+      ({ universalIdentifier }) => universalIdentifier,
+    ),
+    kanbanAggregateOperationViewUniversalIdentifiers:
+      fieldMetadataEntity.kanbanAggregateOperationViews.map(
+        ({ universalIdentifier }) => universalIdentifier,
+      ),
+    calendarViewUniversalIdentifiers: fieldMetadataEntity.calendarViews.map(
+      ({ universalIdentifier }) => universalIdentifier,
+    ),
+    mainGroupByFieldMetadataViewUniversalIdentifiers:
+      fieldMetadataEntity.mainGroupByFieldMetadataViews?.map(
+        ({ universalIdentifier }) => universalIdentifier,
+      ) ?? [],
+    viewSortIds: fieldMetadataEntity.viewSorts?.map(({ id }) => id) ?? [],
+    viewSortUniversalIdentifiers:
+      fieldMetadataEntity.viewSorts?.map(
+        ({ universalIdentifier }) => universalIdentifier,
+      ) ?? [],
+    fieldPermissionUniversalIdentifiers:
+      fieldMetadataEntity.fieldPermissions?.map(
+        ({ universalIdentifier }) => universalIdentifier,
+      ) ?? [],
+    universalSettings: settingsWithUniversalIdentifiers,
   };
 };

@@ -10,9 +10,11 @@ import { updateRecordFromCache } from '@/object-record/cache/utils/updateRecordF
 import { DEFAULT_MUTATION_BATCH_SIZE } from '@/object-record/constants/DefaultMutationBatchSize';
 import { useObjectPermissions } from '@/object-record/hooks/useObjectPermissions';
 import { useRestoreManyRecordsMutation } from '@/object-record/hooks/useRestoreManyRecordsMutation';
+import { useUpsertRecordsInStore } from '@/object-record/record-store/hooks/useUpsertRecordsInStore';
 import { type ObjectRecord } from '@/object-record/types/ObjectRecord';
+import { dispatchObjectRecordOperationBrowserEvent } from '@/browser-event/utils/dispatchObjectRecordOperationBrowserEvent';
 import { getRestoreManyRecordsMutationResponseField } from '@/object-record/utils/getRestoreManyRecordsMutationResponseField';
-import { useRecoilValue } from 'recoil';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { capitalize, isDefined } from 'twenty-shared/utils';
 import { sleep } from '~/utils/sleep';
 
@@ -30,7 +32,9 @@ type RestoreManyRecordsProps = {
 export const useRestoreManyRecords = ({
   objectNameSingular,
 }: useRestoreManyRecordProps) => {
-  const apiConfig = useRecoilValue(apiConfigState);
+  const { upsertRecordsInStore } = useUpsertRecordsInStore();
+
+  const apiConfig = useAtomStateValue(apiConfigState);
 
   const mutationPageSize =
     apiConfig?.mutationMaximumAffectedRecords ?? DEFAULT_MUTATION_BATCH_SIZE;
@@ -119,6 +123,8 @@ export const useRestoreManyRecords = ({
               currentRecord: cachedRecordWithConnection,
               updatedRecord: optimisticRecordWithConnection,
               objectMetadataItems,
+              objectPermissionsByObjectMetadataId,
+              upsertRecordsInStore,
             });
           }
         });
@@ -179,6 +185,8 @@ export const useRestoreManyRecords = ({
                 currentRecord: optimisticRecordWithConnection,
                 updatedRecord: cachedRecordWithConnection,
                 objectMetadataItems,
+                objectPermissionsByObjectMetadataId,
+                upsertRecordsInStore,
               });
             }
           });
@@ -187,9 +195,19 @@ export const useRestoreManyRecords = ({
         });
 
       const restoredRecordsForThisBatch =
-        restoredRecordsResponse.data?.[mutationResponseField] ?? [];
+        (restoredRecordsResponse.data as Record<string, any>)?.[
+          mutationResponseField
+        ] ?? [];
 
       restoredRecords.push(...restoredRecordsForThisBatch);
+
+      dispatchObjectRecordOperationBrowserEvent({
+        objectMetadataItem,
+        operation: {
+          type: 'restore-many',
+          restoredRecords: restoredRecordsForThisBatch,
+        },
+      });
 
       if (isDefined(delayInMsBetweenRequests)) {
         await sleep(delayInMsBetweenRequests);

@@ -6,10 +6,11 @@ import fs from 'fs';
 import bytes from 'bytes';
 import { useContainer } from 'class-validator';
 import session from 'express-session';
-import { graphqlUploadExpress } from 'graphql-upload';
+import graphqlUploadExpress from 'graphql-upload/graphqlUploadExpress.mjs';
 
 import { NodeEnvironment } from 'src/engine/core-modules/twenty-config/interfaces/node-environment.interface';
 
+import { setPgDateTypeParser } from 'src/database/pg/set-pg-date-type-parser';
 import { LoggerService } from 'src/engine/core-modules/logger/logger.service';
 import { getSessionStorageOptions } from 'src/engine/core-modules/session-storage/session-storage.module-factory';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
@@ -21,7 +22,10 @@ import './instrument';
 import { settings } from './engine/constants/settings';
 import { generateFrontConfig } from './utils/generate-front-config';
 
+// Trigger
 const bootstrap = async () => {
+  setPgDateTypeParser();
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     cors: true,
     bufferLogs: process.env.LOGGER_IS_BUFFER_ENABLED === 'true',
@@ -59,7 +63,7 @@ const bootstrap = async () => {
   app.use(
     '/graphql',
     graphqlUploadExpress({
-      maxFieldSize: bytes(settings.storage.maxFileSize),
+      maxFieldSize: bytes(settings.storage.maxFileSize)!,
       maxFiles: 10,
     }),
   );
@@ -67,7 +71,7 @@ const bootstrap = async () => {
   app.use(
     '/metadata',
     graphqlUploadExpress({
-      maxFieldSize: bytes(settings.storage.maxFileSize),
+      maxFieldSize: bytes(settings.storage.maxFileSize)!,
       maxFiles: 10,
     }),
   );

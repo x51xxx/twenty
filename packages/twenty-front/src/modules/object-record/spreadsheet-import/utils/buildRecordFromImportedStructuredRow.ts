@@ -8,12 +8,16 @@ import {
 } from '@/spreadsheet-import/types';
 import { isNonEmptyString } from '@sniptt/guards';
 import { parsePhoneNumberWithError, type CountryCode } from 'libphonenumber-js';
-import { assertUnreachable, isDefined } from 'twenty-shared/utils';
+import {
+  assertUnreachable,
+  isDefined,
+  isEmptyObject,
+  normalizeUrlOrigin,
+} from 'twenty-shared/utils';
 import { z } from 'zod';
 import { FieldMetadataType, RelationType } from '~/generated-metadata/graphql';
 import { castToString } from '~/utils/castToString';
 import { convertCurrencyAmountToCurrencyMicros } from '~/utils/convertCurrencyToCurrencyMicros';
-import { isEmptyObject } from '~/utils/isEmptyObject';
 import { stripSimpleQuotesFromString } from '~/utils/string/stripSimpleQuotesFromString';
 
 type BuildRecordFromImportedStructuredRowArgs = {
@@ -48,6 +52,9 @@ const buildRelationConnectFieldRecord = (
   fieldMetadataItem: FieldMetadataItem,
   importedStructuredRow: ImportedStructuredRow,
   spreadsheetImportFields: SpreadsheetImportFields,
+  compositeFieldTransformConfigs: Partial<
+    Record<FieldMetadataType, Record<string, ((value: any) => any) | undefined>>
+  >,
 ) => {
   if (fieldMetadataItem.relation?.type !== RelationType.MANY_TO_ONE)
     return undefined;
@@ -70,13 +77,19 @@ const buildRelationConnectFieldRecord = (
         isCompositeFieldType(uniqueFieldMetadataItem.type) &&
         isDefined(field.compositeSubFieldKey)
       ) {
+        const rawValue = importedStructuredRow[field.key];
+        const transformConfig =
+          compositeFieldTransformConfigs[uniqueFieldMetadataItem.type];
+        const transform = transformConfig?.[field.compositeSubFieldKey];
+        const value = transform ? transform(rawValue) : rawValue;
+
         return {
           ...acc,
           [uniqueFieldMetadataItem.name]: {
             ...(isDefined(acc?.[uniqueFieldMetadataItem.name])
               ? acc[uniqueFieldMetadataItem.name]
               : {}),
-            [field.compositeSubFieldKey]: importedStructuredRow[field.key],
+            [field.compositeSubFieldKey]: value,
           },
         };
       }
@@ -172,7 +185,7 @@ export const buildRecordFromImportedStructuredRow = ({
     },
     [FieldMetadataType.LINKS]: {
       primaryLinkLabel: castToString,
-      primaryLinkUrl: castToString,
+      primaryLinkUrl: normalizeUrlOrigin,
       secondaryLinks: linkArrayJSONSchema.parse,
     },
 
@@ -183,13 +196,13 @@ export const buildRecordFromImportedStructuredRow = ({
       additionalPhones: phoneArrayJSONSchema.parse,
     },
 
-    [FieldMetadataType.RICH_TEXT_V2]: {
+    [FieldMetadataType.RICH_TEXT]: {
       blocknote: castToString,
       markdown: castToString,
     },
 
     [FieldMetadataType.EMAILS]: {
-      primaryEmail: castToString,
+      primaryEmail: (value: unknown) => castToString(value).toLowerCase(),
       additionalEmails: stringArrayJSONSchema.parse,
     },
     [FieldMetadataType.FULL_NAME]: {
@@ -209,7 +222,7 @@ export const buildRecordFromImportedStructuredRow = ({
       case FieldMetadataType.CURRENCY:
       case FieldMetadataType.ADDRESS:
       case FieldMetadataType.LINKS:
-      case FieldMetadataType.RICH_TEXT_V2:
+      case FieldMetadataType.RICH_TEXT:
       case FieldMetadataType.EMAILS:
       case FieldMetadataType.FULL_NAME: {
         const compositeData = buildCompositeFieldRecord(
@@ -287,19 +300,28 @@ export const buildRecordFromImportedStructuredRow = ({
         break;
       }
       case FieldMetadataType.BOOLEAN:
-        recordToBuild[field.name] =
-          importedFieldValue === 'true' || importedFieldValue === true;
+        if (isDefined(importedFieldValue)) {
+          recordToBuild[field.name] =
+            importedFieldValue === 'true' || importedFieldValue === true;
+        }
         break;
       case FieldMetadataType.NUMBER:
       case FieldMetadataType.NUMERIC:
-        recordToBuild[field.name] = Number(importedFieldValue);
+        if (isDefined(importedFieldValue)) {
+          recordToBuild[field.name] = Number(importedFieldValue);
+        }
         break;
       case FieldMetadataType.RELATION: {
-        recordToBuild[field.name] = buildRelationConnectFieldRecord(
+        const relationConnectFieldValue = buildRelationConnectFieldRecord(
           field,
           importedStructuredRow,
           spreadsheetImportFields,
+          COMPOSITE_FIELD_TRANSFORM_CONFIGS,
         );
+        if (isDefined(relationConnectFieldValue)) {
+          recordToBuild[field.name] = relationConnectFieldValue;
+        }
+
         break;
       }
       case FieldMetadataType.ACTOR:
@@ -310,8 +332,10 @@ export const buildRecordFromImportedStructuredRow = ({
         break;
       case FieldMetadataType.ARRAY:
       case FieldMetadataType.MULTI_SELECT: {
-        recordToBuild[field.name] =
-          stringArrayJSONSchema.parse(importedFieldValue);
+        if (isDefined(importedFieldValue)) {
+          recordToBuild[field.name] =
+            stringArrayJSONSchema.parse(importedFieldValue);
+        }
         break;
       }
       case FieldMetadataType.RAW_JSON: {
@@ -325,13 +349,22 @@ export const buildRecordFromImportedStructuredRow = ({
         break;
       }
       case FieldMetadataType.UUID:
+        if (
+          isDefined(importedFieldValue) &&
+          isNonEmptyString(importedFieldValue)
+        ) {
+          recordToBuild[field.name] = importedFieldValue;
+        }
+        break;
       case FieldMetadataType.DATE:
       case FieldMetadataType.DATE_TIME:
         if (
           isDefined(importedFieldValue) &&
           isNonEmptyString(importedFieldValue)
         ) {
-          recordToBuild[field.name] = importedFieldValue;
+          recordToBuild[field.name] = new Date(
+            importedFieldValue,
+          ).toISOString();
         }
         break;
       case FieldMetadataType.SELECT:
@@ -341,9 +374,9 @@ export const buildRecordFromImportedStructuredRow = ({
           recordToBuild[field.name] = importedFieldValue;
         }
         break;
+      case FieldMetadataType.FILES:
       case FieldMetadataType.MORPH_RELATION:
       case FieldMetadataType.POSITION:
-      case FieldMetadataType.RICH_TEXT:
       case FieldMetadataType.TS_VECTOR:
         break;
       default:

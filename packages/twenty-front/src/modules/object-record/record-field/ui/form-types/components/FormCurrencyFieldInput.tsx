@@ -3,11 +3,12 @@ import { FormNestedFieldInputContainer } from '@/object-record/record-field/ui/f
 import { FormNumberFieldInput } from '@/object-record/record-field/ui/form-types/components/FormNumberFieldInput';
 import { FormSelectFieldInput } from '@/object-record/record-field/ui/form-types/components/FormSelectFieldInput';
 import { type VariablePickerComponent } from '@/object-record/record-field/ui/form-types/types/VariablePickerComponent';
-import { type CurrencyCode } from '@/object-record/record-field/ui/types/CurrencyCode';
 import { type FormFieldCurrencyValue } from '@/object-record/record-field/ui/types/FieldMetadata';
 import { CURRENCIES } from '@/settings/data-model/constants/Currencies';
 import { InputLabel } from '@/ui/input/components/InputLabel';
+import { t } from '@lingui/core/macro';
 import { useMemo } from 'react';
+import { type CurrencyCode } from 'twenty-shared/constants';
 import { IconCircleOff } from 'twenty-ui/display';
 
 type FormCurrencyFieldInputProps = {
@@ -28,7 +29,7 @@ export const FormCurrencyFieldInput = ({
   const currencies = useMemo(() => {
     return [
       {
-        label: 'No currency',
+        label: t`No currency`,
         value: '',
         Icon: IconCircleOff,
       },
@@ -41,7 +42,7 @@ export const FormCurrencyFieldInput = ({
   ) => {
     onChange({
       currencyCode: defaultValue?.currencyCode ?? null,
-      amountMicros: newAmountMicros ?? null,
+      amountMicros: newAmountMicros,
     });
   };
 
@@ -57,7 +58,7 @@ export const FormCurrencyFieldInput = ({
       {label ? <InputLabel>{label}</InputLabel> : null}
       <FormNestedFieldInputContainer>
         <FormSelectFieldInput
-          label="Currency Code"
+          label={t`Currency Code`}
           defaultValue={defaultValue?.currencyCode ?? ''}
           onChange={handleCurrencyCodeChange}
           options={currencies}
@@ -65,11 +66,11 @@ export const FormCurrencyFieldInput = ({
           readonly={readonly}
         />
         <FormNumberFieldInput
-          label="Amount Micros"
+          label={t`Amount Micros`}
           defaultValue={defaultValue?.amountMicros ?? ''}
           onChange={handleAmountMicrosChange}
           VariablePicker={VariablePicker}
-          placeholder="Set 3210000 for $3.21"
+          hint={t`Enter amount x 1 000 000 (e.g. $3.21 → 3210000)`}
           readonly={readonly}
         />
       </FormNestedFieldInputContainer>

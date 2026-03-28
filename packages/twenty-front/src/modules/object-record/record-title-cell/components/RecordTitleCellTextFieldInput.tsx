@@ -9,7 +9,7 @@ import { turnIntoUndefinedIfWhitespacesOnly } from '~/utils/string/turnIntoUndef
 
 type RecordTitleCellTextFieldInputProps = {
   instanceId: string;
-  sizeVariant?: 'xs' | 'md';
+  sizeVariant?: 'xs' | 'sm' | 'md';
 };
 
 export const RecordTitleCellTextFieldInput = ({
@@ -50,6 +50,7 @@ export const RecordTitleCellTextFieldInput = ({
   });
 
   const handleFocus = (event: React.FocusEvent<HTMLInputElement>) => {
+    // Ensure draft value is set from field value if it's undefined or empty when focusing
     if (isDefined(draftValue)) {
       event.target.select();
     }

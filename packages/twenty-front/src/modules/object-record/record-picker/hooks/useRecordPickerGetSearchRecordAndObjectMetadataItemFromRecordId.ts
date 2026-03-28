@@ -1,7 +1,8 @@
 import { useObjectMetadataItems } from '@/object-metadata/hooks/useObjectMetadataItems';
-import { searchRecordStoreComponentFamilyState } from '@/object-record/record-picker/multiple-record-picker/states/searchRecordStoreComponentFamilyState';
+import { searchRecordStoreFamilyState } from '@/object-record/record-picker/multiple-record-picker/states/searchRecordStoreComponentFamilyState';
 import { multipleRecordPickerSinglePickableMorphItemComponentFamilySelector } from '@/object-record/record-picker/multiple-record-picker/states/selectors/multipleRecordPickerSinglePickableMorphItemComponentFamilySelector';
-import { useRecoilComponentFamilyValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentFamilyValue';
+import { useAtomFamilyStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomFamilyStateValue';
+import { useAtomComponentFamilySelectorValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentFamilySelectorValue';
 import { isDefined } from 'twenty-shared/utils';
 
 type UseRecordPickerGetRecordAndObjectMetadataItemFromRecordIdProps = {
@@ -14,17 +15,17 @@ export const useRecordPickerGetSearchRecordAndObjectMetadataItemFromRecordId =
   }: UseRecordPickerGetRecordAndObjectMetadataItemFromRecordIdProps) => {
     const { objectMetadataItems } = useObjectMetadataItems();
 
-    const pickableMorphItem = useRecoilComponentFamilyValue(
+    const pickableMorphItem = useAtomComponentFamilySelectorValue(
       multipleRecordPickerSinglePickableMorphItemComponentFamilySelector,
       recordId,
     );
 
-    const searchRecord = useRecoilComponentFamilyValue(
-      searchRecordStoreComponentFamilyState,
+    const searchRecordStore = useAtomFamilyStateValue(
+      searchRecordStoreFamilyState,
       recordId,
     );
 
-    if (!isDefined(pickableMorphItem) || !isDefined(searchRecord)) {
+    if (!isDefined(pickableMorphItem) || !isDefined(searchRecordStore)) {
       return { searchRecord: null, objectMetadataItem: null };
     }
 
@@ -37,5 +38,5 @@ export const useRecordPickerGetSearchRecordAndObjectMetadataItemFromRecordId =
       return { searchRecord: null, objectMetadataItem: null };
     }
 
-    return { searchRecord, objectMetadataItem };
+    return { searchRecord: searchRecordStore, objectMetadataItem };
   };

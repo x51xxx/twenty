@@ -1,7 +1,8 @@
 import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import { IconMinus, IconPlus } from 'twenty-ui/display';
 import { IconButton } from 'twenty-ui/input';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { castAsNumberOrNull } from '~/utils/cast-as-number-or-null';
 
 type SettingsCounterProps = {
@@ -10,23 +11,28 @@ type SettingsCounterProps = {
   minValue?: number;
   maxValue?: number;
   disabled?: boolean;
+  showButtons?: boolean;
 };
 
-const StyledCounterContainer = styled.div`
+const StyledCounterContainer = styled.div<{ showButtons: boolean }>`
   align-items: center;
   display: flex;
-  gap: ${({ theme }) => theme.spacing(1)};
+  gap: ${themeCssVariables.spacing[1]};
   margin-left: auto;
-  width: ${({ theme }) => theme.spacing(30)};
+  width: ${({ showButtons }) =>
+    showButtons
+      ? themeCssVariables.spacing[30]
+      : themeCssVariables.spacing[16]};
 `;
 
-const StyledTextInput = styled(SettingsTextInput)`
-  width: ${({ theme }) => theme.spacing(16)};
-  input {
-    width: ${({ theme }) => theme.spacing(16)};
-    height: ${({ theme }) => theme.spacing(6)};
+const StyledTextInputContainer = styled.div`
+  width: ${themeCssVariables.spacing[16]};
+
+  > * input {
+    font-weight: ${themeCssVariables.font.weight.medium};
+    height: ${themeCssVariables.spacing[6]};
     text-align: center;
-    font-weight: ${({ theme }) => theme.font.weight.medium};
+    width: ${themeCssVariables.spacing[16]};
   }
 `;
 
@@ -34,11 +40,12 @@ export const SettingsCounter = ({
   value,
   onChange,
   minValue = 0,
-  maxValue = 100,
+  maxValue,
   disabled = false,
+  showButtons = true,
 }: SettingsCounterProps) => {
   const handleIncrementCounter = () => {
-    if (value < maxValue) {
+    if (maxValue === undefined || value < maxValue) {
       onChange(value + 1);
     }
   };
@@ -60,7 +67,7 @@ export const SettingsCounter = ({
       return;
     }
 
-    if (castedNumber > maxValue) {
+    if (maxValue !== undefined && castedNumber > maxValue) {
       onChange(maxValue);
       return;
     }
@@ -68,29 +75,35 @@ export const SettingsCounter = ({
   };
 
   return (
-    <StyledCounterContainer>
-      <IconButton
-        size="small"
-        Icon={IconMinus}
-        variant="secondary"
-        onClick={handleDecrementCounter}
-        disabled={disabled}
-      />
-      <StyledTextInput
-        instanceId="settings-counter-input"
-        name="counter"
-        fullWidth
-        value={value.toString()}
-        onChange={handleTextInputChange}
-        disabled={disabled}
-      />
-      <IconButton
-        size="small"
-        Icon={IconPlus}
-        variant="secondary"
-        onClick={handleIncrementCounter}
-        disabled={disabled}
-      />
+    <StyledCounterContainer showButtons={showButtons}>
+      {showButtons && (
+        <IconButton
+          size="small"
+          Icon={IconMinus}
+          variant="secondary"
+          onClick={handleDecrementCounter}
+          disabled={disabled}
+        />
+      )}
+      <StyledTextInputContainer>
+        <SettingsTextInput
+          instanceId="settings-counter-input"
+          name="counter"
+          fullWidth
+          value={value.toString()}
+          onChange={handleTextInputChange}
+          disabled={disabled}
+        />
+      </StyledTextInputContainer>
+      {showButtons && (
+        <IconButton
+          size="small"
+          Icon={IconPlus}
+          variant="secondary"
+          onClick={handleIncrementCounter}
+          disabled={disabled}
+        />
+      )}
     </StyledCounterContainer>
   );
 };

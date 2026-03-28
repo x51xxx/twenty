@@ -9,34 +9,32 @@ describe('transformStripeSubscriptionEventToDatabaseSubscription', () => {
   const mockTimestamp = 1672531200; // 2023-01-01 00:00:00 UTC
 
   const createMockSubscriptionData = (overrides = {}) => ({
-    object: {
-      id: 'sub_123',
-      customer: 'cus_123',
-      status: 'active',
-      items: {
-        data: [
-          {
-            plan: {
-              interval: 'month',
-            },
+    id: 'sub_123',
+    customer: 'cus_123',
+    status: 'active',
+    items: {
+      data: [
+        {
+          plan: {
+            interval: 'month',
           },
-        ],
-      },
-      cancel_at_period_end: false,
-      currency: 'usd',
-      current_period_end: mockTimestamp,
-      current_period_start: mockTimestamp - 2592000, // 30 days before end
-      metadata: {},
-      collection_method: 'charge_automatically',
-      automatic_tax: null,
-      cancellation_details: null,
-      ended_at: null,
-      trial_start: null,
-      trial_end: null,
-      cancel_at: null,
-      canceled_at: null,
-      ...overrides,
+          current_period_end: mockTimestamp,
+          current_period_start: mockTimestamp - 2592000, // 30 days before end
+        },
+      ],
     },
+    cancel_at_period_end: false,
+    currency: 'usd',
+    metadata: {},
+    collection_method: 'charge_automatically',
+    automatic_tax: null,
+    cancellation_details: null,
+    ended_at: null,
+    trial_start: null,
+    trial_end: null,
+    cancel_at: null,
+    canceled_at: null,
+    ...overrides,
   });
 
   it('should transform basic subscription data correctly', () => {
@@ -66,6 +64,7 @@ describe('transformStripeSubscriptionEventToDatabaseSubscription', () => {
       trialEnd: undefined,
       cancelAt: undefined,
       canceledAt: undefined,
+      phases: [],
     });
   });
 
@@ -122,7 +121,7 @@ describe('transformStripeSubscriptionEventToDatabaseSubscription', () => {
       cancellation_details: {
         comment: 'Customer requested cancellation',
         feedback: 'too_expensive',
-        reason: 'customer_request',
+        reason: 'cancellation_requested',
       },
     });
 
@@ -137,7 +136,7 @@ describe('transformStripeSubscriptionEventToDatabaseSubscription', () => {
     expect(result.cancellationDetails).toEqual({
       comment: 'Customer requested cancellation',
       feedback: 'too_expensive',
-      reason: 'customer_request',
+      reason: 'cancellation_requested',
     });
   });
 
@@ -145,7 +144,11 @@ describe('transformStripeSubscriptionEventToDatabaseSubscription', () => {
     const mockData = createMockSubscriptionData({
       automatic_tax: {
         enabled: true,
-        status: 'calculated',
+        disabled_reason: null,
+        liability: {
+          type: 'self',
+          account: 'acct_123',
+        },
       },
     });
 
@@ -156,7 +159,11 @@ describe('transformStripeSubscriptionEventToDatabaseSubscription', () => {
 
     expect(result.automaticTax).toEqual({
       enabled: true,
-      status: 'calculated',
+      disabled_reason: null,
+      liability: {
+        type: 'self',
+        account: 'acct_123',
+      },
     });
   });
 

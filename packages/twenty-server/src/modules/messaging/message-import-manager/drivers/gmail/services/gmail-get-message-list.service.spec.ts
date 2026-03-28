@@ -1,23 +1,47 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 
+import { google } from 'googleapis';
 import { ConnectedAccountProvider } from 'twenty-shared/types';
 
+import { type MessageFolder } from 'src/modules/messaging/message-folder-manager/interfaces/message-folder-driver.interface';
+
+import { OAuth2ClientManagerService } from 'src/modules/connected-account/oauth2-client-manager/services/oauth2-client-manager.service';
 import { type ConnectedAccountWorkspaceEntity } from 'src/modules/connected-account/standard-objects/connected-account.workspace-entity';
-import { GmailClientProvider } from 'src/modules/messaging/message-import-manager/drivers/gmail/providers/gmail-client.provider';
+import { MessageFolderImportPolicy } from 'src/modules/messaging/common/standard-objects/message-channel.workspace-entity';
+import { MessageFolderPendingSyncAction } from 'src/modules/messaging/common/standard-objects/message-folder.workspace-entity';
 import { GmailGetHistoryService } from 'src/modules/messaging/message-import-manager/drivers/gmail/services/gmail-get-history.service';
 import { GmailGetMessageListService } from 'src/modules/messaging/message-import-manager/drivers/gmail/services/gmail-get-message-list.service';
-import { GmailHandleErrorService } from 'src/modules/messaging/message-import-manager/drivers/gmail/services/gmail-handle-error.service';
+import { GmailMessageListFetchErrorHandler } from 'src/modules/messaging/message-import-manager/drivers/gmail/services/gmail-message-list-fetch-error-handler.service';
+import { computeGmailExcludeSearchFilter } from 'src/modules/messaging/message-import-manager/drivers/gmail/utils/compute-gmail-exclude-search-filter.util';
+
+const createMockFolder = (
+  overrides: Partial<MessageFolder> &
+    Pick<MessageFolder, 'name' | 'externalId' | 'isSynced'>,
+): MessageFolder => ({
+  id: `folder-${overrides.externalId}`,
+  syncCursor: null,
+  isSentFolder: false,
+  parentFolderId: null,
+  pendingSyncAction: MessageFolderPendingSyncAction.NONE,
+  ...overrides,
+});
 
 describe('GmailGetMessageListService', () => {
   let service: GmailGetMessageListService;
-  let gmailClientProvider: GmailClientProvider;
+  let oAuth2ClientManagerService: OAuth2ClientManagerService;
 
   const mockConnectedAccount: Pick<
     ConnectedAccountWorkspaceEntity,
-    'provider' | 'refreshToken' | 'id' | 'handle' | 'connectionParameters'
+    | 'provider'
+    | 'accessToken'
+    | 'refreshToken'
+    | 'id'
+    | 'handle'
+    | 'connectionParameters'
   > = {
     id: 'connected-account-id',
     provider: ConnectedAccountProvider.GOOGLE,
+    accessToken: 'access-token',
     refreshToken: 'refresh-token',
     handle: 'test@gmail.com',
     connectionParameters: {},
@@ -28,9 +52,9 @@ describe('GmailGetMessageListService', () => {
       providers: [
         GmailGetMessageListService,
         {
-          provide: GmailClientProvider,
+          provide: OAuth2ClientManagerService,
           useValue: {
-            getGmailClient: jest.fn(),
+            getGoogleOAuth2Client: jest.fn(),
           },
         },
         {
@@ -41,10 +65,9 @@ describe('GmailGetMessageListService', () => {
           },
         },
         {
-          provide: GmailHandleErrorService,
+          provide: GmailMessageListFetchErrorHandler,
           useValue: {
-            handleGmailMessageListFetchError: jest.fn(),
-            handleGmailMessagesImportError: jest.fn(),
+            handleError: jest.fn(),
           },
         },
       ],
@@ -53,7 +76,13 @@ describe('GmailGetMessageListService', () => {
     service = module.get<GmailGetMessageListService>(
       GmailGetMessageListService,
     );
-    gmailClientProvider = module.get<GmailClientProvider>(GmailClientProvider);
+    oAuth2ClientManagerService = module.get<OAuth2ClientManagerService>(
+      OAuth2ClientManagerService,
+    );
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('getMessageList', () => {
@@ -71,14 +100,26 @@ describe('GmailGetMessageListService', () => {
         },
       };
 
-      (gmailClientProvider.getGmailClient as jest.Mock).mockResolvedValue(
-        mockGmailClient,
-      );
+      jest.spyOn(google, 'gmail').mockReturnValue(mockGmailClient as never);
+
+      (
+        oAuth2ClientManagerService.getGoogleOAuth2Client as jest.Mock
+      ).mockResolvedValue({});
 
       const result = await service.getMessageLists({
-        messageChannel: { syncCursor: '', id: 'my-id' },
+        messageChannel: {
+          syncCursor: '',
+          id: 'my-id',
+          messageFolderImportPolicy: MessageFolderImportPolicy.SELECTED_FOLDERS,
+        },
         connectedAccount: mockConnectedAccount,
-        messageFolders: [],
+        messageFolders: [
+          createMockFolder({
+            name: 'INBOX',
+            externalId: 'INBOX',
+            isSynced: true,
+          }),
+        ],
       });
 
       expect(result[0].messageExternalIds).toHaveLength(0);
@@ -122,14 +163,26 @@ describe('GmailGetMessageListService', () => {
         },
       };
 
-      (gmailClientProvider.getGmailClient as jest.Mock).mockResolvedValue(
-        mockGmailClient,
-      );
+      jest.spyOn(google, 'gmail').mockReturnValue(mockGmailClient as never);
+
+      (
+        oAuth2ClientManagerService.getGoogleOAuth2Client as jest.Mock
+      ).mockResolvedValue({});
 
       const result = await service.getMessageLists({
-        messageChannel: { syncCursor: '', id: 'my-id' },
+        messageChannel: {
+          syncCursor: '',
+          id: 'my-id',
+          messageFolderImportPolicy: MessageFolderImportPolicy.SELECTED_FOLDERS,
+        },
         connectedAccount: mockConnectedAccount,
-        messageFolders: [],
+        messageFolders: [
+          createMockFolder({
+            name: 'INBOX',
+            externalId: 'INBOX',
+            isSynced: true,
+          }),
+        ],
       });
 
       expect(result[0].messageExternalIds).toHaveLength(5);
@@ -173,14 +226,26 @@ describe('GmailGetMessageListService', () => {
         },
       };
 
-      (gmailClientProvider.getGmailClient as jest.Mock).mockResolvedValue(
-        mockGmailClient,
-      );
+      jest.spyOn(google, 'gmail').mockReturnValue(mockGmailClient as never);
+
+      (
+        oAuth2ClientManagerService.getGoogleOAuth2Client as jest.Mock
+      ).mockResolvedValue({});
 
       const result = await service.getMessageLists({
-        messageChannel: { syncCursor: '', id: 'my-id' },
+        messageChannel: {
+          syncCursor: '',
+          id: 'my-id',
+          messageFolderImportPolicy: MessageFolderImportPolicy.SELECTED_FOLDERS,
+        },
         connectedAccount: mockConnectedAccount,
-        messageFolders: [],
+        messageFolders: [
+          createMockFolder({
+            name: 'INBOX',
+            externalId: 'INBOX',
+            isSynced: true,
+          }),
+        ],
       });
 
       expect(result[0].messageExternalIds).toHaveLength(3);
@@ -205,18 +270,183 @@ describe('GmailGetMessageListService', () => {
         },
       };
 
-      (gmailClientProvider.getGmailClient as jest.Mock).mockResolvedValue(
-        mockGmailClient,
-      );
+      jest.spyOn(google, 'gmail').mockReturnValue(mockGmailClient as never);
+
+      (
+        oAuth2ClientManagerService.getGoogleOAuth2Client as jest.Mock
+      ).mockResolvedValue({});
 
       const result = await service.getMessageLists({
-        messageChannel: { syncCursor: '', id: 'my-id' },
+        messageChannel: {
+          syncCursor: '',
+          id: 'my-id',
+          messageFolderImportPolicy: MessageFolderImportPolicy.SELECTED_FOLDERS,
+        },
         connectedAccount: mockConnectedAccount,
-        messageFolders: [],
+        messageFolders: [
+          createMockFolder({
+            name: 'INBOX',
+            externalId: 'INBOX',
+            isSynced: true,
+          }),
+        ],
       });
 
       expect(result[0].messageExternalIds).toHaveLength(0);
       expect(mockGmailClient.users.messages.list).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return empty array when no folders have isSynced=true with SELECTED_FOLDERS policy', async () => {
+      const mockGmailClient = {
+        users: {
+          messages: {
+            list: jest.fn(),
+          },
+        },
+      };
+
+      jest.spyOn(google, 'gmail').mockReturnValue(mockGmailClient as never);
+
+      (
+        oAuth2ClientManagerService.getGoogleOAuth2Client as jest.Mock
+      ).mockResolvedValue({});
+
+      const result = await service.getMessageLists({
+        messageChannel: {
+          syncCursor: '',
+          id: 'my-id',
+          messageFolderImportPolicy: MessageFolderImportPolicy.SELECTED_FOLDERS,
+        },
+        connectedAccount: mockConnectedAccount,
+        messageFolders: [
+          createMockFolder({
+            name: 'Personal',
+            externalId: 'Label_personal',
+            isSynced: false,
+          }),
+          createMockFolder({
+            name: 'Work',
+            externalId: 'Label_work',
+            isSynced: false,
+          }),
+        ],
+      });
+
+      expect(result).toEqual([]);
+      expect(mockGmailClient.users.messages.list).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('initial sync folder filtering', () => {
+    it('should build Gmail query with positive OR filter for synced folders', async () => {
+      const mockGmailClient = {
+        users: {
+          messages: {
+            list: jest.fn().mockResolvedValue({
+              data: { messages: [{ id: 'msg-1' }], nextPageToken: undefined },
+            }),
+            get: jest.fn().mockResolvedValue({
+              data: { historyId: '12345' },
+            }),
+          },
+        },
+      };
+
+      jest.spyOn(google, 'gmail').mockReturnValue(mockGmailClient as never);
+      (
+        oAuth2ClientManagerService.getGoogleOAuth2Client as jest.Mock
+      ).mockResolvedValue({});
+
+      const messageFolders = [
+        createMockFolder({
+          name: 'INBOX',
+          externalId: 'INBOX',
+          isSynced: true,
+        }),
+        createMockFolder({
+          name: 'Work',
+          externalId: 'Label_work',
+          isSynced: true,
+        }),
+        createMockFolder({
+          name: 'Personal',
+          externalId: 'Label_personal',
+          isSynced: false,
+        }),
+        createMockFolder({
+          name: 'Newsletters',
+          externalId: 'Label_newsletters',
+          isSynced: false,
+        }),
+      ];
+
+      await service.getMessageLists({
+        messageChannel: {
+          syncCursor: '',
+          id: 'channel-1',
+          messageFolderImportPolicy: MessageFolderImportPolicy.SELECTED_FOLDERS,
+        },
+        connectedAccount: mockConnectedAccount,
+        messageFolders,
+      });
+
+      const expectedQuery = computeGmailExcludeSearchFilter(
+        messageFolders,
+        MessageFolderImportPolicy.SELECTED_FOLDERS,
+      );
+
+      expect(mockGmailClient.users.messages.list).toHaveBeenCalledWith(
+        expect.objectContaining({
+          q: expectedQuery,
+        }),
+      );
+    });
+
+    it('should only include default exclusions when ALL_FOLDERS policy is set', async () => {
+      const mockGmailClient = {
+        users: {
+          messages: {
+            list: jest.fn().mockResolvedValue({
+              data: { messages: [{ id: 'msg-1' }], nextPageToken: undefined },
+            }),
+            get: jest.fn().mockResolvedValue({
+              data: { historyId: '12345' },
+            }),
+          },
+        },
+      };
+
+      jest.spyOn(google, 'gmail').mockReturnValue(mockGmailClient as never);
+      (
+        oAuth2ClientManagerService.getGoogleOAuth2Client as jest.Mock
+      ).mockResolvedValue({});
+
+      await service.getMessageLists({
+        messageChannel: {
+          syncCursor: '',
+          id: 'channel-1',
+          messageFolderImportPolicy: MessageFolderImportPolicy.ALL_FOLDERS,
+        },
+        connectedAccount: mockConnectedAccount,
+        messageFolders: [
+          createMockFolder({
+            name: 'INBOX',
+            externalId: 'INBOX',
+            isSynced: true,
+          }),
+          createMockFolder({
+            name: 'Personal',
+            externalId: 'Label_personal',
+            isSynced: false,
+          }),
+        ],
+      });
+
+      const callArgs = mockGmailClient.users.messages.list.mock.calls[0][0];
+
+      expect(callArgs.q).toContain('-label:spam');
+      expect(callArgs.q).toContain('-category:promotions');
+      expect(callArgs.q).not.toContain('label:inbox');
     });
   });
 });

@@ -1,15 +1,7 @@
 import { registerEnumType } from '@nestjs/graphql';
 
+import { FileFolder } from 'twenty-shared/types';
 import { type KebabCase } from 'type-fest';
-
-export enum FileFolder {
-  ProfilePicture = 'profile-picture',
-  WorkspaceLogo = 'workspace-logo',
-  Attachment = 'attachment',
-  PersonPicture = 'person-picture',
-  ServerlessFunction = 'serverless-function',
-  File = 'file',
-}
 
 registerEnumType(FileFolder, {
   name: 'FileFolder',
@@ -32,10 +24,40 @@ export const fileFolderConfigs: Record<FileFolder, FileFolderConfig> = {
   [FileFolder.PersonPicture]: {
     ignoreExpirationToken: false,
   },
-  [FileFolder.ServerlessFunction]: {
-    ignoreExpirationToken: false,
+  [FileFolder.CorePicture]: {
+    ignoreExpirationToken: true,
   },
   [FileFolder.File]: {
+    ignoreExpirationToken: false,
+  },
+  [FileFolder.AgentChat]: {
+    ignoreExpirationToken: false,
+  },
+  [FileFolder.BuiltLogicFunction]: {
+    ignoreExpirationToken: false,
+  },
+  [FileFolder.BuiltFrontComponent]: {
+    ignoreExpirationToken: false,
+  },
+  [FileFolder.PublicAsset]: {
+    ignoreExpirationToken: true,
+  },
+  [FileFolder.Source]: {
+    ignoreExpirationToken: false,
+  },
+  [FileFolder.FilesField]: {
+    ignoreExpirationToken: false,
+  },
+  [FileFolder.Dependencies]: {
+    ignoreExpirationToken: false,
+  },
+  [FileFolder.Workflow]: {
+    ignoreExpirationToken: false,
+  },
+  [FileFolder.AppTarball]: {
+    ignoreExpirationToken: false,
+  },
+  [FileFolder.GeneratedSdkClient]: {
     ignoreExpirationToken: false,
   },
 };

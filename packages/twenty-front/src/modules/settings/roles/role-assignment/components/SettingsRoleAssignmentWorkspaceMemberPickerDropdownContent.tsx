@@ -1,16 +1,16 @@
-import { currentWorkspaceMembersState } from '@/auth/states/currentWorkspaceMembersStates';
-import { type CurrentWorkspaceMember } from '@/auth/states/currentWorkspaceMemberState';
+import { currentWorkspaceMembersState } from '@/auth/states/currentWorkspaceMembersState';
 import { t } from '@lingui/core/macro';
-import { useRecoilValue } from 'recoil';
 import { isDefined } from 'twenty-shared/utils';
 import { MenuItem, MenuItemAvatar } from 'twenty-ui/navigation';
-import { type SearchRecord } from '~/generated-metadata/graphql';
+import { type SearchRecord } from '~/generated/graphql';
+import { type PartialWorkspaceMember } from '@/settings/roles/types/RoleWithPartialMembers';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 
 type SettingsRoleAssignmentWorkspaceMemberPickerDropdownContentProps = {
   loading: boolean;
   searchFilter: string;
   filteredWorkspaceMembers: SearchRecord[];
-  onSelect: (workspaceMember: CurrentWorkspaceMember) => void;
+  onSelect: (workspaceMember: PartialWorkspaceMember) => void;
 };
 
 export const SettingsRoleAssignmentWorkspaceMemberPickerDropdownContent = ({
@@ -19,7 +19,9 @@ export const SettingsRoleAssignmentWorkspaceMemberPickerDropdownContent = ({
   filteredWorkspaceMembers,
   onSelect,
 }: SettingsRoleAssignmentWorkspaceMemberPickerDropdownContentProps) => {
-  const currentWorkspaceMembers = useRecoilValue(currentWorkspaceMembersState);
+  const currentWorkspaceMembers = useAtomStateValue(
+    currentWorkspaceMembersState,
+  );
 
   if (loading) {
     return null;

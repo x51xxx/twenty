@@ -1,6 +1,6 @@
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import { RecordFieldListInputContextProvider } from '@/object-record/record-field-list/anchored-portal/components/RecordFieldListInputContextProvider';
 import { useFieldListFieldMetadataFromPosition } from '@/object-record/record-field-list/hooks/useFieldListFieldMetadataFromPosition';
 import { RecordFieldListComponentInstanceContext } from '@/object-record/record-field-list/states/contexts/RecordFieldListComponentInstanceContext';
@@ -12,7 +12,7 @@ import { useAvailableComponentInstanceIdOrThrow } from '@/ui/utilities/state/com
 import { isDefined } from 'twenty-shared/utils';
 
 type RecordFieldListCellEditModePortalProps = {
-  objectMetadataItem: ObjectMetadataItem;
+  objectMetadataItem: EnrichedObjectMetadataItem;
   recordId: string;
 };
 
@@ -24,7 +24,7 @@ export const RecordFieldListCellEditModePortal = ({
     RecordFieldListComponentInstanceContext,
   );
 
-  const editModePosition = useRecoilComponentValue(
+  const recordFieldListCellEditModePosition = useAtomComponentStateValue(
     recordFieldListCellEditModePositionComponentState,
   );
 
@@ -32,19 +32,26 @@ export const RecordFieldListCellEditModePortal = ({
     objectNameSingular: objectMetadataItem.nameSingular,
   });
 
-  if (!isDefined(editModePosition) || !isDefined(editedFieldMetadataItem)) {
+  if (
+    !isDefined(recordFieldListCellEditModePosition) ||
+    !isDefined(editedFieldMetadataItem)
+  ) {
     return null;
   }
 
   return (
     <RecordInlineCellAnchoredPortal
-      position={editModePosition}
       fieldMetadataItem={editedFieldMetadataItem}
       objectMetadataItem={objectMetadataItem}
       recordId={recordId}
       instanceIdPrefix={instanceId}
     >
-      <RecordFieldListInputContextProvider>
+      <RecordFieldListInputContextProvider
+        fieldMetadataItem={editedFieldMetadataItem}
+        objectMetadataItem={objectMetadataItem}
+        recordId={recordId}
+        instanceIdPrefix={instanceId}
+      >
         <RecordInlineCellEditMode>
           <FieldInput />
         </RecordInlineCellEditMode>

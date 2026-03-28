@@ -1,14 +1,18 @@
 import { UseGuards } from '@nestjs/common';
-import { Args, ArgsType, Field, Int, Query, Resolver } from '@nestjs/graphql';
+import { Args, ArgsType, Field, Int, Query } from '@nestjs/graphql';
 
 import { Max } from 'class-validator';
 
 import { UUIDScalarType } from 'src/engine/api/graphql/workspace-schema-builder/graphql-types/scalars';
 import { TIMELINE_CALENDAR_EVENTS_MAX_PAGE_SIZE } from 'src/engine/core-modules/calendar/constants/calendar.constants';
-import { TimelineCalendarEventsWithTotal } from 'src/engine/core-modules/calendar/dtos/timeline-calendar-events-with-total.dto';
+import { TimelineCalendarEventsWithTotalDTO } from 'src/engine/core-modules/calendar/dtos/timeline-calendar-events-with-total.dto';
 import { TimelineCalendarEventService } from 'src/engine/core-modules/calendar/timeline-calendar-event.service';
+import { AuthWorkspace } from 'src/engine/decorators/auth/auth-workspace.decorator';
 import { AuthWorkspaceMemberId } from 'src/engine/decorators/auth/auth-workspace-member-id.decorator';
+import { CoreResolver } from 'src/engine/api/graphql/graphql-config/decorators/core-resolver.decorator';
+import { CustomPermissionGuard } from 'src/engine/guards/custom-permission.guard';
 import { WorkspaceAuthGuard } from 'src/engine/guards/workspace-auth.guard';
+import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 
 @ArgsType()
 class GetTimelineCalendarEventsFromPersonIdArgs {
@@ -49,23 +53,25 @@ class GetTimelineCalendarEventsFromOpportunityIdArgs {
   pageSize: number;
 }
 
-@UseGuards(WorkspaceAuthGuard)
-@Resolver(() => TimelineCalendarEventsWithTotal)
+@UseGuards(WorkspaceAuthGuard, CustomPermissionGuard)
+@CoreResolver(() => TimelineCalendarEventsWithTotalDTO)
 export class TimelineCalendarEventResolver {
   constructor(
     private readonly timelineCalendarEventService: TimelineCalendarEventService,
   ) {}
 
-  @Query(() => TimelineCalendarEventsWithTotal)
+  @Query(() => TimelineCalendarEventsWithTotalDTO)
   async getTimelineCalendarEventsFromPersonId(
     @Args()
     { personId, page, pageSize }: GetTimelineCalendarEventsFromPersonIdArgs,
     @AuthWorkspaceMemberId() workspaceMemberId: string,
+    @AuthWorkspace() workspace: WorkspaceEntity,
   ) {
     const timelineCalendarEvents =
       await this.timelineCalendarEventService.getCalendarEventsFromPersonIds({
         currentWorkspaceMemberId: workspaceMemberId,
         personIds: [personId],
+        workspaceId: workspace.id,
         page,
         pageSize,
       });
@@ -73,16 +79,18 @@ export class TimelineCalendarEventResolver {
     return timelineCalendarEvents;
   }
 
-  @Query(() => TimelineCalendarEventsWithTotal)
+  @Query(() => TimelineCalendarEventsWithTotalDTO)
   async getTimelineCalendarEventsFromCompanyId(
     @Args()
     { companyId, page, pageSize }: GetTimelineCalendarEventsFromCompanyIdArgs,
     @AuthWorkspaceMemberId() workspaceMemberId: string,
+    @AuthWorkspace() workspace: WorkspaceEntity,
   ) {
     const timelineCalendarEvents =
       await this.timelineCalendarEventService.getCalendarEventsFromCompanyId({
         currentWorkspaceMemberId: workspaceMemberId,
         companyId,
+        workspaceId: workspace.id,
         page,
         pageSize,
       });
@@ -90,7 +98,7 @@ export class TimelineCalendarEventResolver {
     return timelineCalendarEvents;
   }
 
-  @Query(() => TimelineCalendarEventsWithTotal)
+  @Query(() => TimelineCalendarEventsWithTotalDTO)
   async getTimelineCalendarEventsFromOpportunityId(
     @Args()
     {
@@ -99,12 +107,14 @@ export class TimelineCalendarEventResolver {
       pageSize,
     }: GetTimelineCalendarEventsFromOpportunityIdArgs,
     @AuthWorkspaceMemberId() workspaceMemberId: string,
+    @AuthWorkspace() workspace: WorkspaceEntity,
   ) {
     const timelineCalendarEvents =
       await this.timelineCalendarEventService.getCalendarEventsFromOpportunityId(
         {
           currentWorkspaceMemberId: workspaceMemberId,
           opportunityId,
+          workspaceId: workspace.id,
           page,
           pageSize,
         },

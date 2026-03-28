@@ -7,6 +7,7 @@ import { useImpersonationAuth } from '@/settings/admin-panel/hooks/useImpersonat
 import { useImpersonationRedirect } from '@/settings/admin-panel/hooks/useImpersonationRedirect';
 import { userLookupResultState } from '@/settings/admin-panel/states/userLookupResultState';
 import { type WorkspaceInfo } from '@/settings/admin-panel/types/WorkspaceInfo';
+import { getWorkspaceSchemaName } from '@/settings/admin-panel/utils/getWorkspaceSchemaName';
 import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
 import { Table } from '@/ui/layout/table/components/Table';
 import { TableBody } from '@/ui/layout/table/components/TableBody';
@@ -14,27 +15,31 @@ import { TableCell } from '@/ui/layout/table/components/TableCell';
 import { TableHeader } from '@/ui/layout/table/components/TableHeader';
 import { TableRow } from '@/ui/layout/table/components/TableRow';
 import { DEFAULT_WORKSPACE_LOGO } from '@/ui/navigation/navigation-drawer/constants/DefaultWorkspaceLogo';
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import { useLingui } from '@lingui/react/macro';
 import { isNonEmptyString } from '@sniptt/guards';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { useState } from 'react';
-import { useRecoilState, useRecoilValue } from 'recoil';
 import { getImageAbsoluteURI, isDefined } from 'twenty-shared/utils';
-import { Chip, AvatarChip } from 'twenty-ui/components';
+import { useAtomState } from '@/ui/utilities/state/jotai/hooks/useAtomState';
+import { AvatarOrIcon, Chip } from 'twenty-ui/components';
 import {
   H2Title,
   IconEyeShare,
   IconHome,
   IconId,
+  IconLink,
   IconUser,
 } from 'twenty-ui/display';
 import { Button, Toggle } from 'twenty-ui/input';
 import { Section } from 'twenty-ui/layout';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { REACT_APP_SERVER_BASE_URL } from '~/config';
+import { useMutation } from '@apollo/client/react';
 import {
   type FeatureFlagKey,
-  useImpersonateMutation,
-  useUpdateWorkspaceFeatureFlagMutation,
+  ImpersonateDocument,
+  UpdateWorkspaceFeatureFlagDocument,
 } from '~/generated-metadata/graphql';
 
 type SettingsAdminWorkspaceContentProps = {
@@ -44,30 +49,30 @@ type SettingsAdminWorkspaceContentProps = {
 const StyledContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.spacing(3)};
-  margin-top: ${({ theme }) => theme.spacing(6)};
+  gap: ${themeCssVariables.spacing[3]};
+  margin-top: ${themeCssVariables.spacing[6]};
 `;
 
 const StyledButtonContainer = styled.div`
-  margin-top: ${({ theme }) => theme.spacing(3)};
+  margin-top: ${themeCssVariables.spacing[3]};
 `;
 
 export const SettingsAdminWorkspaceContent = ({
   activeWorkspace,
 }: SettingsAdminWorkspaceContentProps) => {
-  const canManageFeatureFlags = useRecoilValue(canManageFeatureFlagsState);
+  const canManageFeatureFlags = useAtomStateValue(canManageFeatureFlagsState);
   const { enqueueErrorSnackBar } = useSnackBar();
-  const [currentUser] = useRecoilState(currentUserState);
-  const currentWorkspace = useRecoilValue(currentWorkspaceState);
+  const [currentUser] = useAtomState(currentUserState);
+  const currentWorkspace = useAtomStateValue(currentWorkspaceState);
 
-  const [updateFeatureFlag] = useUpdateWorkspaceFeatureFlagMutation();
+  const [updateFeatureFlag] = useMutation(UpdateWorkspaceFeatureFlagDocument);
   const [isImpersonateLoading, setIsImpersonationLoading] = useState(false);
   const { executeImpersonationAuth } = useImpersonationAuth();
   const { executeImpersonationRedirect } = useImpersonationRedirect();
-  const [impersonate] = useImpersonateMutation();
+  const [impersonate] = useMutation(ImpersonateDocument);
 
   const { updateFeatureFlagState } = useFeatureFlagState();
-  const userLookupResult = useRecoilValue(userLookupResultState);
+  const userLookupResult = useAtomStateValue(userLookupResultState);
 
   const { t } = useLingui();
 
@@ -92,11 +97,13 @@ export const SettingsAdminWorkspaceContent = ({
         return executeImpersonationRedirect(
           workspace.workspaceUrls,
           loginToken.token,
+          '_blank',
         );
       },
       onError: (error) => {
+        const errorMessage = error.message;
         enqueueErrorSnackBar({
-          message: `Failed to impersonate user. ${error.message}`,
+          message: t`Failed to impersonate user. ${errorMessage}`,
         });
       },
     }).finally(() => {
@@ -125,11 +132,16 @@ export const SettingsAdminWorkspaceContent = ({
         if (isDefined(previousValue)) {
           updateFeatureFlagState(workspaceId, featureFlag, previousValue);
         }
+        const errorMessage = error.message;
         enqueueErrorSnackBar({
-          message: `Failed to update feature flag. ${error.message}`,
+          message: t`Failed to update feature flag. ${errorMessage}`,
         });
       },
     });
+  };
+
+  const getWorkspaceUrl = (workspaceUrls: WorkspaceInfo['workspaceUrls']) => {
+    return workspaceUrls.customUrl ?? workspaceUrls.subdomainUrl;
   };
 
   const workspaceInfoItems = [
@@ -139,8 +151,9 @@ export const SettingsAdminWorkspaceContent = ({
       value: (
         <Chip
           label={activeWorkspace?.name ?? ''}
+          emptyLabel={t`Untitled`}
           leftComponent={
-            <AvatarChip
+            <AvatarOrIcon
               avatarUrl={
                 getImageAbsoluteURI({
                   imageUrl: isNonEmptyString(activeWorkspace?.logo)
@@ -158,6 +171,20 @@ export const SettingsAdminWorkspaceContent = ({
       Icon: IconId,
       label: t`ID`,
       value: activeWorkspace?.id,
+    },
+    {
+      Icon: IconId,
+      label: t`Schema name`,
+      value: isDefined(activeWorkspace?.id)
+        ? getWorkspaceSchemaName(activeWorkspace.id)
+        : '',
+    },
+    {
+      Icon: IconLink,
+      label: t`URL`,
+      value: activeWorkspace?.workspaceUrls
+        ? getWorkspaceUrl(activeWorkspace.workspaceUrls)
+        : '',
     },
     {
       Icon: IconUser,
@@ -185,7 +212,11 @@ export const SettingsAdminWorkspaceContent = ({
               Icon={IconEyeShare}
               variant="primary"
               accent="default"
-              title={t`Impersonate`}
+              title={
+                activeWorkspace.allowImpersonation === false
+                  ? t`Impersonation is disabled for this workspace`
+                  : t`Impersonate`
+              }
               onClick={() => handleImpersonate(activeWorkspace.id)}
               disabled={
                 isImpersonateLoading ||

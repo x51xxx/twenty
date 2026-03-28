@@ -1,11 +1,11 @@
-import { isDefined } from 'twenty-shared/utils';
-
 import { type WorkspacePostQueryHookInstance } from 'src/engine/api/graphql/workspace-query-runner/workspace-query-hook/interfaces/workspace-query-hook.interface';
 
 import { WorkspaceQueryHook } from 'src/engine/api/graphql/workspace-query-runner/workspace-query-hook/decorators/workspace-query-hook.decorator';
 import { WorkspaceQueryHookType } from 'src/engine/api/graphql/workspace-query-runner/workspace-query-hook/types/workspace-query-hook.type';
-import { type AuthContext } from 'src/engine/core-modules/auth/types/auth-context.type';
+import { isUserAuthContext } from 'src/engine/core-modules/auth/guards/is-user-auth-context.guard';
+import { type WorkspaceAuthContext } from 'src/engine/core-modules/auth/types/workspace-auth-context.type';
 import { ForbiddenError } from 'src/engine/core-modules/graphql/utils/graphql-errors.util';
+import { TWENTY_STANDARD_APPLICATION } from 'src/engine/workspace-manager/twenty-standard-application/constants/twenty-standard-applications';
 import { ApplyCalendarEventsVisibilityRestrictionsService } from 'src/modules/calendar/common/query-hooks/calendar-event/services/apply-calendar-events-visibility-restrictions.service';
 import { type CalendarEventWorkspaceEntity } from 'src/modules/calendar/common/standard-objects/calendar-event.workspace-entity';
 
@@ -21,19 +21,36 @@ export class CalendarEventFindOnePostQueryHook
   ) {}
 
   async execute(
-    authContext: AuthContext,
+    authContext: WorkspaceAuthContext,
     _objectName: string,
     payload: CalendarEventWorkspaceEntity[],
   ): Promise<void> {
-    const { user, apiKey } = authContext;
+    const isUserContext = isUserAuthContext(authContext);
+    const userId = isUserContext ? authContext.user.id : undefined;
 
-    if (!isDefined(user) && !isDefined(apiKey)) {
-      throw new ForbiddenError('User is required');
+    const isTwentyStandardApplication =
+      authContext.type === 'application' &&
+      authContext.application.universalIdentifier ===
+        TWENTY_STANDARD_APPLICATION.universalIdentifier;
+
+    if (
+      !isUserContext &&
+      authContext.type !== 'apiKey' &&
+      !isTwentyStandardApplication
+    ) {
+      throw new ForbiddenError('Authentication is required');
+    }
+
+    const workspace = authContext.workspace;
+
+    if (!workspace) {
+      throw new ForbiddenError('Workspace is required');
     }
 
     await this.applyCalendarEventsVisibilityRestrictionsService.applyCalendarEventsVisibilityRestrictions(
       payload,
-      user?.id,
+      workspace.id,
+      userId,
     );
   }
 }

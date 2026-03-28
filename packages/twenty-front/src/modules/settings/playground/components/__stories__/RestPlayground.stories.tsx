@@ -1,16 +1,15 @@
+import { RestPlayground } from '@/settings/playground/components/RestPlayground';
 import { playgroundApiKeyState } from '@/settings/playground/states/playgroundApiKeyState';
 import { PlaygroundSchemas } from '@/settings/playground/types/PlaygroundSchemas';
-import { action } from '@storybook/addon-actions';
-import { type Meta, type StoryObj } from '@storybook/react';
+import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { HttpResponse, http } from 'msw';
 import { useEffect } from 'react';
-import { useSetRecoilState } from 'recoil';
+import { action } from 'storybook/actions';
 import { ComponentDecorator } from 'twenty-ui/testing';
-import { I18nFrontDecorator } from '~/testing/decorators/I18nFrontDecorator';
-import { RestPlayground } from '../RestPlayground';
 
 const PlaygroundApiKeySetterEffect = () => {
-  const setPlaygroundApiKey = useSetRecoilState(playgroundApiKeyState);
+  const setPlaygroundApiKey = useSetAtomState(playgroundApiKeyState);
 
   useEffect(() => {
     setPlaygroundApiKey('test-api-key-123');
@@ -87,7 +86,7 @@ const openApiSpec = {
 const meta: Meta<typeof RestPlayground> = {
   title: 'Modules/Settings/Playground/RestPlayground',
   component: RestPlayground,
-  decorators: [ComponentDecorator, I18nFrontDecorator],
+  decorators: [ComponentDecorator],
   parameters: {
     docs: {
       description: {

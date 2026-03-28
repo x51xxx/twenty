@@ -21,6 +21,7 @@ export type OIDCRequest = Omit<
     firstName?: string | null;
     lastName?: string | null;
     workspaceInviteHash?: string;
+    oidcTokenClaims?: Record<string, unknown>;
   };
 };
 
@@ -45,7 +46,7 @@ export class OIDCAuthStrategy extends PassportStrategy(
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   async authenticate(req: Request, options: any) {
     return super.authenticate(req, {
       ...options,
@@ -85,7 +86,7 @@ export class OIDCAuthStrategy extends PassportStrategy(
   async validate(
     req: Request,
     tokenset: TokenSet,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line @typescripttypescript/no-explicit-any
     done: (err: any, user?: OIDCRequest['user']) => void,
   ) {
     try {
@@ -110,6 +111,7 @@ export class OIDCAuthStrategy extends PassportStrategy(
         identityProviderId: state.identityProviderId,
         ...(userinfo.given_name ? { firstName: userinfo.given_name } : {}),
         ...(userinfo.family_name ? { lastName: userinfo.family_name } : {}),
+        oidcTokenClaims: tokenset.claims() as Record<string, unknown>,
       });
     } catch (err) {
       done(err);

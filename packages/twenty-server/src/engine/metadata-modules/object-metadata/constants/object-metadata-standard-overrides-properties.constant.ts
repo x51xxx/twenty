@@ -1,8 +1,9 @@
-import { type FlatObjectMetadataPropertiesToCompare } from 'src/engine/metadata-modules/flat-object-metadata/types/flat-object-metadata-properties-to-compare.type';
+import { type MetadataUniversalFlatEntityPropertiesToCompare } from 'src/engine/workspace-manager/workspace-migration/universal-flat-entity/types/metadata-universal-flat-entity-properties-to-compare.type';
 
 export const OBJECT_METADATA_STANDARD_OVERRIDES_PROPERTIES = [
+  'color',
   'labelSingular',
   'labelPlural',
   'description',
   'icon',
-] as const satisfies FlatObjectMetadataPropertiesToCompare[];
+] as const satisfies MetadataUniversalFlatEntityPropertiesToCompare<'objectMetadata'>[];

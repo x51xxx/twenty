@@ -3,7 +3,7 @@ import { DropdownContent } from '@/ui/layout/dropdown/components/DropdownContent
 import { DropdownMenuItemsContainer } from '@/ui/layout/dropdown/components/DropdownMenuItemsContainer';
 import { SelectableList } from '@/ui/layout/selectable-list/components/SelectableList';
 import { SelectableListItem } from '@/ui/layout/selectable-list/components/SelectableListItem';
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import { useMemo, useRef } from 'react';
 import { isDefined } from 'twenty-shared/utils';
 import { type SelectOption } from 'twenty-ui/input';
@@ -57,7 +57,7 @@ export const PlaceAutocompleteSelect = ({
                   <MenuItemSelectTag
                     key={option.value}
                     text={option.label}
-                    color={'transparent'}
+                    color="transparent"
                     onClick={() => onChange(option.value)}
                   />
                 </SelectableListItem>

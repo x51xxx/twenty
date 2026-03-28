@@ -1,18 +1,17 @@
 import { GraphQLPlayground } from '@/settings/playground/components/GraphQLPlayground';
 import { playgroundApiKeyState } from '@/settings/playground/states/playgroundApiKeyState';
-import { action } from '@storybook/addon-actions';
-import { type Meta, type StoryObj } from '@storybook/react';
+import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useEffect } from 'react';
-import { useSetRecoilState } from 'recoil';
+import { action } from 'storybook/actions';
 import {
   ComponentDecorator,
   ComponentWithRouterDecorator,
 } from 'twenty-ui/testing';
-import { I18nFrontDecorator } from '~/testing/decorators/I18nFrontDecorator';
 import { graphqlMocks } from '~/testing/graphqlMocks';
 
 const PlaygroundApiKeySetterEffect = () => {
-  const setPlaygroundApiKey = useSetRecoilState(playgroundApiKeyState);
+  const setPlaygroundApiKey = useSetAtomState(playgroundApiKeyState);
 
   useEffect(() => {
     setPlaygroundApiKey('test-api-key-123');
@@ -24,11 +23,7 @@ const PlaygroundApiKeySetterEffect = () => {
 const meta: Meta<typeof GraphQLPlayground> = {
   title: 'Modules/Settings/Playground/GraphQLPlayground',
   component: GraphQLPlayground,
-  decorators: [
-    ComponentDecorator,
-    I18nFrontDecorator,
-    ComponentWithRouterDecorator,
-  ],
+  decorators: [ComponentDecorator, ComponentWithRouterDecorator],
   parameters: {
     docs: {
       description: {

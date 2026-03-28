@@ -1,23 +1,26 @@
+import { useSnackBarOnQueryError } from '@/apollo/hooks/useSnackBarOnQueryError';
 import { useRedirect } from '@/domain-manager/hooks/useRedirect';
 import { InformationBanner } from '@/information-banner/components/InformationBanner';
 import { usePermissionFlagMap } from '@/settings/roles/hooks/usePermissionFlagMap';
-import { SettingsPath } from '@/types/SettingsPath';
 import { t } from '@lingui/core/macro';
-import { isDefined } from 'twenty-shared/utils';
+import { SettingsPath } from 'twenty-shared/types';
+import { getSettingsPath, isDefined } from 'twenty-shared/utils';
+import { useQuery } from '@apollo/client/react';
 import {
   PermissionFlagType,
-  useBillingPortalSessionQuery,
+  BillingPortalSessionDocument,
 } from '~/generated-metadata/graphql';
-import { getSettingsPath } from '~/utils/navigation/getSettingsPath';
 
 export const InformationBannerBillingSubscriptionPaused = () => {
   const { redirect } = useRedirect();
 
-  const { data, loading } = useBillingPortalSessionQuery({
+  const { data, loading, error } = useQuery(BillingPortalSessionDocument, {
     variables: {
       returnUrlPath: getSettingsPath(SettingsPath.Billing),
     },
   });
+
+  useSnackBarOnQueryError(error);
 
   const {
     [PermissionFlagType.WORKSPACE]: hasPermissionToUpdateBillingDetails,
@@ -31,6 +34,7 @@ export const InformationBannerBillingSubscriptionPaused = () => {
 
   return (
     <InformationBanner
+      componentInstanceId="information-banner-billing-subscription-paused"
       variant="danger"
       message={
         hasPermissionToUpdateBillingDetails

@@ -1,31 +1,30 @@
 import { currentWorkspaceState } from '@/auth/states/currentWorkspaceState';
 import { FormRawJsonFieldInput } from '@/object-record/record-field/ui/form-types/components/FormRawJsonFieldInput';
-import { getFunctionOutputSchema } from '@/serverless-functions/utils/getFunctionOutputSchema';
 import { Select } from '@/ui/input/components/Select';
 import { TextInput } from '@/ui/input/components/TextInput';
 import { GenericDropdownContentWidth } from '@/ui/layout/dropdown/constants/GenericDropdownContentWidth';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 import { workflowVisualizerWorkflowIdComponentState } from '@/workflow/states/workflowVisualizerWorkflowIdComponentState';
 import { type WorkflowWebhookTrigger } from '@/workflow/types/Workflow';
 import { parseAndValidateVariableFriendlyStringifiedJson } from '@/workflow/utils/parseAndValidateVariableFriendlyStringifiedJson';
 import { WorkflowStepBody } from '@/workflow/workflow-steps/components/WorkflowStepBody';
-import { WorkflowStepHeader } from '@/workflow/workflow-steps/components/WorkflowStepHeader';
+import { WorkflowStepFooter } from '@/workflow/workflow-steps/components/WorkflowStepFooter';
 import { WEBHOOK_TRIGGER_AUTHENTICATION_OPTIONS } from '@/workflow/workflow-trigger/constants/WebhookTriggerAuthenticationOptions';
 import { WEBHOOK_TRIGGER_HTTP_METHOD_OPTIONS } from '@/workflow/workflow-trigger/constants/WebhookTriggerHttpMethodOptions';
-import { getTriggerDefaultLabel } from '@/workflow/workflow-trigger/utils/getTriggerDefaultLabel';
-import { getTriggerHeaderType } from '@/workflow/workflow-trigger/utils/getTriggerHeaderType';
-import { getTriggerIcon } from '@/workflow/workflow-trigger/utils/getTriggerIcon';
-import { getTriggerIconColor } from '@/workflow/workflow-trigger/utils/getTriggerIconColor';
 import { getWebhookTriggerDefaultSettings } from '@/workflow/workflow-trigger/utils/getWebhookTriggerDefaultSettings';
-import { useTheme } from '@emotion/react';
 import { isNonEmptyString } from '@sniptt/guards';
-import { useState } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
+import { useContext, useState } from 'react';
 import { isDefined } from 'twenty-shared/utils';
-import { IconCopy, useIcons } from 'twenty-ui/display';
+import { getOutputSchemaFromValue } from 'twenty-shared/logic-function';
+import { TRIGGER_STEP_ID } from 'twenty-shared/workflow';
+import { t } from '@lingui/core/macro';
+import { IconCopy } from 'twenty-ui/display';
+
 import { useDebouncedCallback } from 'use-debounce';
 import { REACT_APP_SERVER_BASE_URL } from '~/config';
 import { useCopyToClipboard } from '~/hooks/useCopyToClipboard';
+import { ThemeContext } from 'twenty-ui/theme-constants';
 
 type WorkflowEditTriggerWebhookFormProps = {
   trigger: WorkflowWebhookTrigger;
@@ -51,24 +50,18 @@ export const WorkflowEditTriggerWebhookForm = ({
   trigger,
   triggerOptions,
 }: WorkflowEditTriggerWebhookFormProps) => {
-  const theme = useTheme();
+  const { theme } = useContext(ThemeContext);
   const { copyToClipboard } = useCopyToClipboard();
   const [errorMessages, setErrorMessages] = useState<FormErrorMessages>({});
   const [errorMessagesVisible, setErrorMessagesVisible] = useState(false);
-  const { getIcon } = useIcons();
-  const workflowVisualizerWorkflowId = useRecoilComponentValue(
+  const workflowVisualizerWorkflowId = useAtomComponentStateValue(
     workflowVisualizerWorkflowIdComponentState,
   );
-  const currentWorkspace = useRecoilValue(currentWorkspaceState);
+  const currentWorkspace = useAtomStateValue(currentWorkspaceState);
 
   const onBlur = () => {
     setErrorMessagesVisible(true);
   };
-
-  const headerTitle = trigger.name ?? getTriggerDefaultLabel(trigger);
-
-  const headerIcon = getTriggerIcon(trigger);
-  const headerType = getTriggerHeaderType(trigger);
 
   const webhookUrl = `${REACT_APP_SERVER_BASE_URL}/webhooks/workflows/${currentWorkspace?.id}/${workflowVisualizerWorkflowId}`;
   const displayWebhookUrl = webhookUrl.replace(/^(https?:\/\/)?(www\.)?/, '');
@@ -84,26 +77,9 @@ export const WorkflowEditTriggerWebhookForm = ({
 
   return (
     <>
-      <WorkflowStepHeader
-        onTitleChange={(newName: string) => {
-          if (triggerOptions.readonly === true) {
-            return;
-          }
-
-          triggerOptions.onTriggerUpdate({
-            ...trigger,
-            name: newName,
-          });
-        }}
-        Icon={getIcon(headerIcon)}
-        iconColor={getTriggerIconColor({ theme, triggerType: trigger.type })}
-        initialTitle={headerTitle}
-        headerType={headerType}
-        disabled={triggerOptions.readonly}
-      />
       <WorkflowStepBody>
         <TextInput
-          label="Live URL"
+          label={t`Live URL`}
           value={displayWebhookUrl}
           RightIcon={() => (
             <IconCopy
@@ -116,7 +92,7 @@ export const WorkflowEditTriggerWebhookForm = ({
         />
         <Select
           dropdownId="workflow-edit-webhook-trigger-http-method"
-          label="HTTP method"
+          label={t`HTTP method`}
           fullWidth
           disabled={triggerOptions.readonly}
           value={trigger.settings.httpMethod}
@@ -134,13 +110,13 @@ export const WorkflowEditTriggerWebhookForm = ({
               { computeOutputSchema: false },
             );
           }}
-          dropdownOffset={{ y: parseInt(theme.spacing(1), 10) }}
+          dropdownOffset={{ y: 4 }}
           dropdownWidth={GenericDropdownContentWidth.ExtraLarge}
         />
         {trigger.settings.httpMethod === 'POST' && (
           <FormRawJsonFieldInput
-            label="Expected Body"
-            placeholder="Enter a JSON object"
+            label={t`Expected Body`}
+            placeholder={t`Enter a JSON object`}
             error={
               errorMessagesVisible ? errorMessages.expectedBody : undefined
             }
@@ -175,7 +151,7 @@ export const WorkflowEditTriggerWebhookForm = ({
                 expectedBody: undefined,
               }));
 
-              const outputSchema = getFunctionOutputSchema(parsingResult.data);
+              const outputSchema = getOutputSchemaFromValue(parsingResult.data);
 
               triggerOptions.onTriggerUpdate(
                 {
@@ -194,7 +170,7 @@ export const WorkflowEditTriggerWebhookForm = ({
         )}
         <Select
           dropdownId="workflow-edit-webhook-trigger-auth"
-          label="Auth"
+          label={t`Auth`}
           fullWidth
           disabled
           value={trigger.settings.authentication}
@@ -214,6 +190,9 @@ export const WorkflowEditTriggerWebhookForm = ({
           }}
         />
       </WorkflowStepBody>
+      {!triggerOptions.readonly && (
+        <WorkflowStepFooter stepId={TRIGGER_STEP_ID} />
+      )}
     </>
   );
 };

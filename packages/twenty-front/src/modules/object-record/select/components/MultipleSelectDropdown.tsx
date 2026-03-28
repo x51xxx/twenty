@@ -9,7 +9,8 @@ import { SelectableListItem } from '@/ui/layout/selectable-list/components/Selec
 import { useSelectableList } from '@/ui/layout/selectable-list/hooks/useSelectableList';
 import { selectedItemIdComponentState } from '@/ui/layout/selectable-list/states/selectedItemIdComponentState';
 import { useHotkeysOnFocusedElement } from '@/ui/utilities/hotkey/hooks/useHotkeysOnFocusedElement';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+import { t } from '@lingui/core/macro';
 import { Avatar } from 'twenty-ui/display';
 import { MenuItem, MenuItemMultiSelectAvatar } from 'twenty-ui/navigation';
 
@@ -38,7 +39,7 @@ export const MultipleSelectDropdown = ({
 
   const { resetSelectedItem } = useSelectableList(selectableListId);
 
-  const selectedItemId = useRecoilComponentValue(
+  const selectedItemId = useAtomComponentStateValue(
     selectedItemIdComponentState,
     selectableListId,
   );
@@ -117,7 +118,7 @@ export const MultipleSelectDropdown = ({
             </SelectableListItem>
           );
         })}
-        {showNoResult && <MenuItem text="No results" />}
+        {showNoResult && <MenuItem text={t`No results`} />}
         {loadingItems && <DropdownMenuSkeletonItem />}
       </DropdownMenuItemsContainer>
     </SelectableList>

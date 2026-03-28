@@ -1,89 +1,107 @@
 import { Select } from '@/ui/input/components/Select';
 import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
 import { RELATIVE_DATE_DIRECTION_SELECT_OPTIONS } from '@/ui/input/components/internal/date/constants/RelativeDateDirectionSelectOptions';
+import { RELATIVE_DATETIME_UNITS_SELECT_OPTIONS } from '@/ui/input/components/internal/date/constants/RelativeDateTimeUnitSelectOptions';
 import { RELATIVE_DATE_UNITS_SELECT_OPTIONS } from '@/ui/input/components/internal/date/constants/RelativeDateUnitSelectOptions';
-import { variableDateViewFilterValuePartsSchema } from '@/views/view-filter-value/utils/resolveDateViewFilterValue';
-import {
-  type VariableDateViewFilterValueDirection,
-  type VariableDateViewFilterValueUnit,
-} from 'twenty-shared/types';
 
-import styled from '@emotion/styled';
-import { useEffect, useState } from 'react';
+import { t } from '@lingui/core/macro';
+import { styled } from '@linaria/react';
+import { useState } from 'react';
+import { type Nullable } from 'twenty-shared/types';
+import {
+  isDefined,
+  relativeDateFilterSchema,
+  type RelativeDateFilter,
+  type RelativeDateFilterDirection,
+  type RelativeDateFilterUnit,
+} from 'twenty-shared/utils';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 const StyledContainer = styled.div<{ noPadding: boolean }>`
-  display: flex;
   align-items: center;
-  gap: ${({ theme }) => theme.spacing(1)};
-  padding: ${({ theme, noPadding }) => (noPadding ? '0' : theme.spacing(2))};
+  display: flex;
+  gap: ${themeCssVariables.spacing[1]};
+  padding: ${({ noPadding }) =>
+    noPadding ? '0' : themeCssVariables.spacing[2]};
   padding-bottom: 0;
 `;
 
 type RelativeDatePickerHeaderProps = {
-  direction: VariableDateViewFilterValueDirection;
-  amount?: number;
-  unit: VariableDateViewFilterValueUnit;
-  onChange?: (value: {
-    direction: VariableDateViewFilterValueDirection;
-    amount?: number;
-    unit: VariableDateViewFilterValueUnit;
-  }) => void;
+  instanceId: string;
+  direction: RelativeDateFilterDirection;
+  amount?: Nullable<number>;
+  unit: RelativeDateFilterUnit;
+  onChange?: (value: RelativeDateFilter) => void;
   isFormField?: boolean;
   readonly?: boolean;
   unitDropdownWidth?: number;
+  allowIntraDayUnits?: boolean;
 };
 
-export const RelativeDatePickerHeader = (
-  props: RelativeDatePickerHeaderProps,
-) => {
-  const [direction, setDirection] = useState(props.direction);
-  const [amountString, setAmountString] = useState(
-    props.amount ? props.amount.toString() : '',
-  );
-  const [unit, setUnit] = useState(props.unit);
+export const RelativeDatePickerHeader = ({
+  instanceId,
+  direction,
+  unit,
+  amount,
+  isFormField,
+  onChange,
+  readonly,
+  unitDropdownWidth,
+  allowIntraDayUnits,
+}: RelativeDatePickerHeaderProps) => {
+  const amountString = amount?.toString() ?? '';
 
-  useEffect(() => {
-    setAmountString(props.amount ? props.amount.toString() : '');
-    setUnit(props.unit);
-    setDirection(props.direction);
-  }, [props.amount, props.unit, props.direction]);
+  const amountTextValue = direction === 'THIS' ? '' : amountString;
+  const amountInputPlaceholder = direction === 'THIS' ? '-' : t`Number`;
 
-  const textInputValue = direction === 'THIS' ? '' : amountString;
-  const textInputPlaceholder = direction === 'THIS' ? '-' : 'Number';
+  const [draftAmountValue, setDraftAmountValue] = useState(amountTextValue);
 
-  const isUnitPlural = props.amount && props.amount > 1 && direction !== 'THIS';
-  const unitSelectOptions = RELATIVE_DATE_UNITS_SELECT_OPTIONS.map((unit) => ({
+  const isUnitPlural = isDefined(amount) && amount > 1 && direction !== 'THIS';
+  const unitOptionsSource = allowIntraDayUnits
+    ? RELATIVE_DATETIME_UNITS_SELECT_OPTIONS
+    : RELATIVE_DATE_UNITS_SELECT_OPTIONS;
+  const unitSelectOptions = unitOptionsSource.map((unit) => ({
     ...unit,
     label: `${unit.label}${isUnitPlural ? 's' : ''}`,
   }));
 
   return (
-    <StyledContainer noPadding={props.isFormField ?? false}>
+    <StyledContainer noPadding={isFormField ?? false}>
       <Select
-        dropdownId="direction-select"
+        dropdownId={`direction-select-${instanceId}`}
         value={direction}
         onChange={(newDirection) => {
-          setDirection(newDirection);
-          if (props.amount === undefined && newDirection !== 'THIS') return;
-          props.onChange?.({
+          if (amount === undefined && newDirection !== 'THIS') {
+            return;
+          }
+
+          if (draftAmountValue === '') {
+            setDraftAmountValue('1');
+          }
+
+          if (newDirection === 'THIS') {
+            setDraftAmountValue('');
+          }
+
+          onChange?.({
             direction: newDirection,
-            amount: props.amount,
+            amount: amount,
             unit: unit,
           });
         }}
         options={RELATIVE_DATE_DIRECTION_SELECT_OPTIONS}
         fullWidth
-        disabled={props.readonly}
+        disabled={readonly}
       />
       <SettingsTextInput
-        instanceId="relative-date-picker-amount"
+        instanceId={`relative-date-picker-amount-${instanceId}`}
         width={50}
-        value={textInputValue}
+        value={draftAmountValue}
         onChange={(text) => {
           const amountString = text.replace(/[^0-9]|^0+/g, '');
-          const amount = parseInt(amountString);
+          setDraftAmountValue(amountString);
 
-          setAmountString(amountString);
+          const amount = parseInt(amountString);
 
           const valueParts = {
             direction,
@@ -91,31 +109,35 @@ export const RelativeDatePickerHeader = (
             unit,
           };
 
-          if (
-            variableDateViewFilterValuePartsSchema.safeParse(valueParts).success
-          ) {
-            props.onChange?.(valueParts);
+          if (relativeDateFilterSchema.safeParse(valueParts).success === true) {
+            onChange?.(valueParts);
           }
         }}
-        placeholder={textInputPlaceholder}
-        disabled={direction === 'THIS' || props.readonly}
+        placeholder={amountInputPlaceholder}
+        disabled={direction === 'THIS' || readonly}
       />
       <Select
-        dropdownId="unit-select"
+        dropdownId={`unit-select-${instanceId}`}
         value={unit}
         onChange={(newUnit) => {
-          setUnit(newUnit);
-          if (direction !== 'THIS' && props.amount === undefined) return;
-          props.onChange?.({
+          if (direction !== 'THIS' && amount === undefined) {
+            return;
+          }
+
+          if (draftAmountValue === '' && direction !== 'THIS') {
+            setDraftAmountValue('1');
+          }
+
+          onChange?.({
             direction,
-            amount: props.amount,
+            amount: amount,
             unit: newUnit,
           });
         }}
         fullWidth
         options={unitSelectOptions}
-        disabled={props.readonly}
-        dropdownWidth={props.unitDropdownWidth}
+        disabled={readonly}
+        dropdownWidth={unitDropdownWidth}
       />
     </StyledContainer>
   );

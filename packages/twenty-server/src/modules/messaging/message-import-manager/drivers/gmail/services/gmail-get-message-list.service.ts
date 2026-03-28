@@ -1,54 +1,67 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { isNonEmptyString } from '@sniptt/guards';
-import { type gmail_v1 as gmailV1 } from 'googleapis';
-import { isDefined } from 'twenty-shared/utils';
+import { google } from 'googleapis';
 
+import { OAuth2ClientManagerService } from 'src/modules/connected-account/oauth2-client-manager/services/oauth2-client-manager.service';
 import { type ConnectedAccountWorkspaceEntity } from 'src/modules/connected-account/standard-objects/connected-account.workspace-entity';
+import {
+  MessageChannelWorkspaceEntity,
+  MessageFolderImportPolicy,
+} from 'src/modules/messaging/common/standard-objects/message-channel.workspace-entity';
 import { type MessageFolderWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-folder.workspace-entity';
 import {
   MessageImportDriverException,
   MessageImportDriverExceptionCode,
 } from 'src/modules/messaging/message-import-manager/drivers/exceptions/message-import-driver.exception';
-import { MESSAGING_GMAIL_EXCLUDED_CATEGORIES } from 'src/modules/messaging/message-import-manager/drivers/gmail/constants/messaging-gmail-excluded-categories';
 import { MESSAGING_GMAIL_USERS_MESSAGES_LIST_MAX_RESULT } from 'src/modules/messaging/message-import-manager/drivers/gmail/constants/messaging-gmail-users-messages-list-max-result.constant';
-import { GmailClientProvider } from 'src/modules/messaging/message-import-manager/drivers/gmail/providers/gmail-client.provider';
 import { GmailGetHistoryService } from 'src/modules/messaging/message-import-manager/drivers/gmail/services/gmail-get-history.service';
-import { GmailHandleErrorService } from 'src/modules/messaging/message-import-manager/drivers/gmail/services/gmail-handle-error.service';
-import { computeGmailCategoryExcludeSearchFilter } from 'src/modules/messaging/message-import-manager/drivers/gmail/utils/compute-gmail-category-excude-search-filter.util';
-import { computeGmailCategoryLabelId } from 'src/modules/messaging/message-import-manager/drivers/gmail/utils/compute-gmail-category-label-id.util';
-import { mapGmailDefaultFolderToCategoryOrUndefined } from 'src/modules/messaging/message-import-manager/drivers/gmail/utils/map-gmail-default-folder-to-category';
+import { GmailMessageListFetchErrorHandler } from 'src/modules/messaging/message-import-manager/drivers/gmail/services/gmail-message-list-fetch-error-handler.service';
+import { computeGmailExcludeSearchFilter } from 'src/modules/messaging/message-import-manager/drivers/gmail/utils/compute-gmail-exclude-search-filter.util';
 import { type GetMessageListsArgs } from 'src/modules/messaging/message-import-manager/types/get-message-lists-args.type';
 import { type GetMessageListsResponse } from 'src/modules/messaging/message-import-manager/types/get-message-lists-response.type';
-import { assertNotNull } from 'src/utils/assert';
 
 @Injectable()
 export class GmailGetMessageListService {
   private readonly logger = new Logger(GmailGetMessageListService.name);
   constructor(
-    private readonly gmailClientProvider: GmailClientProvider,
     private readonly gmailGetHistoryService: GmailGetHistoryService,
-    private readonly gmailHandleErrorService: GmailHandleErrorService,
+    private readonly oAuth2ClientManagerService: OAuth2ClientManagerService,
+    private readonly gmailMessageListFetchErrorHandler: GmailMessageListFetchErrorHandler,
   ) {}
 
   private async getMessageListWithoutCursor(
     connectedAccount: Pick<
       ConnectedAccountWorkspaceEntity,
-      'provider' | 'refreshToken' | 'id' | 'handle'
+      'provider' | 'accessToken' | 'refreshToken' | 'id' | 'handle'
     >,
     messageFolders: Pick<
       MessageFolderWorkspaceEntity,
-      'name' | 'externalId' | 'isSynced'
+      'name' | 'externalId' | 'isSynced' | 'parentFolderId'
     >[],
+    messageChannel: Pick<
+      MessageChannelWorkspaceEntity,
+      'messageFolderImportPolicy'
+    >,
   ): Promise<GetMessageListsResponse> {
-    const gmailClient =
-      await this.gmailClientProvider.getGmailClient(connectedAccount);
+    const oAuth2Client =
+      await this.oAuth2ClientManagerService.getGoogleOAuth2Client(
+        connectedAccount,
+      );
+    const gmailClient = google.gmail({
+      version: 'v1',
+      auth: oAuth2Client,
+    });
 
     let pageToken: string | undefined;
     let hasMoreMessages = true;
 
     const messageExternalIds: string[] = [];
-    const excludedCategories = this.computeExcludedCategories(messageFolders);
+
+    const excludedSearchFilter = computeGmailExcludeSearchFilter(
+      messageFolders,
+      messageChannel.messageFolderImportPolicy,
+    );
 
     while (hasMoreMessages) {
       const messageList = await gmailClient.users.messages
@@ -56,8 +69,7 @@ export class GmailGetMessageListService {
           userId: 'me',
           maxResults: MESSAGING_GMAIL_USERS_MESSAGES_LIST_MAX_RESULT,
           pageToken,
-          q: computeGmailCategoryExcludeSearchFilter(excludedCategories),
-          labelIds: this.getCustomLabelIds(messageFolders),
+          q: excludedSearchFilter,
         })
         .catch((error) => {
           this.logger.error(
@@ -67,7 +79,7 @@ export class GmailGetMessageListService {
             `Connected account ${connectedAccount.id}: Error fetching message list: ${JSON.stringify(error)}`,
           );
 
-          this.gmailHandleErrorService.handleGmailMessageListFetchError(error);
+          this.gmailMessageListFetchErrorHandler.handleError(error);
 
           return {
             data: {
@@ -110,10 +122,7 @@ export class GmailGetMessageListService {
         id: firstMessageExternalId,
       })
       .catch((error) => {
-        this.gmailHandleErrorService.handleGmailMessagesImportError(
-          error,
-          firstMessageExternalId as string,
-        );
+        this.gmailMessageListFetchErrorHandler.handleError(error);
       });
 
     const nextSyncCursor = firstMessageContent?.data?.historyId;
@@ -141,11 +150,36 @@ export class GmailGetMessageListService {
     connectedAccount,
     messageFolders,
   }: GetMessageListsArgs): Promise<GetMessageListsResponse> {
-    const gmailClient =
-      await this.gmailClientProvider.getGmailClient(connectedAccount);
+    if (
+      messageChannel.messageFolderImportPolicy ===
+      MessageFolderImportPolicy.SELECTED_FOLDERS
+    ) {
+      const foldersToSync = messageFolders.filter((folder) => folder.isSynced);
+
+      if (foldersToSync.length === 0) {
+        this.logger.warn(
+          `Connected account ${connectedAccount.id} Message Channel: ${messageChannel.id}: No folders to process`,
+        );
+
+        return [];
+      }
+    }
+
+    const oAuth2Client =
+      await this.oAuth2ClientManagerService.getGoogleOAuth2Client(
+        connectedAccount,
+      );
+    const gmailClient = google.gmail({
+      version: 'v1',
+      auth: oAuth2Client,
+    });
 
     if (!isNonEmptyString(messageChannel.syncCursor)) {
-      return this.getMessageListWithoutCursor(connectedAccount, messageFolders);
+      return this.getMessageListWithoutCursor(
+        connectedAccount,
+        messageFolders,
+        messageChannel,
+      );
     }
 
     const { history, historyId: nextSyncCursor } =
@@ -157,16 +191,6 @@ export class GmailGetMessageListService {
     const { messagesAdded, messagesDeleted } =
       await this.gmailGetHistoryService.getMessageIdsFromHistory(history);
 
-    const messageIdsToFilter = await this.getEmailIdsFromExcludedCategories(
-      gmailClient,
-      messageChannel.syncCursor,
-      messageFolders,
-    );
-
-    const messagesAddedFiltered = messagesAdded.filter(
-      (messageId) => !messageIdsToFilter.includes(messageId),
-    );
-
     if (!nextSyncCursor) {
       throw new MessageImportDriverException(
         `No nextSyncCursor found for connected account ${connectedAccount.id}`,
@@ -176,76 +200,12 @@ export class GmailGetMessageListService {
 
     return [
       {
-        messageExternalIds: messagesAddedFiltered,
+        messageExternalIds: messagesAdded,
         messageExternalIdsToDelete: messagesDeleted,
         previousSyncCursor: messageChannel.syncCursor,
         nextSyncCursor,
         folderId: undefined,
       },
     ];
-  }
-
-  private computeExcludedCategories(
-    messageFolders: Pick<MessageFolderWorkspaceEntity, 'name' | 'externalId'>[],
-  ) {
-    const includedDefaultCategories = messageFolders
-      .map((messageFolder) =>
-        mapGmailDefaultFolderToCategoryOrUndefined(messageFolder.name),
-      )
-      .filter(isDefined);
-
-    return MESSAGING_GMAIL_EXCLUDED_CATEGORIES.filter(
-      (excludedCategory) =>
-        !includedDefaultCategories.includes(excludedCategory),
-    );
-  }
-
-  private async getEmailIdsFromExcludedCategories(
-    gmailClient: gmailV1.Gmail,
-    lastSyncHistoryId: string,
-    messageFolders: Pick<MessageFolderWorkspaceEntity, 'name' | 'externalId'>[],
-  ): Promise<string[]> {
-    const emailIds: string[] = [];
-
-    const excludedCategories = this.computeExcludedCategories(messageFolders);
-
-    for (const category of excludedCategories) {
-      const { history } = await this.gmailGetHistoryService.getHistory(
-        gmailClient,
-        lastSyncHistoryId,
-        ['messageAdded'],
-        computeGmailCategoryLabelId(category),
-      );
-
-      const emailIdsFromCategory = history
-        .map((history) => history.messagesAdded)
-        .flat()
-        .map((message) => message?.message?.id)
-        .filter((id) => id)
-        .filter(assertNotNull);
-
-      emailIds.push(...emailIdsFromCategory);
-    }
-
-    return emailIds;
-  }
-
-  private getCustomLabelIds(
-    messageFolders: Pick<
-      MessageFolderWorkspaceEntity,
-      'name' | 'externalId' | 'isSynced'
-    >[],
-  ): string[] | undefined {
-    const customLabelIds = messageFolders
-      .filter(
-        (folder) =>
-          folder.externalId &&
-          folder.isSynced &&
-          !mapGmailDefaultFolderToCategoryOrUndefined(folder.name),
-      )
-      .map((folder) => folder.externalId)
-      .filter((id): id is string => !!id);
-
-    return customLabelIds.length > 0 ? customLabelIds : undefined;
   }
 }

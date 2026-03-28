@@ -1,20 +1,15 @@
-import { useRecoilValue } from 'recoil';
-
 import { currentWorkspaceState } from '@/auth/states/currentWorkspaceState';
-import { BillingProductKey } from '~/generated/graphql';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 
 export const useIsSomeMeteredProductCapReached = (): boolean => {
-  const currentWorkspace = useRecoilValue(currentWorkspaceState);
+  const billingSubscriptionItems = useAtomStateValue(currentWorkspaceState)
+    ?.currentBillingSubscription?.billingSubscriptionItems;
 
-  const meteredProductKeys = Object.values(BillingProductKey).filter(
-    (productKey) => productKey !== BillingProductKey.BASE_PRODUCT,
+  if (!billingSubscriptionItems) {
+    return false;
+  }
+
+  return billingSubscriptionItems.some(
+    ({ hasReachedCurrentPeriodCap }) => hasReachedCurrentPeriodCap,
   );
-
-  return meteredProductKeys.some((productKey) => {
-    return (
-      currentWorkspace?.currentBillingSubscription?.billingSubscriptionItems?.find(
-        (item) => item.billingProduct?.metadata.productKey === productKey,
-      )?.hasReachedCurrentPeriodCap ?? false
-    );
-  });
 };

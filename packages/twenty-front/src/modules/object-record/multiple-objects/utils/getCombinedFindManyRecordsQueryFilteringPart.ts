@@ -1,8 +1,8 @@
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import { capitalize } from 'twenty-shared/utils';
 
 export const getCombinedFindManyRecordsQueryFilteringPart = (
-  objectMetadataItem: ObjectMetadataItem,
+  objectMetadataItem: EnrichedObjectMetadataItem,
 ) => {
   return `${objectMetadataItem.namePlural}(
   filter: $filter${capitalize(objectMetadataItem.nameSingular)},
@@ -10,6 +10,5 @@ export const getCombinedFindManyRecordsQueryFilteringPart = (
   after: $after${capitalize(objectMetadataItem.nameSingular)},
   before: $before${capitalize(objectMetadataItem.nameSingular)},
   first: $first${capitalize(objectMetadataItem.nameSingular)},
-  last: $last${capitalize(objectMetadataItem.nameSingular)},
-  limit: $limit${capitalize(objectMetadataItem.nameSingular)})`;
+  last: $last${capitalize(objectMetadataItem.nameSingular)})`;
 };

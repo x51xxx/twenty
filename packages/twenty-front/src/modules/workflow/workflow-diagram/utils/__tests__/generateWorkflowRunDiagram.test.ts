@@ -2,10 +2,10 @@ import {
   type WorkflowStep,
   type WorkflowTrigger,
 } from '@/workflow/types/Workflow';
-import { FieldMetadataType } from 'twenty-shared/types';
 import { StepStatus, type WorkflowRunStepInfos } from 'twenty-shared/workflow';
+import { FieldMetadataType } from 'twenty-shared/types';
 import { getUuidV4Mock } from '~/testing/utils/getUuidV4Mock';
-import { generateWorkflowRunDiagram } from '../generateWorkflowRunDiagram';
+import { generateWorkflowRunDiagram } from '@/workflow/workflow-diagram/utils/generateWorkflowRunDiagram';
 
 jest.mock('uuid', () => ({
   v4: getUuidV4Mock(),
@@ -35,9 +35,8 @@ describe('generateWorkflowRunDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -54,9 +53,8 @@ describe('generateWorkflowRunDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -73,9 +71,8 @@ describe('generateWorkflowRunDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -104,8 +101,6 @@ describe('generateWorkflowRunDiagram', () => {
       trigger,
       steps,
       stepInfos,
-
-      isWorkflowBranchEnabled: true,
     });
 
     expect(result).toMatchInlineSnapshot(`
@@ -123,13 +118,16 @@ describe('generateWorkflowRunDiagram', () => {
         "markerStart": undefined,
         "selectable": false,
         "source": "trigger",
+        "sourceHandle": "default",
         "target": "step1",
-        "type": "empty-filter--run",
+        "targetHandle": "default",
+        "type": "readonly",
         "zIndex": -2,
       },
       {
         "data": {
           "edgeExecutionStatus": "FAILED",
+          "edgePathStrategy": undefined,
           "edgeType": "default",
         },
         "deletable": false,
@@ -138,13 +136,16 @@ describe('generateWorkflowRunDiagram', () => {
         "markerStart": undefined,
         "selectable": false,
         "source": "step1",
+        "sourceHandle": "default",
         "target": "step2",
-        "type": "empty-filter--run",
+        "targetHandle": "default",
+        "type": "readonly",
         "zIndex": -2,
       },
       {
         "data": {
           "edgeExecutionStatus": "NOT_STARTED",
+          "edgePathStrategy": undefined,
           "edgeType": "default",
         },
         "deletable": false,
@@ -153,8 +154,10 @@ describe('generateWorkflowRunDiagram', () => {
         "markerStart": undefined,
         "selectable": false,
         "source": "step2",
+        "sourceHandle": "default",
         "target": "step3",
-        "type": "empty-filter--run",
+        "targetHandle": "default",
+        "type": "readonly",
         "zIndex": -2,
       },
     ],
@@ -266,9 +269,8 @@ describe('generateWorkflowRunDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -285,9 +287,8 @@ describe('generateWorkflowRunDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -304,9 +305,8 @@ describe('generateWorkflowRunDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -337,8 +337,6 @@ describe('generateWorkflowRunDiagram', () => {
       trigger,
       steps,
       stepInfos,
-
-      isWorkflowBranchEnabled: true,
     });
 
     expect(result).toMatchInlineSnapshot(`
@@ -356,13 +354,16 @@ describe('generateWorkflowRunDiagram', () => {
         "markerStart": undefined,
         "selectable": false,
         "source": "trigger",
+        "sourceHandle": "default",
         "target": "step1",
-        "type": "empty-filter--run",
+        "targetHandle": "default",
+        "type": "readonly",
         "zIndex": -2,
       },
       {
         "data": {
           "edgeExecutionStatus": "SUCCESS",
+          "edgePathStrategy": undefined,
           "edgeType": "default",
         },
         "deletable": false,
@@ -371,13 +372,16 @@ describe('generateWorkflowRunDiagram', () => {
         "markerStart": undefined,
         "selectable": false,
         "source": "step1",
+        "sourceHandle": "default",
         "target": "step2",
-        "type": "empty-filter--run",
+        "targetHandle": "default",
+        "type": "readonly",
         "zIndex": -2,
       },
       {
         "data": {
           "edgeExecutionStatus": "SUCCESS",
+          "edgePathStrategy": undefined,
           "edgeType": "default",
         },
         "deletable": false,
@@ -386,8 +390,10 @@ describe('generateWorkflowRunDiagram', () => {
         "markerStart": undefined,
         "selectable": false,
         "source": "step2",
+        "sourceHandle": "default",
         "target": "step3",
-        "type": "empty-filter--run",
+        "targetHandle": "default",
+        "type": "readonly",
         "zIndex": -2,
       },
     ],
@@ -499,9 +505,8 @@ describe('generateWorkflowRunDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -518,9 +523,8 @@ describe('generateWorkflowRunDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -537,9 +541,8 @@ describe('generateWorkflowRunDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -570,8 +573,6 @@ describe('generateWorkflowRunDiagram', () => {
       trigger,
       steps,
       stepInfos,
-
-      isWorkflowBranchEnabled: true,
     });
 
     expect(result).toMatchInlineSnapshot(`
@@ -589,13 +590,16 @@ describe('generateWorkflowRunDiagram', () => {
         "markerStart": undefined,
         "selectable": false,
         "source": "trigger",
+        "sourceHandle": "default",
         "target": "step1",
-        "type": "empty-filter--run",
+        "targetHandle": "default",
+        "type": "readonly",
         "zIndex": -2,
       },
       {
         "data": {
           "edgeExecutionStatus": "RUNNING",
+          "edgePathStrategy": undefined,
           "edgeType": "default",
         },
         "deletable": false,
@@ -604,13 +608,16 @@ describe('generateWorkflowRunDiagram', () => {
         "markerStart": undefined,
         "selectable": false,
         "source": "step1",
+        "sourceHandle": "default",
         "target": "step2",
-        "type": "empty-filter--run",
+        "targetHandle": "default",
+        "type": "readonly",
         "zIndex": -2,
       },
       {
         "data": {
           "edgeExecutionStatus": "NOT_STARTED",
+          "edgePathStrategy": undefined,
           "edgeType": "default",
         },
         "deletable": false,
@@ -619,8 +626,10 @@ describe('generateWorkflowRunDiagram', () => {
         "markerStart": undefined,
         "selectable": false,
         "source": "step2",
+        "sourceHandle": "default",
         "target": "step3",
-        "type": "empty-filter--run",
+        "targetHandle": "default",
+        "type": "readonly",
         "zIndex": -2,
       },
     ],
@@ -732,9 +741,8 @@ describe('generateWorkflowRunDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -751,9 +759,8 @@ describe('generateWorkflowRunDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -770,9 +777,8 @@ describe('generateWorkflowRunDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -789,9 +795,8 @@ describe('generateWorkflowRunDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -822,8 +827,6 @@ describe('generateWorkflowRunDiagram', () => {
       trigger,
       steps,
       stepInfos,
-
-      isWorkflowBranchEnabled: true,
     });
 
     expect(result).toMatchInlineSnapshot(`
@@ -841,13 +844,16 @@ describe('generateWorkflowRunDiagram', () => {
         "markerStart": undefined,
         "selectable": false,
         "source": "trigger",
+        "sourceHandle": "default",
         "target": "step1",
-        "type": "empty-filter--run",
+        "targetHandle": "default",
+        "type": "readonly",
         "zIndex": -2,
       },
       {
         "data": {
           "edgeExecutionStatus": "SUCCESS",
+          "edgePathStrategy": undefined,
           "edgeType": "default",
         },
         "deletable": false,
@@ -856,13 +862,16 @@ describe('generateWorkflowRunDiagram', () => {
         "markerStart": undefined,
         "selectable": false,
         "source": "step1",
+        "sourceHandle": "default",
         "target": "step2",
-        "type": "empty-filter--run",
+        "targetHandle": "default",
+        "type": "readonly",
         "zIndex": -2,
       },
       {
         "data": {
           "edgeExecutionStatus": "RUNNING",
+          "edgePathStrategy": undefined,
           "edgeType": "default",
         },
         "deletable": false,
@@ -871,13 +880,16 @@ describe('generateWorkflowRunDiagram', () => {
         "markerStart": undefined,
         "selectable": false,
         "source": "step2",
+        "sourceHandle": "default",
         "target": "step3",
-        "type": "empty-filter--run",
+        "targetHandle": "default",
+        "type": "readonly",
         "zIndex": -2,
       },
       {
         "data": {
           "edgeExecutionStatus": "NOT_STARTED",
+          "edgePathStrategy": undefined,
           "edgeType": "default",
         },
         "deletable": false,
@@ -886,8 +898,10 @@ describe('generateWorkflowRunDiagram', () => {
         "markerStart": undefined,
         "selectable": false,
         "source": "step3",
+        "sourceHandle": "default",
         "target": "step4",
-        "type": "empty-filter--run",
+        "targetHandle": "default",
+        "type": "readonly",
         "zIndex": -2,
       },
     ],
@@ -1055,8 +1069,6 @@ describe('generateWorkflowRunDiagram', () => {
       trigger,
       steps,
       stepInfos,
-
-      isWorkflowBranchEnabled: true,
     });
 
     expect(result).toMatchInlineSnapshot(`
@@ -1074,8 +1086,10 @@ describe('generateWorkflowRunDiagram', () => {
         "markerStart": undefined,
         "selectable": false,
         "source": "trigger",
+        "sourceHandle": "default",
         "target": "step1",
-        "type": "empty-filter--run",
+        "targetHandle": "default",
+        "type": "readonly",
         "zIndex": -2,
       },
     ],

@@ -1,19 +1,20 @@
 import { SaveAndCancelButtons } from '@/settings/components/SaveAndCancelButtons/SaveAndCancelButtons';
 import { SettingsPageContainer } from '@/settings/components/SettingsPageContainer';
-import { SettingsPath } from '@/types/SettingsPath';
 import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
 import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
 import { SubMenuTopBarContainer } from '@/ui/layout/page/components/SubMenuTopBarContainer';
-import { ApolloError } from '@apollo/client';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { Controller, useForm } from 'react-hook-form';
+import { SettingsPath } from 'twenty-shared/types';
+import { getSettingsPath } from 'twenty-shared/utils';
 import { H2Title } from 'twenty-ui/display';
 import { Section } from 'twenty-ui/layout';
 import { z } from 'zod';
-import { useCreateApprovedAccessDomainMutation } from '~/generated-metadata/graphql';
+import { useMutation } from '@apollo/client/react';
+import { CreateApprovedAccessDomainDocument } from '~/generated-metadata/graphql';
 import { useNavigateSettings } from '~/hooks/useNavigateSettings';
-import { getSettingsPath } from '~/utils/navigation/getSettingsPath';
 
 export const SettingsSecurityApprovedAccessDomain = () => {
   const navigate = useNavigateSettings();
@@ -22,27 +23,27 @@ export const SettingsSecurityApprovedAccessDomain = () => {
 
   const { enqueueSuccessSnackBar, enqueueErrorSnackBar } = useSnackBar();
 
-  const [createApprovedAccessDomain] = useCreateApprovedAccessDomainMutation();
+  const [createApprovedAccessDomain] = useMutation(
+    CreateApprovedAccessDomainDocument,
+  );
 
   const form = useForm<{ domain: string; email: string }>({
     mode: 'onSubmit',
     resolver: zodResolver(
-      z
-        .object({
-          domain: z
-            .string()
-            .regex(
-              /^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9-]*[A-Za-z0-9])\.[a-zA-Z]{2,}$/,
-              {
-                message: t`Domains have to be smaller than 256 characters, cannot contain spaces and cannot contain any special characters.`,
-              },
-            )
-            .max(256),
-          email: z.string().min(1, {
-            message: t`Email cannot be empty`,
-          }),
-        })
-        .strict(),
+      z.strictObject({
+        domain: z
+          .string()
+          .regex(
+            /^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9-]*[A-Za-z0-9])\.[a-zA-Z]{2,}$/,
+            {
+              message: t`Domains have to be smaller than 256 characters, cannot contain spaces and cannot contain any special characters.`,
+            },
+          )
+          .max(256),
+        email: z.string().min(1, {
+          message: t`Email cannot be empty`,
+        }),
+      }),
     ),
     defaultValues: {
       email: '',
@@ -69,13 +70,13 @@ export const SettingsSecurityApprovedAccessDomain = () => {
         },
         onError: (error) => {
           enqueueErrorSnackBar({
-            apolloError: error instanceof ApolloError ? error : undefined,
+            apolloError: CombinedGraphQLErrors.is(error) ? error : undefined,
           });
         },
       });
     } catch (error) {
       enqueueErrorSnackBar({
-        apolloError: error instanceof ApolloError ? error : undefined,
+        apolloError: CombinedGraphQLErrors.is(error) ? error : undefined,
       });
     }
   };
@@ -83,7 +84,7 @@ export const SettingsSecurityApprovedAccessDomain = () => {
   return (
     <form onSubmit={form.handleSubmit(handleSave)}>
       <SubMenuTopBarContainer
-        title="New Approved Access Domain"
+        title={t`New Approved Access Domain`}
         actionButton={
           <SaveAndCancelButtons
             onCancel={() => navigate(SettingsPath.Domains)}

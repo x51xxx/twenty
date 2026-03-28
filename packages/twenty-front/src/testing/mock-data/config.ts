@@ -1,5 +1,5 @@
 import { type ClientConfig } from '@/client-config/types/ClientConfig';
-import { CaptchaDriverType, SupportDriver } from '~/generated/graphql';
+import { CaptchaDriverType, SupportDriver } from '~/generated-metadata/graphql';
 
 export const mockedClientConfig: ClientConfig = {
   aiModels: [],
@@ -11,12 +11,11 @@ export const mockedClientConfig: ClientConfig = {
     magicLink: false,
     password: true,
     microsoft: false,
+    casdoor: false,
     sso: [],
   },
   frontDomain: 'localhost',
   defaultSubdomain: 'app',
-  chromeExtensionId: 'MOCKED_EXTENSION_ID',
-  debugMode: false,
   analyticsEnabled: true,
   support: {
     supportDriver: SupportDriver.FRONT,
@@ -56,4 +55,8 @@ export const mockedClientConfig: ClientConfig = {
   isConfigVariablesInDbEnabled: false,
   isImapSmtpCaldavEnabled: false,
   isTwoFactorAuthenticationEnabled: false,
+  isEmailingDomainsEnabled: false,
+  allowRequestsToTwentyIcons: true,
+  isCloudflareIntegrationEnabled: false,
+  isClickHouseConfigured: false,
 };

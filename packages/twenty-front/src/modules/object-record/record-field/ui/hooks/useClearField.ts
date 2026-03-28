@@ -1,13 +1,16 @@
-import { useContext } from 'react';
-import { useRecoilCallback } from 'recoil';
+import { useCallback, useContext } from 'react';
+import { useStore } from 'jotai';
 
-import { objectMetadataItemsState } from '@/object-metadata/states/objectMetadataItemsState';
+import { objectMetadataItemsSelector } from '@/object-metadata/states/objectMetadataItemsSelector';
 import { recordStoreFamilySelector } from '@/object-record/record-store/states/selectors/recordStoreFamilySelector';
 import { generateEmptyFieldValue } from '@/object-record/utils/generateEmptyFieldValue';
 
-import { FieldContext } from '../contexts/FieldContext';
+import { FieldContext } from '@/object-record/record-field/ui/contexts/FieldContext';
+import { getForeignKeyNameFromRelationFieldName } from '@/object-record/utils/getForeignKeyNameFromRelationFieldName';
+import { FieldMetadataType, RelationType } from 'twenty-shared/types';
 
 export const useClearField = () => {
+  const store = useStore();
   const {
     recordId,
     fieldDefinition,
@@ -16,49 +19,75 @@ export const useClearField = () => {
 
   const [updateRecord] = useUpdateRecord();
 
-  const clearField = useRecoilCallback(
-    ({ snapshot, set }) =>
-      () => {
-        const objectMetadataItems = snapshot
-          .getLoadable(objectMetadataItemsState)
-          .getValue();
+  const clearField = useCallback(() => {
+    const objectMetadataItems = store.get(objectMetadataItemsSelector.atom);
 
-        const foundObjectMetadataItem = objectMetadataItems.find(
-          (item) =>
-            item.nameSingular ===
-            fieldDefinition.metadata.objectMetadataNameSingular,
-        );
+    const foundObjectMetadataItem = objectMetadataItems.find(
+      (item) =>
+        item.nameSingular ===
+        fieldDefinition.metadata.objectMetadataNameSingular,
+    );
 
-        const foundFieldMetadataItem = foundObjectMetadataItem?.fields.find(
-          (field) => field.name === fieldDefinition.metadata.fieldName,
-        );
+    const foundFieldMetadataItem = foundObjectMetadataItem?.fields.find(
+      (field) => field.name === fieldDefinition.metadata.fieldName,
+    );
 
-        if (!foundObjectMetadataItem || !foundFieldMetadataItem) {
-          throw new Error('Field metadata item cannot be found');
-        }
+    if (!foundObjectMetadataItem || !foundFieldMetadataItem) {
+      throw new Error('Field metadata item cannot be found');
+    }
 
-        const fieldName = fieldDefinition.metadata.fieldName;
+    const isRelation =
+      foundFieldMetadataItem.type === FieldMetadataType.RELATION ||
+      foundFieldMetadataItem.type === FieldMetadataType.MORPH_RELATION;
 
-        const emptyFieldValue = generateEmptyFieldValue({
-          fieldMetadataItem: foundFieldMetadataItem,
-        });
+    const shouldSkipClearingBecauseInvolvesMultipleRecords =
+      isRelation &&
+      foundFieldMetadataItem.settings?.relationType ===
+        RelationType.ONE_TO_MANY;
 
-        set(
-          recordStoreFamilySelector({ recordId, fieldName }),
-          emptyFieldValue,
-        );
+    if (shouldSkipClearingBecauseInvolvesMultipleRecords) {
+      return;
+    }
 
-        updateRecord?.({
-          variables: {
-            where: { id: recordId },
-            updateOneRecordInput: {
-              [fieldName]: emptyFieldValue,
-            },
-          },
-        });
+    const fieldName = fieldDefinition.metadata.fieldName;
+
+    const emptyFieldValue = generateEmptyFieldValue({
+      fieldMetadataItem: foundFieldMetadataItem,
+    });
+
+    store.set(
+      recordStoreFamilySelector.selectorFamily({ recordId, fieldName }),
+      emptyFieldValue,
+    );
+
+    const isManyToOneRelation =
+      isRelation &&
+      foundFieldMetadataItem.settings?.relationType ===
+        RelationType.MANY_TO_ONE;
+
+    const updateFieldName = isManyToOneRelation
+      ? getForeignKeyNameFromRelationFieldName(fieldName)
+      : fieldName;
+
+    if (isManyToOneRelation) {
+      store.set(
+        recordStoreFamilySelector.selectorFamily({
+          recordId,
+          fieldName: updateFieldName,
+        }),
+        emptyFieldValue,
+      );
+    }
+
+    updateRecord?.({
+      variables: {
+        where: { id: recordId },
+        updateOneRecordInput: {
+          [updateFieldName]: emptyFieldValue,
+        },
       },
-    [recordId, fieldDefinition, updateRecord],
-  );
+    });
+  }, [recordId, fieldDefinition, store, updateRecord]);
 
   return clearField;
 };

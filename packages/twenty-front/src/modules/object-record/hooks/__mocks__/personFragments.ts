@@ -1,5 +1,11 @@
 export const PERSON_FRAGMENT_WITH_DEPTH_ZERO_RELATIONS = `
       __typename
+      avatarFile {
+        fileId
+        label
+        extension
+        url
+      }
       avatarUrl
       city
       companyId
@@ -36,6 +42,12 @@ export const PERSON_FRAGMENT_WITH_DEPTH_ZERO_RELATIONS = `
       }
       position
       updatedAt
+      updatedBy {
+        source
+        workspaceMemberId
+        name
+        context
+      }
       whatsapp {
         primaryPhoneNumber
         primaryPhoneCountryCode
@@ -56,99 +68,50 @@ export const PERSON_FRAGMENT_WITH_DEPTH_ONE_RELATIONS = `
         edges {
           node {
             __typename
-            authorId
-            companyId
-            createdAt
-            deletedAt
-            fullPath
             id
             name
-            noteId
-            opportunityId
-            personId
-            petId
-            rocketId
-            surveyResultId
-            taskId
-            type
-            updatedAt
           }
         }
+      }
+      avatarFile {
+        fileId
+        label
+        extension
+        url
       }
       avatarUrl
       calendarEventParticipants {
         edges {
           node {
             __typename
-            calendarEventId
-            createdAt
-            deletedAt
-            displayName
             handle
             id
-            isOrganizer
-            personId
-            responseStatus
-            updatedAt
-            workspaceMemberId
+          }
+        }
+      }
+      caredForPets {
+        edges {
+          node {
+            __typename
+            id
+            pet {
+              __typename
+              id
+              name
+            }
           }
         }
       }
       city
       company {
         __typename
-        accountOwnerId
-        address {
-          addressStreet1
-          addressStreet2
-          addressCity
-          addressState
-          addressCountry
-          addressPostcode
-          addressLat
-          addressLng
-        }
-        annualRecurringRevenue {
-          amountMicros
-          currencyCode
-        }
-        createdAt
-        createdBy {
-          source
-          workspaceMemberId
-          name
-          context
-        }
-        deletedAt
         domainName {
           primaryLinkUrl
           primaryLinkLabel
           secondaryLinks
         }
-        employees
         id
-        idealCustomerProfile
-        introVideo {
-          primaryLinkUrl
-          primaryLinkLabel
-          secondaryLinks
-        }
-        linkedinLink {
-          primaryLinkUrl
-          primaryLinkLabel
-          secondaryLinks
-        }
         name
-        position
-        tagline
-        updatedAt
-        visaSponsorship
-        workPolicy
-        xLink {
-          primaryLinkUrl
-          primaryLinkLabel
-          secondaryLinks
-        }
       }
       companyId
       createdAt
@@ -167,25 +130,7 @@ export const PERSON_FRAGMENT_WITH_DEPTH_ONE_RELATIONS = `
         edges {
           node {
             __typename
-            companyId
-            createdAt
-            deletedAt
-            favoriteFolderId
-            forWorkspaceMemberId
             id
-            noteId
-            opportunityId
-            personId
-            petId
-            position
-            rocketId
-            surveyResultId
-            taskId
-            updatedAt
-            viewId
-            workflowId
-            workflowRunId
-            workflowVersionId
           }
         }
       }
@@ -201,16 +146,8 @@ export const PERSON_FRAGMENT_WITH_DEPTH_ONE_RELATIONS = `
         edges {
           node {
             __typename
-            createdAt
-            deletedAt
-            displayName
             handle
             id
-            messageId
-            personId
-            role
-            updatedAt
-            workspaceMemberId
           }
         }
       }
@@ -222,17 +159,12 @@ export const PERSON_FRAGMENT_WITH_DEPTH_ONE_RELATIONS = `
         edges {
           node {
             __typename
-            companyId
-            createdAt
-            deletedAt
             id
-            noteId
-            opportunityId
-            personId
-            petId
-            rocketId
-            surveyResultId
-            updatedAt
+            note {
+              __typename
+              id
+              title
+            }
           }
         }
       }
@@ -247,45 +179,40 @@ export const PERSON_FRAGMENT_WITH_DEPTH_ONE_RELATIONS = `
         edges {
           node {
             __typename
-            amount {
-              amountMicros
-              currencyCode
-            }
-            closeDate
-            companyId
-            createdAt
-            createdBy {
-              source
-              workspaceMemberId
-              name
-              context
-            }
-            deletedAt
             id
             name
-            pointOfContactId
-            position
-            stage
-            updatedAt
           }
         }
       }
       position
+      previousCompanies {
+        edges {
+          node {
+            __typename
+            company {
+              __typename
+              domainName {
+                primaryLinkUrl
+                primaryLinkLabel
+                secondaryLinks
+              }
+              id
+              name
+            }
+            id
+          }
+        }
+      }
       taskTargets {
         edges {
           node {
             __typename
-            companyId
-            createdAt
-            deletedAt
             id
-            opportunityId
-            personId
-            petId
-            rocketId
-            surveyResultId
-            taskId
-            updatedAt
+            task {
+              __typename
+              id
+              title
+            }
           }
         }
       }
@@ -293,32 +220,18 @@ export const PERSON_FRAGMENT_WITH_DEPTH_ONE_RELATIONS = `
         edges {
           node {
             __typename
-            companyId
-            createdAt
-            deletedAt
-            happensAt
             id
-            linkedObjectMetadataId
-            linkedRecordCachedName
-            linkedRecordId
             name
-            noteId
-            opportunityId
-            personId
-            petId
-            properties
-            rocketId
-            surveyResultId
-            taskId
-            updatedAt
-            workflowId
-            workflowRunId
-            workflowVersionId
-            workspaceMemberId
           }
         }
       }
       updatedAt
+      updatedBy {
+        source
+        workspaceMemberId
+        name
+        context
+      }
       whatsapp {
         primaryPhoneNumber
         primaryPhoneCountryCode

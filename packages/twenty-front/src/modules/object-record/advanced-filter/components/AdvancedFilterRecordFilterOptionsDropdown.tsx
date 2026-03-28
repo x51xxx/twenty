@@ -10,7 +10,8 @@ import { Dropdown } from '@/ui/layout/dropdown/components/Dropdown';
 import { DropdownContent } from '@/ui/layout/dropdown/components/DropdownContent';
 import { DropdownMenuItemsContainer } from '@/ui/layout/dropdown/components/DropdownMenuItemsContainer';
 import { useCloseDropdown } from '@/ui/layout/dropdown/hooks/useCloseDropdown';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+import { t } from '@lingui/core/macro';
 import { isDefined } from 'twenty-shared/utils';
 import { IconDotsVertical, IconTrash } from 'twenty-ui/display';
 import { IconButton } from 'twenty-ui/input';
@@ -30,7 +31,7 @@ export const AdvancedFilterRecordFilterOptionsDropdown = ({
   const { removeRecordFilter } = useRemoveRecordFilter();
   const { removeRecordFilterGroup } = useRemoveRecordFilterGroup();
 
-  const currentRecordFilters = useRecoilComponentValue(
+  const currentRecordFilters = useAtomComponentStateValue(
     currentRecordFiltersComponentState,
   );
 
@@ -68,7 +69,7 @@ export const AdvancedFilterRecordFilterOptionsDropdown = ({
       dropdownId={dropdownId}
       clickableComponent={
         <IconButton
-          aria-label="Record filter rule options"
+          aria-label={t`Record filter rule options`}
           variant="tertiary"
           Icon={IconDotsVertical}
         />
@@ -77,7 +78,7 @@ export const AdvancedFilterRecordFilterOptionsDropdown = ({
         <DropdownContent>
           <DropdownMenuItemsContainer>
             <MenuItem
-              text="Remove rule"
+              text={t`Remove rule`}
               onClick={handleRemove}
               LeftIcon={IconTrash}
               accent="danger"

@@ -3,6 +3,9 @@ import { Controller, useFormContext } from 'react-hook-form';
 import { useFieldMetadataItemById } from '@/object-metadata/hooks/useFieldMetadataItemById';
 import { phonesSchema as phonesFieldDefaultValueSchema } from '@/object-record/record-field/ui/types/guards/isFieldPhonesValue';
 import { SettingsOptionCardContentSelect } from '@/settings/components/SettingsOptions/SettingsOptionCardContentSelect';
+import { mergeSettingsSchemas } from '@/settings/data-model/fields/forms/utils/mergeSettingsSchema';
+import { settingsDataModelFieldMaxValuesSchema } from '@/settings/data-model/fields/forms/utils/settingsDataModelFieldMaxValuesSchema';
+import { settingsDataModelFieldOnClickActionSchema } from '@/settings/data-model/fields/forms/utils/settingsDataModelFieldOnClickActionSchema';
 import { countryCodeToCallingCode } from '@/settings/data-model/fields/preview/utils/getPhonesFieldPreviewValue';
 import { Select } from '@/ui/input/components/Select';
 import { useCountries } from '@/ui/input/components/internal/hooks/useCountries';
@@ -23,9 +26,16 @@ type SettingsDataModelFieldPhonesFormProps = {
   existingFieldMetadataId: string;
 };
 
-export const settingsDataModelFieldPhonesFormSchema = z.object({
-  defaultValue: phonesFieldDefaultValueSchema,
-});
+export const settingsDataModelFieldPhonesFormSchema = z
+  .object({
+    defaultValue: phonesFieldDefaultValueSchema,
+  })
+  .merge(
+    mergeSettingsSchemas(
+      settingsDataModelFieldMaxValuesSchema,
+      settingsDataModelFieldOnClickActionSchema,
+    ),
+  );
 
 export type SettingsDataModelFieldPhonesFormValues = z.infer<
   typeof settingsDataModelFieldPhonesFormSchema

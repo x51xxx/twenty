@@ -1,19 +1,22 @@
 import { type GraphQLScalarType } from 'graphql';
+import {
+  type FieldMetadataType,
+  type FieldMetadataDefaultValue,
+} from 'twenty-shared/types';
 
-import { type InputTypeDefinitionKind } from 'src/engine/api/graphql/workspace-schema-builder/factories/input-type-definition.factory';
+import { type GqlInputTypeDefinitionKind } from 'src/engine/api/graphql/workspace-schema-builder/enums/gql-input-type-definition-kind.enum';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export interface ArgMetadata<T = any> {
-  kind?: InputTypeDefinitionKind;
+export interface ArgMetadata {
+  kind?: GqlInputTypeDefinitionKind;
   type?: GraphQLScalarType;
   isNullable?: boolean;
   isArray?: boolean;
-  defaultValue?: T;
+  defaultValue?: FieldMetadataDefaultValue<FieldMetadataType>;
 }
 
 export interface ArgsMetadata {
   args: {
     [key: string]: ArgMetadata;
   };
-  objectMetadataId: string;
+  objectMetadataSingularName: string;
 }

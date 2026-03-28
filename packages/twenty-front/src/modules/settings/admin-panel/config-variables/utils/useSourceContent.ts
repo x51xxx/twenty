@@ -1,23 +1,24 @@
-import { CustomError } from '@/error-handler/CustomError';
-import { useTheme } from '@emotion/react';
 import { useLingui } from '@lingui/react/macro';
+import { useContext } from 'react';
+import { CustomError } from 'twenty-shared/utils';
+import { ThemeContext } from 'twenty-ui/theme-constants';
 
-import { ConfigSource } from '~/generated/graphql';
+import { ConfigSource } from '~/generated-metadata/graphql';
 
 export const useSourceContent = (source: ConfigSource) => {
+  const { theme } = useContext(ThemeContext);
   const { t } = useLingui();
-  const theme = useTheme();
 
   switch (source) {
     case ConfigSource.DATABASE:
       return {
         text: t`Stored in database`,
-        color: theme.color.blue50,
+        color: theme.color.blue10,
       };
     case ConfigSource.ENVIRONMENT:
       return {
         text: t`Environment variable`,
-        color: theme.color.green50,
+        color: theme.color.green10,
       };
     case ConfigSource.DEFAULT:
       return {

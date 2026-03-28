@@ -2,7 +2,7 @@ import {
   type WorkflowStep,
   type WorkflowTrigger,
 } from '@/workflow/types/Workflow';
-import { generateWorkflowDiagram } from '../generateWorkflowDiagram';
+import { generateWorkflowDiagram } from '@/workflow/workflow-diagram/utils/generateWorkflowDiagram';
 
 describe('generateWorkflowDiagram', () => {
   it('should generate a single trigger node when no step is provided', () => {
@@ -19,7 +19,7 @@ describe('generateWorkflowDiagram', () => {
     const result = generateWorkflowDiagram({
       trigger,
       steps,
-      defaultEdgeType: 'empty-filter--editable',
+      workflowContext: 'workflow',
     });
 
     expect(result.nodes).toHaveLength(1);
@@ -54,9 +54,8 @@ describe('generateWorkflowDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -73,9 +72,8 @@ describe('generateWorkflowDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -86,7 +84,7 @@ describe('generateWorkflowDiagram', () => {
     const result = generateWorkflowDiagram({
       trigger,
       steps,
-      defaultEdgeType: 'empty-filter--editable',
+      workflowContext: 'workflow',
     });
 
     expect(result.nodes).toHaveLength(steps.length + 1); // All steps + trigger
@@ -133,9 +131,8 @@ describe('generateWorkflowDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -152,9 +149,8 @@ describe('generateWorkflowDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -165,7 +161,7 @@ describe('generateWorkflowDiagram', () => {
     const result = generateWorkflowDiagram({
       trigger,
       steps,
-      defaultEdgeType: 'empty-filter--editable',
+      workflowContext: 'workflow',
     });
 
     expect(result.edges.length).toEqual(2);
@@ -200,9 +196,8 @@ describe('generateWorkflowDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -219,9 +214,8 @@ describe('generateWorkflowDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -232,7 +226,7 @@ describe('generateWorkflowDiagram', () => {
     const result = generateWorkflowDiagram({
       trigger,
       steps,
-      defaultEdgeType: 'empty-filter--editable',
+      workflowContext: 'workflow',
     });
 
     expect(result.edges.length).toEqual(2);
@@ -267,9 +261,8 @@ describe('generateWorkflowDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -286,9 +279,8 @@ describe('generateWorkflowDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -305,9 +297,8 @@ describe('generateWorkflowDiagram', () => {
             continueOnFailure: { value: false },
           },
           input: {
-            serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-            serverlessFunctionVersion: '1',
-            serverlessFunctionInput: {},
+            logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+            logicFunctionInput: {},
           },
           outputSchema: {},
         },
@@ -318,7 +309,7 @@ describe('generateWorkflowDiagram', () => {
     const result = generateWorkflowDiagram({
       trigger,
       steps,
-      defaultEdgeType: 'empty-filter--editable',
+      workflowContext: 'workflow',
     });
 
     expect(result.edges.length).toEqual(4);

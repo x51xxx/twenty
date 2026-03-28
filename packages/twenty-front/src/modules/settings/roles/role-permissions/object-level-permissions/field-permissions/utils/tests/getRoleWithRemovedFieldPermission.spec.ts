@@ -1,5 +1,5 @@
 import { type FieldPermission, type Role } from '~/generated-metadata/graphql';
-import { getRoleWithRemovedFieldPermission } from '../getRoleWithRemovedFieldPermission';
+import { getRoleWithRemovedFieldPermission } from '@/settings/roles/role-permissions/object-level-permissions/field-permissions/utils/getRoleWithRemovedFieldPermission';
 
 const BASE_FIELD_PERMISSION: FieldPermission = {
   id: 'field-permission-1',
@@ -17,9 +17,14 @@ const BASE_ROLE_MOCK: Role = {
   canSoftDeleteAllObjectRecords: true,
   canUpdateAllObjectRecords: true,
   canUpdateAllSettings: true,
+  canBeAssignedToUsers: true,
+  canBeAssignedToAgents: true,
+  canBeAssignedToApiKeys: true,
   id: '1',
   isEditable: true,
   label: 'Role base',
+  agents: [],
+  apiKeys: [],
   workspaceMembers: [],
   fieldPermissions: [BASE_FIELD_PERMISSION],
 };

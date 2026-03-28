@@ -16,15 +16,17 @@ import {
 } from 'typeorm';
 
 import { UUIDScalarType } from 'src/engine/api/graphql/workspace-schema-builder/graphql-types/scalars';
-import { BillingCustomer } from 'src/engine/core-modules/billing/entities/billing-customer.entity';
+import { BillingCustomerEntity } from 'src/engine/core-modules/billing/entities/billing-customer.entity';
 import { BillingEntitlementKey } from 'src/engine/core-modules/billing/enums/billing-entitlement-key.enum';
+import { WorkspaceRelatedEntity } from 'src/engine/workspace-manager/types/workspace-related-entity';
+
 @Entity({ name: 'billingEntitlement', schema: 'core' })
-@ObjectType()
+@ObjectType('BillingEntitlement')
 @Unique('IDX_BILLING_ENTITLEMENT_KEY_WORKSPACE_ID_UNIQUE', [
   'key',
   'workspaceId',
 ])
-export class BillingEntitlement {
+export class BillingEntitlementEntity extends WorkspaceRelatedEntity {
   @IDField(() => UUIDScalarType)
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -32,10 +34,6 @@ export class BillingEntitlement {
   @Field(() => String)
   @Column({ nullable: false, type: 'text' })
   key: BillingEntitlementKey;
-
-  @Field(() => UUIDScalarType)
-  @Column({ nullable: false, type: 'uuid' })
-  workspaceId: string;
 
   @Column({ nullable: false })
   stripeCustomerId: string;
@@ -53,7 +51,7 @@ export class BillingEntitlement {
   @Column({ nullable: true, type: 'timestamptz' })
   deletedAt?: Date;
   @ManyToOne(
-    () => BillingCustomer,
+    () => BillingCustomerEntity,
     (billingCustomer) => billingCustomer.billingEntitlements,
     {
       onDelete: 'CASCADE',
@@ -64,5 +62,5 @@ export class BillingEntitlement {
     referencedColumnName: 'stripeCustomerId',
     name: 'stripeCustomerId',
   })
-  billingCustomer: Relation<BillingCustomer>;
+  billingCustomer: Relation<BillingCustomerEntity>;
 }

@@ -1,31 +1,18 @@
-import { TEST_NOT_EXISTING_VIEW_FILTER_ID } from 'test/integration/constants/test-view-ids.constants';
-import { createViewFilterOperationFactory } from 'test/integration/graphql/utils/create-view-filter-operation-factory.util';
-import { deleteViewFilterOperationFactory } from 'test/integration/graphql/utils/delete-view-filter-operation-factory.util';
-import { destroyViewFilterOperationFactory } from 'test/integration/graphql/utils/destroy-view-filter-operation-factory.util';
-import { findViewFiltersOperationFactory } from 'test/integration/graphql/utils/find-view-filters-operation-factory.util';
-import {
-  assertGraphQLErrorResponse,
-  assertGraphQLSuccessfulResponse,
-} from 'test/integration/graphql/utils/graphql-test-assertions.util';
-import { makeGraphqlAPIRequest } from 'test/integration/graphql/utils/make-graphql-api-request.util';
-import { updateViewFilterOperationFactory } from 'test/integration/graphql/utils/update-view-filter-operation-factory.util';
-import { createViewFilterData } from 'test/integration/graphql/utils/view-data-factory.util';
+import { expectOneNotInternalServerErrorSnapshot } from 'test/integration/graphql/utils/expect-one-not-internal-server-error-snapshot.util';
 import { createTestViewWithGraphQL } from 'test/integration/graphql/utils/view-graphql.util';
 import { createOneFieldMetadata } from 'test/integration/metadata/suites/field-metadata/utils/create-one-field-metadata.util';
 import { createOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/create-one-object-metadata.util';
 import { deleteOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/delete-one-object-metadata.util';
-import {
-  assertViewFilterStructure,
-  cleanupViewRecords,
-} from 'test/integration/utils/view-test.util';
-import { FieldMetadataType } from 'twenty-shared/types';
+import { updateOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/update-one-object-metadata.util';
+import { createOneViewFilter } from 'test/integration/metadata/suites/view-filter/utils/create-one-view-filter.util';
+import { deleteOneViewFilter } from 'test/integration/metadata/suites/view-filter/utils/delete-one-view-filter.util';
+import { destroyOneViewFilter } from 'test/integration/metadata/suites/view-filter/utils/destroy-one-view-filter.util';
+import { findViewFilters } from 'test/integration/metadata/suites/view-filter/utils/find-view-filters.util';
+import { updateOneViewFilter } from 'test/integration/metadata/suites/view-filter/utils/update-one-view-filter.util';
+import { destroyOneView } from 'test/integration/metadata/suites/view/utils/destroy-one-view.util';
+import { FieldMetadataType, ViewFilterOperand } from 'twenty-shared/types';
 
-import { ErrorCode } from 'src/engine/core-modules/graphql/utils/graphql-errors.util';
-import { ViewFilterOperand } from 'src/engine/core-modules/view/enums/view-filter-operand';
-import {
-  ViewFilterExceptionMessageKey,
-  generateViewFilterExceptionMessage,
-} from 'src/engine/core-modules/view/exceptions/view-filter.exception';
+const TEST_NOT_EXISTING_VIEW_FILTER_ID = '20202020-52c5-4152-8c09-76a845fb8ece';
 
 describe('View Filter Resolver', () => {
   let testViewId: string;
@@ -38,11 +25,12 @@ describe('View Filter Resolver', () => {
         createOneObject: { id: objectMetadataId },
       },
     } = await createOneObjectMetadata({
+      expectToFail: false,
       input: {
-        nameSingular: 'myTestObject',
-        namePlural: 'myTestObjects',
-        labelSingular: 'My Test Object',
-        labelPlural: 'My Test Objects',
+        nameSingular: 'myFilterTestObject',
+        namePlural: 'myFilterTestObjects',
+        labelSingular: 'My Filter Test Object',
+        labelPlural: 'My Filter Test Objects',
         icon: 'Icon123',
       },
     });
@@ -54,6 +42,7 @@ describe('View Filter Resolver', () => {
         createOneField: { id: fieldMetadataId },
       },
     } = await createOneFieldMetadata({
+      expectToFail: false,
       input: {
         name: 'testField',
         label: 'Test Field',
@@ -67,14 +56,22 @@ describe('View Filter Resolver', () => {
   });
 
   afterAll(async () => {
+    await updateOneObjectMetadata({
+      expectToFail: false,
+      input: {
+        idToUpdate: testObjectMetadataId,
+        updatePayload: {
+          isActive: false,
+        },
+      },
+    });
     await deleteOneObjectMetadata({
+      expectToFail: false,
       input: { idToDelete: testObjectMetadataId },
     });
   });
 
   beforeEach(async () => {
-    await cleanupViewRecords();
-
     const view = await createTestViewWithGraphQL({
       name: 'Test View for Filters',
       objectMetadataId: testObjectMetadataId,
@@ -83,39 +80,43 @@ describe('View Filter Resolver', () => {
     testViewId = view.id;
   });
 
-  afterAll(async () => {
-    await cleanupViewRecords();
+  afterEach(async () => {
+    await destroyOneView({
+      viewId: testViewId,
+      expectToFail: false,
+    });
   });
 
-  describe('getCoreViewFilters', () => {
+  describe('getViewFilters', () => {
     it('should return empty array when no view filters exist', async () => {
-      const operation = findViewFiltersOperationFactory({ viewId: testViewId });
-      const response = await makeGraphqlAPIRequest(operation);
+      const { data, errors } = await findViewFilters({
+        viewId: testViewId,
+        expectToFail: false,
+      });
 
-      assertGraphQLSuccessfulResponse(response);
-      expect(response.body.data.getCoreViewFilters).toEqual([]);
+      expect(errors).toBeUndefined();
+      expect(data.getViewFilters).toEqual([]);
     });
 
     it('should return view filters for a specific view', async () => {
-      const filterData = createViewFilterData(testViewId, {
-        operand: ViewFilterOperand.CONTAINS,
-        value: 'test',
-        fieldMetadataId: testFieldMetadataId,
-      });
-      const createOperation = createViewFilterOperationFactory({
-        data: filterData,
+      await createOneViewFilter({
+        input: {
+          fieldMetadataId: testFieldMetadataId,
+          viewId: testViewId,
+          operand: ViewFilterOperand.CONTAINS,
+          value: 'test',
+        },
+        expectToFail: false,
       });
 
-      await makeGraphqlAPIRequest(createOperation);
-
-      const getOperation = findViewFiltersOperationFactory({
+      const { data, errors } = await findViewFilters({
         viewId: testViewId,
+        expectToFail: false,
       });
-      const response = await makeGraphqlAPIRequest(getOperation);
 
-      assertGraphQLSuccessfulResponse(response);
-      expect(response.body.data.getCoreViewFilters).toHaveLength(1);
-      assertViewFilterStructure(response.body.data.getCoreViewFilters[0], {
+      expect(errors).toBeUndefined();
+      expect(data.getViewFilters).toHaveLength(1);
+      expect(data.getViewFilters[0]).toMatchObject({
         fieldMetadataId: testFieldMetadataId,
         operand: ViewFilterOperand.CONTAINS,
         value: 'test',
@@ -124,19 +125,20 @@ describe('View Filter Resolver', () => {
     });
   });
 
-  describe('createCoreViewFilter', () => {
+  describe('createViewFilter', () => {
     it('should create a new view filter with string value', async () => {
-      const filterData = createViewFilterData(testViewId, {
-        operand: ViewFilterOperand.IS,
-        value: 'test value',
-        fieldMetadataId: testFieldMetadataId,
+      const { data, errors } = await createOneViewFilter({
+        input: {
+          fieldMetadataId: testFieldMetadataId,
+          viewId: testViewId,
+          operand: ViewFilterOperand.IS,
+          value: 'test value',
+        },
+        expectToFail: false,
       });
 
-      const operation = createViewFilterOperationFactory({ data: filterData });
-      const response = await makeGraphqlAPIRequest(operation);
-
-      assertGraphQLSuccessfulResponse(response);
-      assertViewFilterStructure(response.body.data.createCoreViewFilter, {
+      expect(errors).toBeUndefined();
+      expect(data.createViewFilter).toMatchObject({
         fieldMetadataId: testFieldMetadataId,
         operand: ViewFilterOperand.IS,
         value: 'test value',
@@ -145,17 +147,18 @@ describe('View Filter Resolver', () => {
     });
 
     it('should create a view filter with numeric value', async () => {
-      const filterData = createViewFilterData(testViewId, {
-        operand: ViewFilterOperand.GREATER_THAN_OR_EQUAL,
-        value: 100,
-        fieldMetadataId: testFieldMetadataId,
+      const { data, errors } = await createOneViewFilter({
+        input: {
+          fieldMetadataId: testFieldMetadataId,
+          viewId: testViewId,
+          operand: ViewFilterOperand.GREATER_THAN_OR_EQUAL,
+          value: 100,
+        },
+        expectToFail: false,
       });
 
-      const operation = createViewFilterOperationFactory({ data: filterData });
-      const response = await makeGraphqlAPIRequest(operation);
-
-      assertGraphQLSuccessfulResponse(response);
-      assertViewFilterStructure(response.body.data.createCoreViewFilter, {
+      expect(errors).toBeUndefined();
+      expect(data.createViewFilter).toMatchObject({
         fieldMetadataId: testFieldMetadataId,
         operand: ViewFilterOperand.GREATER_THAN_OR_EQUAL,
         value: 100,
@@ -164,18 +167,18 @@ describe('View Filter Resolver', () => {
     });
 
     it('should create a view filter with boolean value', async () => {
-      const operation = createViewFilterOperationFactory({
-        data: createViewFilterData(testViewId, {
+      const { data, errors } = await createOneViewFilter({
+        input: {
+          fieldMetadataId: testFieldMetadataId,
+          viewId: testViewId,
           operand: ViewFilterOperand.IS,
           value: true,
-          fieldMetadataId: testFieldMetadataId,
-        }),
+        },
+        expectToFail: false,
       });
 
-      const response = await makeGraphqlAPIRequest(operation);
-
-      assertGraphQLSuccessfulResponse(response);
-      assertViewFilterStructure(response.body.data.createCoreViewFilter, {
+      expect(errors).toBeUndefined();
+      expect(data.createViewFilter).toMatchObject({
         fieldMetadataId: testFieldMetadataId,
         operand: ViewFilterOperand.IS,
         value: true,
@@ -184,32 +187,33 @@ describe('View Filter Resolver', () => {
     });
   });
 
-  describe('updateCoreViewFilter', () => {
+  describe('updateViewFilter', () => {
     it('should update an existing view filter', async () => {
-      const createOperation = createViewFilterOperationFactory({
-        data: createViewFilterData(testViewId, {
+      const { data: createData } = await createOneViewFilter({
+        input: {
+          fieldMetadataId: testFieldMetadataId,
+          viewId: testViewId,
           operand: ViewFilterOperand.CONTAINS,
           value: 'original',
-          fieldMetadataId: testFieldMetadataId,
-        }),
-      });
-
-      const createResponse = await makeGraphqlAPIRequest(createOperation);
-
-      const viewFilterId = createResponse.body.data.createCoreViewFilter.id;
-
-      const updateOperation = updateViewFilterOperationFactory({
-        viewFilterId: viewFilterId,
-        data: {
-          operand: ViewFilterOperand.DOES_NOT_CONTAIN,
-          value: 'updated',
         },
+        expectToFail: false,
       });
 
-      const response = await makeGraphqlAPIRequest(updateOperation);
+      const viewFilterId = createData.createViewFilter.id;
 
-      assertGraphQLSuccessfulResponse(response);
-      assertViewFilterStructure(response.body.data.updateCoreViewFilter, {
+      const { data, errors } = await updateOneViewFilter({
+        input: {
+          id: viewFilterId,
+          update: {
+            operand: ViewFilterOperand.DOES_NOT_CONTAIN,
+            value: 'updated',
+          },
+        },
+        expectToFail: false,
+      });
+
+      expect(errors).toBeUndefined();
+      expect(data.updateViewFilter).toMatchObject({
         id: viewFilterId,
         operand: ViewFilterOperand.DOES_NOT_CONTAIN,
         value: 'updated',
@@ -217,101 +221,92 @@ describe('View Filter Resolver', () => {
     });
 
     it('should throw an error when updating non-existent view filter', async () => {
-      const operation = updateViewFilterOperationFactory({
-        viewFilterId: TEST_NOT_EXISTING_VIEW_FILTER_ID,
+      const { errors } = await updateOneViewFilter({
+        input: {
+          id: TEST_NOT_EXISTING_VIEW_FILTER_ID,
+          update: {},
+        },
+        expectToFail: true,
       });
-      const response = await makeGraphqlAPIRequest(operation);
 
-      assertGraphQLErrorResponse(
-        response,
-        ErrorCode.NOT_FOUND,
-        generateViewFilterExceptionMessage(
-          ViewFilterExceptionMessageKey.VIEW_FILTER_NOT_FOUND,
-          TEST_NOT_EXISTING_VIEW_FILTER_ID,
-        ),
-      );
+      expectOneNotInternalServerErrorSnapshot({ errors });
     });
   });
 
-  describe('deleteCoreViewFilter', () => {
+  describe('deleteViewFilter', () => {
     it('should delete an existing view filter', async () => {
-      const createOperation = createViewFilterOperationFactory({
-        data: createViewFilterData(testViewId, {
+      const { data: createData } = await createOneViewFilter({
+        input: {
+          fieldMetadataId: testFieldMetadataId,
+          viewId: testViewId,
           operand: ViewFilterOperand.CONTAINS,
           value: 'to delete',
-          fieldMetadataId: testFieldMetadataId,
-        }),
+        },
+        expectToFail: false,
       });
 
-      const createResponse = await makeGraphqlAPIRequest(createOperation);
+      const viewFilterId = createData.createViewFilter.id;
 
-      const viewFilterId = createResponse.body.data.createCoreViewFilter.id;
-
-      const deleteOperation = deleteViewFilterOperationFactory({
-        viewFilterId: viewFilterId,
+      const { data, errors } = await deleteOneViewFilter({
+        input: { id: viewFilterId },
+        expectToFail: false,
       });
 
-      const response = await makeGraphqlAPIRequest(deleteOperation);
-
-      assertGraphQLSuccessfulResponse(response);
-      expect(response.body.data.deleteCoreViewFilter).toBe(true);
+      expect(errors).toBeUndefined();
+      expect(data.deleteViewFilter).toMatchObject({
+        id: viewFilterId,
+      });
+      expect(data.deleteViewFilter.deletedAt).toBeDefined();
     });
 
     it('should throw an error when deleting non-existent view filter', async () => {
-      const operation = deleteViewFilterOperationFactory({
-        viewFilterId: TEST_NOT_EXISTING_VIEW_FILTER_ID,
+      const { errors } = await deleteOneViewFilter({
+        input: { id: TEST_NOT_EXISTING_VIEW_FILTER_ID },
+        expectToFail: true,
       });
-      const response = await makeGraphqlAPIRequest(operation);
 
-      assertGraphQLErrorResponse(
-        response,
-        ErrorCode.NOT_FOUND,
-        generateViewFilterExceptionMessage(
-          ViewFilterExceptionMessageKey.VIEW_FILTER_NOT_FOUND,
-          TEST_NOT_EXISTING_VIEW_FILTER_ID,
-        ),
-      );
+      expectOneNotInternalServerErrorSnapshot({ errors });
     });
   });
 
-  describe('destroyCoreViewFilter', () => {
+  describe('destroyViewFilter', () => {
     it('should destroy an existing view filter', async () => {
-      const createOperation = createViewFilterOperationFactory({
-        data: createViewFilterData(testViewId, {
+      const { data: createData } = await createOneViewFilter({
+        input: {
+          fieldMetadataId: testFieldMetadataId,
+          viewId: testViewId,
           operand: ViewFilterOperand.CONTAINS,
           value: 'to destroy',
-          fieldMetadataId: testFieldMetadataId,
-        }),
+        },
+        expectToFail: false,
       });
 
-      const createResponse = await makeGraphqlAPIRequest(createOperation);
+      const viewFilterId = createData.createViewFilter.id;
 
-      const viewFilterId = createResponse.body.data.createCoreViewFilter.id;
-
-      const destroyOperation = destroyViewFilterOperationFactory({
-        viewFilterId: viewFilterId,
+      await deleteOneViewFilter({
+        input: {
+          id: viewFilterId,
+        },
+        expectToFail: false,
+      });
+      const { data, errors } = await destroyOneViewFilter({
+        input: { id: viewFilterId },
+        expectToFail: false,
       });
 
-      const response = await makeGraphqlAPIRequest(destroyOperation);
-
-      assertGraphQLSuccessfulResponse(response);
-      expect(response.body.data.destroyCoreViewFilter).toBe(true);
+      expect(errors).toBeUndefined();
+      expect(data.destroyViewFilter).toMatchObject({
+        id: viewFilterId,
+      });
     });
 
     it('should throw an error when destroying non-existent view filter', async () => {
-      const operation = destroyViewFilterOperationFactory({
-        viewFilterId: TEST_NOT_EXISTING_VIEW_FILTER_ID,
+      const { errors } = await destroyOneViewFilter({
+        input: { id: TEST_NOT_EXISTING_VIEW_FILTER_ID },
+        expectToFail: true,
       });
-      const response = await makeGraphqlAPIRequest(operation);
 
-      assertGraphQLErrorResponse(
-        response,
-        ErrorCode.NOT_FOUND,
-        generateViewFilterExceptionMessage(
-          ViewFilterExceptionMessageKey.VIEW_FILTER_NOT_FOUND,
-          TEST_NOT_EXISTING_VIEW_FILTER_ID,
-        ),
-      );
+      expectOneNotInternalServerErrorSnapshot({ errors });
     });
   });
 });

@@ -1,16 +1,9 @@
-import { useRecoilState } from 'recoil';
-
-import { useFindManyRecordsSelectedInContextStore } from '@/context-store/hooks/useFindManyRecordsSelectedInContextStore';
 import { type MergeManySettings } from '@/object-record/hooks/useMergeManyRecords';
-import { mergeSettingsState } from '../states/mergeSettingsState';
+import { mergeSettingsState } from '@/object-record/record-merge/states/mergeSettingsState';
+import { useAtomState } from '@/ui/utilities/state/jotai/hooks/useAtomState';
 
 export const useMergeRecordsSettings = () => {
-  const [mergeSettings, setMergeSettings] = useRecoilState(mergeSettingsState);
-  const { records: selectedRecords } = useFindManyRecordsSelectedInContextStore(
-    {
-      limit: 10,
-    },
-  );
+  const [mergeSettings, setMergeSettings] = useAtomState(mergeSettingsState);
 
   const updateMergeSettings = (settings: MergeManySettings) => {
     setMergeSettings(settings);
@@ -24,7 +17,6 @@ export const useMergeRecordsSettings = () => {
   };
 
   return {
-    selectedRecords,
     mergeSettings,
     updateMergeSettings,
     updatePriorityRecordIndex,

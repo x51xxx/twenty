@@ -1,13 +1,12 @@
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
 import { renderHook } from '@testing-library/react';
-import { RecoilRoot } from 'recoil';
 
-import { AppPath } from '@/types/AppPath';
 import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
+import { AppPath } from 'twenty-shared/types';
 import { useNavigateApp } from '~/hooks/useNavigateApp';
-import { useAuth } from '../useAuth';
-import { useVerifyLogin } from '../useVerifyLogin';
+import { useAuth } from '@/auth/hooks/useAuth';
+import { useVerifyLogin } from '@/auth/hooks/useVerifyLogin';
 
 import { SOURCE_LOCALE } from 'twenty-shared/translations';
 import { dynamicActivate } from '~/utils/i18n/dynamicActivate';
@@ -28,8 +27,7 @@ dynamicActivate(SOURCE_LOCALE);
 
 const renderHooks = () => {
   const { result } = renderHook(() => useVerifyLogin(), {
-    wrapper: ({ children }) =>
-      RecoilRoot({ children: I18nProvider({ i18n, children }) }),
+    wrapper: ({ children }) => I18nProvider({ i18n, children }),
   });
   return { result };
 };

@@ -4,25 +4,33 @@ import { type FlatIndexMetadata } from 'src/engine/metadata-modules/flat-index-m
 import { IndexType } from 'src/engine/metadata-modules/index-metadata/types/indexType.types';
 
 type FlatIndexMetadataOverrides = Required<
-  Pick<FlatIndexMetadata, 'uniqueIdentifier' | 'objectMetadataId'>
+  Pick<
+    FlatIndexMetadata,
+    | 'universalIdentifier'
+    | 'objectMetadataId'
+    | 'objectMetadataUniversalIdentifier'
+    | 'applicationUniversalIdentifier'
+  >
 > &
   Partial<FlatIndexMetadata>;
 export const getFlatIndexMetadataMock = (
   overrides: FlatIndexMetadataOverrides,
 ): FlatIndexMetadata => {
-  const createdAt = faker.date.anytime();
+  const createdAt = faker.date.anytime().toISOString();
 
   return {
+    universalFlatIndexFieldMetadatas: [],
     flatIndexFieldMetadatas: [],
     createdAt,
     id: faker.string.uuid(),
     indexType: IndexType.BTREE,
-    indexWhereClause: undefined,
+    indexWhereClause: null,
     isCustom: false,
     isUnique: false,
     name: 'defaultFlatIndexMetadataName',
     updatedAt: createdAt,
     workspaceId: faker.string.uuid(),
+    applicationId: faker.string.uuid(),
     ...overrides,
   };
 };

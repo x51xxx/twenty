@@ -1,17 +1,39 @@
-import { type ApiKey } from 'src/engine/core-modules/api-key/api-key.entity';
-import { type UserWorkspace } from 'src/engine/core-modules/user-workspace/user-workspace.entity';
-import { type User } from 'src/engine/core-modules/user/user.entity';
+import { type ApiKeyEntity } from 'src/engine/core-modules/api-key/api-key.entity';
+import { type ApplicationEntity } from 'src/engine/core-modules/application/application.entity';
+import { type AuthContextUser } from 'src/engine/core-modules/auth/types/auth-context-user.type';
+import { type UserWorkspaceEntity } from 'src/engine/core-modules/user-workspace/user-workspace.entity';
 import { type AuthProviderEnum } from 'src/engine/core-modules/workspace/types/workspace.type';
-import { type Workspace } from 'src/engine/core-modules/workspace/workspace.entity';
+import { type WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
+import { type WorkspaceMemberWorkspaceEntity } from 'src/modules/workspace-member/standard-objects/workspace-member.workspace-entity';
 
-export type AuthContext = {
-  user?: User | null | undefined;
-  apiKey?: ApiKey | null | undefined;
+export { AUTH_CONTEXT_USER_SELECT_FIELDS } from 'src/engine/core-modules/auth/constants/auth-context-user-select-fields.constants';
+export { type AuthContextUser } from 'src/engine/core-modules/auth/types/auth-context-user.type';
+
+export type RawAuthContext = {
+  user?: AuthContextUser | null | undefined;
+  apiKey?: ApiKeyEntity | null | undefined;
   workspaceMemberId?: string;
-  workspace?: Workspace;
+  workspaceMember?: WorkspaceMemberWorkspaceEntity;
+  workspace?: WorkspaceEntity;
+  application?: ApplicationEntity | null | undefined;
   userWorkspaceId?: string;
-  userWorkspace?: UserWorkspace;
+  userWorkspace?: UserWorkspaceEntity;
   authProvider?: AuthProviderEnum;
+  impersonationContext?: {
+    impersonatorUserWorkspaceId?: string;
+    impersonatedUserWorkspaceId?: string;
+  };
+};
+
+// @deprecated Use WorkspaceAuthContext instead
+export type AuthContext = RawAuthContext;
+
+export type SerializableAuthContext = {
+  userId?: string;
+  userWorkspaceId?: string;
+  workspaceMemberId?: string;
+  apiKeyId?: string;
+  applicationId?: string;
 };
 
 export enum JwtTokenTypeEnum {
@@ -24,13 +46,15 @@ export enum JwtTokenTypeEnum {
   POSTGRES_PROXY = 'POSTGRES_PROXY',
   REMOTE_SERVER = 'REMOTE_SERVER',
   KEY_ENCRYPTION_KEY = 'KEY_ENCRYPTION_KEY',
+  APPLICATION_ACCESS = 'APPLICATION_ACCESS',
+  APPLICATION_REFRESH = 'APPLICATION_REFRESH',
 }
 
 type CommonPropertiesJwtPayload = {
   sub: string;
 };
 
-export type FileTokenJwtPayload = CommonPropertiesJwtPayload & {
+export type FileTokenJwtPayloadLegacy = CommonPropertiesJwtPayload & {
   type: JwtTokenTypeEnum.FILE;
   workspaceId: string;
   filename: string;
@@ -40,10 +64,17 @@ export type FileTokenJwtPayload = CommonPropertiesJwtPayload & {
   personId?: string;
 };
 
+export type FileTokenJwtPayload = CommonPropertiesJwtPayload & {
+  type: JwtTokenTypeEnum.FILE;
+  workspaceId: string;
+  fileId: string;
+};
+
 export type LoginTokenJwtPayload = CommonPropertiesJwtPayload & {
   type: JwtTokenTypeEnum.LOGIN;
   workspaceId: string;
-  authProvider?: AuthProviderEnum;
+  authProvider: AuthProviderEnum;
+  impersonatorUserWorkspaceId?: string;
 };
 
 export type TransientTokenJwtPayload = CommonPropertiesJwtPayload & {
@@ -55,11 +86,14 @@ export type TransientTokenJwtPayload = CommonPropertiesJwtPayload & {
 
 export type RefreshTokenJwtPayload = CommonPropertiesJwtPayload & {
   type: JwtTokenTypeEnum.REFRESH;
-  workspaceId?: string;
+  workspaceId?: string | null;
   userId: string;
   jti?: string;
   authProvider?: AuthProviderEnum;
   targetedTokenType: JwtTokenTypeEnum;
+  isImpersonating?: boolean;
+  impersonatorUserWorkspaceId?: string;
+  impersonatedUserWorkspaceId?: string;
 };
 
 export type WorkspaceAgnosticTokenJwtPayload = CommonPropertiesJwtPayload & {
@@ -75,30 +109,47 @@ export type ApiKeyTokenJwtPayload = CommonPropertiesJwtPayload & {
   jti?: string;
 };
 
+export type ApplicationAccessTokenJwtPayload = CommonPropertiesJwtPayload & {
+  type: JwtTokenTypeEnum.APPLICATION_ACCESS;
+  workspaceId: string;
+  applicationId: string;
+  userWorkspaceId?: string;
+  userId?: string;
+};
+
+export type ApplicationRefreshTokenJwtPayload = CommonPropertiesJwtPayload & {
+  type: JwtTokenTypeEnum.APPLICATION_REFRESH;
+  workspaceId: string;
+  applicationId: string;
+  userWorkspaceId?: string;
+  userId?: string;
+};
+
 export type AccessTokenJwtPayload = CommonPropertiesJwtPayload & {
   type: JwtTokenTypeEnum.ACCESS;
   workspaceId: string;
   userId: string;
   workspaceMemberId?: string;
   userWorkspaceId: string;
-  authProvider?: AuthProviderEnum;
+  authProvider: AuthProviderEnum;
+  isImpersonating?: boolean;
+  impersonatorUserWorkspaceId?: string;
+  impersonatedUserWorkspaceId?: string;
 };
 
 export type PostgresProxyTokenJwtPayload = CommonPropertiesJwtPayload & {
   type: JwtTokenTypeEnum.POSTGRES_PROXY;
 };
 
-export type RemoteServerTokenJwtPayload = CommonPropertiesJwtPayload & {
-  type: JwtTokenTypeEnum.REMOTE_SERVER;
-};
-
 export type JwtPayload =
   | AccessTokenJwtPayload
   | ApiKeyTokenJwtPayload
+  | ApplicationAccessTokenJwtPayload
+  | ApplicationRefreshTokenJwtPayload
   | WorkspaceAgnosticTokenJwtPayload
   | LoginTokenJwtPayload
   | TransientTokenJwtPayload
   | RefreshTokenJwtPayload
   | FileTokenJwtPayload
-  | PostgresProxyTokenJwtPayload
-  | RemoteServerTokenJwtPayload;
+  | FileTokenJwtPayloadLegacy
+  | PostgresProxyTokenJwtPayload;

@@ -1,5 +1,5 @@
-import { type Meta, type StoryObj } from '@storybook/react';
-import { expect, fn, userEvent, within } from '@storybook/test';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
+import { expect, fn, userEvent, within } from 'storybook/test';
 
 import { IconUser } from '@ui/display/icon/components/TablerIcons';
 import {
@@ -7,7 +7,7 @@ import {
   type CatalogStory,
   ComponentDecorator,
 } from '@ui/testing';
-import { MAIN_COLOR_NAMES, type ThemeColor } from '@ui/theme';
+import { type ThemeColor, MAIN_COLOR_NAMES } from '@ui/theme';
 
 import { Tag } from '../Tag';
 

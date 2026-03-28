@@ -1,6 +1,5 @@
 import type React from 'react';
 
-import { type HandleContainerMouseEnterArgs } from '@/object-record/record-table/hooks/internal/useHandleContainerMouseEnter';
 import { type OpenTableCellArgs } from '@/object-record/record-table/record-table-cell/hooks/useOpenRecordTableCell';
 import { type MoveFocusDirection } from '@/object-record/record-table/types/MoveFocusDirection';
 import { type TableCellPosition } from '@/object-record/record-table/types/TableCellPosition';
@@ -12,11 +11,11 @@ export type RecordTableBodyContextProps = {
   onMoveFocus: (direction: MoveFocusDirection) => void;
   onCloseTableCell: () => void;
   onMoveHoverToCurrentCell: (cellPosition: TableCellPosition) => void;
-  onActionMenuDropdownOpened: (
+  onCommandMenuDropdownOpened: (
     event: React.MouseEvent,
     recordId: string,
   ) => void;
-  onCellMouseEnter: (args: HandleContainerMouseEnterArgs) => void;
+  hasUserSelectedAllRows?: boolean;
 };
 
 export const [

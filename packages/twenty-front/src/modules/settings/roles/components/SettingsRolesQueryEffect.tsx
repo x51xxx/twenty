@@ -2,50 +2,51 @@ import { settingsDraftRoleFamilyState } from '@/settings/roles/states/settingsDr
 import { settingsPersistedRoleFamilyState } from '@/settings/roles/states/settingsPersistedRoleFamilyState';
 import { settingsRoleIdsState } from '@/settings/roles/states/settingsRoleIdsState';
 import { settingsRolesIsLoadingState } from '@/settings/roles/states/settingsRolesIsLoadingState';
-import { getSnapshotValue } from '@/ui/utilities/state/utils/getSnapshotValue';
-import { useEffect } from 'react';
-import { useRecoilCallback, useSetRecoilState } from 'recoil';
+import { type RoleWithPartialMembers } from '@/settings/roles/types/RoleWithPartialMembers';
+import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
+import { useStore } from 'jotai';
+import { useCallback, useEffect } from 'react';
 import { isDefined } from 'twenty-shared/utils';
-import { type Role, useGetRolesQuery } from '~/generated-metadata/graphql';
+import { useQuery } from '@apollo/client/react';
+import { GetRolesDocument } from '~/generated-metadata/graphql';
 import { isDeeplyEqual } from '~/utils/isDeeplyEqual';
 
 export const SettingsRolesQueryEffect = () => {
-  const { data, loading } = useGetRolesQuery({
+  const { data, loading } = useQuery(GetRolesDocument, {
     fetchPolicy: 'network-only',
   });
 
-  const setSettingsRolesIsLoading = useSetRecoilState(
+  const setSettingsRolesIsLoading = useSetAtomState(
     settingsRolesIsLoadingState,
   );
 
-  const populateRoles = useRecoilCallback(
-    ({ set, snapshot }) =>
-      (roles: Role[]) => {
-        const roleIds = roles.map((role) => role.id);
-        set(settingsRoleIdsState, roleIds);
-        roles.forEach((role) => {
-          const persistedRole = getSnapshotValue(
-            snapshot,
-            settingsPersistedRoleFamilyState(role.id),
-          );
+  const store = useStore();
 
-          const currentDraftRole = getSnapshotValue(
-            snapshot,
-            settingsDraftRoleFamilyState(role.id),
-          );
+  const populateRoles = useCallback(
+    (roles: RoleWithPartialMembers[]) => {
+      const roleIds = roles.map((role) => role.id);
+      store.set(settingsRoleIdsState.atom, roleIds);
+      roles.forEach((role) => {
+        const persistedRole = store.get(
+          settingsPersistedRoleFamilyState.atomFamily(role.id),
+        );
 
-          if (isDeeplyEqual(role, persistedRole)) {
-            return;
-          }
+        const currentDraftRole = store.get(
+          settingsDraftRoleFamilyState.atomFamily(role.id),
+        );
 
-          set(settingsPersistedRoleFamilyState(role.id), role);
+        if (isDeeplyEqual(role, persistedRole)) {
+          return;
+        }
 
-          if (!isDeeplyEqual(currentDraftRole, role)) {
-            set(settingsDraftRoleFamilyState(role.id), role);
-          }
-        });
-      },
-    [],
+        store.set(settingsPersistedRoleFamilyState.atomFamily(role.id), role);
+
+        if (!isDeeplyEqual(currentDraftRole, role)) {
+          store.set(settingsDraftRoleFamilyState.atomFamily(role.id), role);
+        }
+      });
+    },
+    [store],
   );
 
   useEffect(() => {

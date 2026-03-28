@@ -12,12 +12,17 @@ import { MultipleSelectDropdown } from '@/object-record/select/components/Multip
 import { useRecordsForSelect } from '@/object-record/select/hooks/useRecordsForSelect';
 import { type SelectableItem } from '@/object-record/select/types/SelectableItem';
 import { DropdownMenuSeparator } from '@/ui/layout/dropdown/components/DropdownMenuSeparator';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentSelectorValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentSelectorValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 import { type RelationFilterValue } from '@/views/view-filter-value/types/RelationFilterValue';
-import { arrayOfUuidOrVariableSchema } from '@/views/view-filter-value/validation-schemas/arrayOfUuidsOrVariablesSchema';
-import { jsonRelationFilterValueSchema } from '@/views/view-filter-value/validation-schemas/jsonRelationFilterValueSchema';
-import { isDefined } from 'twenty-shared/utils';
+import {
+  arrayOfUuidOrVariableSchema,
+  isDefined,
+  jsonRelationFilterValueSchema,
+} from 'twenty-shared/utils';
 import { IconUserCircle } from 'twenty-ui/display';
+import { allowRequestsToTwentyIconsState } from '@/client-config/states/allowRequestsToTwentyIcons';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 
 export const EMPTY_FILTER_VALUE: string = JSON.stringify({
   isCurrentWorkspaceMemberSelected: false,
@@ -35,8 +40,12 @@ export const ObjectFilterDropdownRecordSelect = ({
   recordFilterId,
   dropdownId,
 }: ObjectFilterDropdownRecordSelectProps) => {
-  const fieldMetadataItemUsedInFilterDropdown = useRecoilComponentValue(
+  const fieldMetadataItemUsedInFilterDropdown = useAtomComponentSelectorValue(
     fieldMetadataItemUsedInDropdownComponentSelector,
+  );
+
+  const allowRequestsToTwentyIcons = useAtomStateValue(
+    allowRequestsToTwentyIconsState,
   );
 
   const { objectFilterDropdownFilterValue } =
@@ -45,15 +54,15 @@ export const ObjectFilterDropdownRecordSelect = ({
   const { applyObjectFilterDropdownFilterValue } =
     useApplyObjectFilterDropdownFilterValue();
 
-  const selectedOperandInDropdown = useRecoilComponentValue(
+  const selectedOperandInDropdown = useAtomComponentStateValue(
     selectedOperandInDropdownComponentState,
   );
 
-  const objectFilterDropdownSearchInput = useRecoilComponentValue(
+  const objectFilterDropdownSearchInput = useAtomComponentStateValue(
     objectFilterDropdownSearchInputComponentState,
   );
 
-  const currentRecordFilters = useRecoilComponentValue(
+  const currentRecordFilters = useAtomComponentStateValue(
     currentRecordFiltersComponentState,
   );
 
@@ -118,6 +127,7 @@ export const ObjectFilterDropdownRecordSelect = ({
       selectedIds: selectedRecordIds,
       objectNameSingular,
       limit: 10,
+      allowRequestsToTwentyIcons,
     });
 
   const currentWorkspaceMemberSelectableItem: SelectableItem = {

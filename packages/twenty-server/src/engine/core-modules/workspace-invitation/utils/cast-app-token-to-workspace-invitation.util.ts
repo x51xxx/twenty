@@ -1,5 +1,5 @@
 import {
-  type AppToken,
+  type AppTokenEntity,
   AppTokenType,
 } from 'src/engine/core-modules/app-token/app-token.entity';
 import {
@@ -7,7 +7,9 @@ import {
   WorkspaceInvitationExceptionCode,
 } from 'src/engine/core-modules/workspace-invitation/workspace-invitation.exception';
 
-export const castAppTokenToWorkspaceInvitationUtil = (appToken: AppToken) => {
+export const castAppTokenToWorkspaceInvitationUtil = (
+  appToken: AppTokenEntity,
+) => {
   if (appToken.type !== AppTokenType.InvitationToken) {
     throw new WorkspaceInvitationException(
       `Token type must be "${AppTokenType.InvitationToken}"`,
@@ -25,6 +27,7 @@ export const castAppTokenToWorkspaceInvitationUtil = (appToken: AppToken) => {
   return {
     id: appToken.id,
     email: appToken.context.email,
+    roleId: appToken.context.roleId ?? null,
     expiresAt: appToken.expiresAt,
   };
 };

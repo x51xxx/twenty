@@ -1,5 +1,5 @@
 import { useDropdownContextCurrentContentId } from '@/dropdown-context-state-management/hooks/useDropdownContextCurrentContentId';
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import { RecordBoardColumnHeaderAggregateDropdownComponentInstanceContext } from '@/object-record/record-board/contexts/RecordBoardColumnHeaderAggregateDropdownComponentInstanceContext';
 import { RecordBoardColumnHeaderAggregateDropdownButton } from '@/object-record/record-board/record-board-column/components/RecordBoardColumnHeaderAggregateDropdownButton';
 import { AggregateDropdownContent } from '@/object-record/record-board/record-board-column/components/RecordBoardColumnHeaderAggregateDropdownContent';
@@ -7,17 +7,18 @@ import { RecordBoardColumnHeaderAggregateDropdownContext } from '@/object-record
 import { type RecordBoardColumnHeaderAggregateContentId } from '@/object-record/record-board/types/RecordBoardColumnHeaderAggregateContentId';
 import { Dropdown } from '@/ui/layout/dropdown/components/Dropdown';
 import { DROPDOWN_OFFSET_Y } from '@/ui/layout/dropdown/constants/DropdownOffsetY';
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
+import { type Nullable } from 'twenty-shared/types';
 
 type RecordBoardColumnHeaderAggregateDropdownProps = {
-  aggregateValue?: string | number;
-  aggregateLabel?: string;
-  objectMetadataItem: ObjectMetadataItem;
+  aggregateValue?: Nullable<string | number>;
+  aggregateLabel?: Nullable<string>;
+  objectMetadataItem: EnrichedObjectMetadataItem;
   dropdownId: string;
 };
 
 const StyledContainer = styled.div`
-  overflow: hidden;
+  flex-shrink: 0;
 `;
 
 export const RecordBoardColumnHeaderAggregateDropdown = ({

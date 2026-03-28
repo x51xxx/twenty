@@ -1,17 +1,15 @@
+import { workflowRunIteratorSubStepIterationIndexComponentState } from '@/side-panel/pages/workflow/step/view-run/states/workflowRunIteratorSubStepIterationIndexComponentState';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 import { useWorkflowRun } from '@/workflow/hooks/useWorkflowRun';
 import { useWorkflowRunIdOrThrow } from '@/workflow/hooks/useWorkflowRunIdOrThrow';
 import { getStepDefinitionOrThrow } from '@/workflow/utils/getStepDefinitionOrThrow';
 import { WorkflowRunStepJsonContainer } from '@/workflow/workflow-steps/components/WorkflowRunStepJsonContainer';
-import { WorkflowStepHeader } from '@/workflow/workflow-steps/components/WorkflowStepHeader';
+import { getIsDescendantOfIterator } from '@/workflow/workflow-steps/utils/getIsDescendantOfIterator';
 import { getWorkflowRunStepContext } from '@/workflow/workflow-steps/utils/getWorkflowRunStepContext';
 import { getWorkflowVariablesUsedInStep } from '@/workflow/workflow-steps/utils/getWorkflowVariablesUsedInStep';
-import { getActionHeaderTypeOrThrow } from '@/workflow/workflow-steps/workflow-actions/utils/getActionHeaderTypeOrThrow';
-import { getActionIcon } from '@/workflow/workflow-steps/workflow-actions/utils/getActionIcon';
-import { getActionIconColorOrThrow } from '@/workflow/workflow-steps/workflow-actions/utils/getActionIconColorOrThrow';
-import { useTheme } from '@emotion/react';
 import { useLingui } from '@lingui/react/macro';
 import { isDefined } from 'twenty-shared/utils';
-import { IconBrackets, useIcons } from 'twenty-ui/display';
+import { IconBrackets } from 'twenty-ui/display';
 import {
   type GetJsonNodeHighlighting,
   JsonNestedNode,
@@ -22,15 +20,17 @@ import { type JsonValue } from 'type-fest';
 import { useCopyToClipboard } from '~/hooks/useCopyToClipboard';
 
 export const WorkflowRunStepInputDetail = ({ stepId }: { stepId: string }) => {
-  const { t, i18n } = useLingui();
-  const { getIcon } = useIcons();
-  const theme = useTheme();
+  const { t } = useLingui();
   const { copyToClipboard } = useCopyToClipboard();
 
   const workflowRunId = useWorkflowRunIdOrThrow();
   const workflowRun = useWorkflowRun({ workflowRunId });
   const step = workflowRun?.state?.flow.steps.find(
     (step) => step.id === stepId,
+  );
+
+  const workflowRunIteratorSubStepIterationIndex = useAtomComponentStateValue(
+    workflowRunIteratorSubStepIterationIndexComponentState,
   );
 
   if (
@@ -54,14 +54,6 @@ export const WorkflowRunStepInputDetail = ({ stepId }: { stepId: string }) => {
     throw new Error('The input tab must be rendered with an action step.');
   }
 
-  const headerTitle = stepDefinition.definition.name;
-  const headerIcon = getActionIcon(stepDefinition.definition.type);
-  const headerIconColor = getActionIconColorOrThrow({
-    theme,
-    actionType: stepDefinition.definition.type,
-  });
-  const headerType = getActionHeaderTypeOrThrow(stepDefinition.definition.type);
-
   const variablesUsedInStep = getWorkflowVariablesUsedInStep({
     step,
   });
@@ -71,6 +63,12 @@ export const WorkflowRunStepInputDetail = ({ stepId }: { stepId: string }) => {
     stepInfos: workflowRun.state.stepInfos,
     flow: workflowRun.state.flow,
     stepId,
+    currentLoopIterationIndex: getIsDescendantOfIterator({
+      stepId,
+      steps: workflowRun.state.flow.steps,
+    })
+      ? workflowRunIteratorSubStepIterationIndex
+      : undefined,
   });
 
   if (stepContext.length === 0) {
@@ -102,14 +100,6 @@ export const WorkflowRunStepInputDetail = ({ stepId }: { stepId: string }) => {
 
   return (
     <>
-      <WorkflowStepHeader
-        disabled
-        Icon={getIcon(headerIcon)}
-        iconColor={headerIconColor}
-        initialTitle={headerTitle}
-        headerType={i18n._(headerType)}
-      />
-
       <WorkflowRunStepJsonContainer>
         <JsonTreeContextProvider
           value={{

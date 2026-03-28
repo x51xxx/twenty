@@ -3,12 +3,15 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 
 import { Repository } from 'typeorm';
 
-import { AppToken } from 'src/engine/core-modules/app-token/app-token.entity';
+import {
+  AppTokenEntity,
+  AppTokenType,
+} from 'src/engine/core-modules/app-token/app-token.entity';
 import { AuthException } from 'src/engine/core-modules/auth/auth.exception';
+import { JwtTokenTypeEnum } from 'src/engine/core-modules/auth/types/auth-context.type';
 import { JwtWrapperService } from 'src/engine/core-modules/jwt/services/jwt-wrapper.service';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
-import { User } from 'src/engine/core-modules/user/user.entity';
-import { JwtTokenTypeEnum } from 'src/engine/core-modules/auth/types/auth-context.type';
+import { UserEntity } from 'src/engine/core-modules/user/user.entity';
 
 import { RefreshTokenService } from './refresh-token.service';
 
@@ -16,8 +19,8 @@ describe('RefreshTokenService', () => {
   let service: RefreshTokenService;
   let jwtWrapperService: JwtWrapperService;
   let twentyConfigService: TwentyConfigService;
-  let appTokenRepository: Repository<AppToken>;
-  let userRepository: Repository<User>;
+  let appTokenRepository: Repository<AppTokenEntity>;
+  let userRepository: Repository<UserEntity>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -39,11 +42,11 @@ describe('RefreshTokenService', () => {
           },
         },
         {
-          provide: getRepositoryToken(AppToken),
+          provide: getRepositoryToken(AppTokenEntity),
           useClass: Repository,
         },
         {
-          provide: getRepositoryToken(User),
+          provide: getRepositoryToken(UserEntity),
           useClass: Repository,
         },
       ],
@@ -52,10 +55,12 @@ describe('RefreshTokenService', () => {
     service = module.get<RefreshTokenService>(RefreshTokenService);
     jwtWrapperService = module.get<JwtWrapperService>(JwtWrapperService);
     twentyConfigService = module.get<TwentyConfigService>(TwentyConfigService);
-    appTokenRepository = module.get<Repository<AppToken>>(
-      getRepositoryToken(AppToken),
+    appTokenRepository = module.get<Repository<AppTokenEntity>>(
+      getRepositoryToken(AppTokenEntity),
     );
-    userRepository = module.get<Repository<User>>(getRepositoryToken(User));
+    userRepository = module.get<Repository<UserEntity>>(
+      getRepositoryToken(UserEntity),
+    );
   });
 
   it('should be defined', () => {
@@ -68,19 +73,20 @@ describe('RefreshTokenService', () => {
       const mockJwtPayload = {
         jti: 'token-id',
         sub: 'user-id',
+        type: JwtTokenTypeEnum.REFRESH,
       };
       const mockAppToken = {
         id: 'token-id',
         workspaceId: 'workspace-id',
         revokedAt: null,
-      };
-      const mockUser: Partial<User> = {
+      } as AppTokenEntity;
+      const mockUser = {
         id: 'some-id',
         firstName: 'John',
         lastName: 'Doe',
         email: 'john.doe@example.com',
         defaultAvatarUrl: '',
-      };
+      } as UserEntity;
 
       jest
         .spyOn(jwtWrapperService, 'verifyJwtToken')
@@ -88,17 +94,14 @@ describe('RefreshTokenService', () => {
       jest.spyOn(jwtWrapperService, 'decode').mockReturnValue(mockJwtPayload);
       jest
         .spyOn(appTokenRepository, 'findOneBy')
-        .mockResolvedValue(mockAppToken as AppToken);
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser as User);
+        .mockResolvedValue(mockAppToken);
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser);
       jest.spyOn(twentyConfigService, 'get').mockReturnValue('1h');
 
       const result = await service.verifyRefreshToken(mockToken);
 
       expect(result).toEqual({ user: mockUser, token: mockAppToken });
-      expect(jwtWrapperService.verifyJwtToken).toHaveBeenCalledWith(
-        mockToken,
-        'REFRESH',
-      );
+      expect(jwtWrapperService.verifyJwtToken).toHaveBeenCalledWith(mockToken);
     });
 
     it('should throw an error if the token is malformed', async () => {
@@ -129,10 +132,10 @@ describe('RefreshTokenService', () => {
       jest.spyOn(jwtWrapperService, 'sign').mockReturnValue(mockToken);
       jest
         .spyOn(appTokenRepository, 'create')
-        .mockReturnValue({ id: 'new-token-id' } as AppToken);
+        .mockReturnValue({ id: 'new-token-id' } as AppTokenEntity);
       jest
         .spyOn(appTokenRepository, 'save')
-        .mockResolvedValue({ id: 'new-token-id' } as AppToken);
+        .mockResolvedValue({ id: 'new-token-id' } as AppTokenEntity);
 
       const result = await service.generateRefreshToken({
         userId,
@@ -149,9 +152,9 @@ describe('RefreshTokenService', () => {
         {
           sub: userId,
           workspaceId,
-          type: 'REFRESH',
+          type: JwtTokenTypeEnum.REFRESH,
           userId: 'user-id',
-          targetedTokenType: 'ACCESS',
+          targetedTokenType: JwtTokenTypeEnum.ACCESS,
         },
         expect.objectContaining({
           secret: 'mock-secret',
@@ -172,5 +175,52 @@ describe('RefreshTokenService', () => {
         }),
       ).rejects.toThrow(AuthException);
     });
+  });
+
+  it('returns impersonation claims from verified refresh token', async () => {
+    const refreshToken = 'rtok';
+    const userId = 'user-id';
+    const tokenId = 'token-id';
+
+    (jwtWrapperService.verifyJwtToken as jest.Mock).mockResolvedValue(
+      undefined,
+    );
+    (jwtWrapperService.decode as jest.Mock).mockReturnValue({
+      sub: userId,
+      jti: tokenId,
+      type: JwtTokenTypeEnum.REFRESH,
+      targetedTokenType: JwtTokenTypeEnum.ACCESS,
+      isImpersonating: true,
+      impersonatorUserWorkspaceId: 'uw-imp',
+      impersonatedUserWorkspaceId: 'uw-orig',
+    });
+
+    const token = {
+      id: tokenId,
+      type: AppTokenType.RefreshToken,
+    } as AppTokenEntity;
+
+    jest.spyOn(appTokenRepository, 'findOneBy').mockResolvedValue(token);
+
+    const user = { id: userId } as UserEntity;
+
+    jest.spyOn(userRepository, 'findOne').mockResolvedValue(user);
+
+    const out = await service.verifyRefreshToken(refreshToken);
+
+    expect(out.isImpersonating).toBe(true);
+    expect(out.impersonatorUserWorkspaceId).toBe('uw-imp');
+    expect(out.impersonatedUserWorkspaceId).toBe('uw-orig');
+  });
+
+  it('throws on malformed refresh token', async () => {
+    (jwtWrapperService.verifyJwtToken as jest.Mock).mockResolvedValue(
+      undefined,
+    );
+    (jwtWrapperService.decode as jest.Mock).mockReturnValue({});
+
+    await expect(service.verifyRefreshToken('rtok')).rejects.toThrow(
+      AuthException,
+    );
   });
 });

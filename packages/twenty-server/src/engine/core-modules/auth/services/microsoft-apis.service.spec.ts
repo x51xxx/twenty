@@ -7,21 +7,23 @@ import { CreateCalendarChannelService } from 'src/engine/core-modules/auth/servi
 import { CreateConnectedAccountService } from 'src/engine/core-modules/auth/services/create-connected-account.service';
 import { CreateMessageChannelService } from 'src/engine/core-modules/auth/services/create-message-channel.service';
 import { MicrosoftAPIsService } from 'src/engine/core-modules/auth/services/microsoft-apis.service';
-import { ResetCalendarChannelService } from 'src/engine/core-modules/auth/services/reset-calendar-channel.service';
-import { ResetMessageChannelService } from 'src/engine/core-modules/auth/services/reset-message-channel.service';
-import { ResetMessageFolderService } from 'src/engine/core-modules/auth/services/reset-message-folder.service';
 import { UpdateConnectedAccountOnReconnectService } from 'src/engine/core-modules/auth/services/update-connected-account-on-reconnect.service';
+import { CalendarChannelDataAccessService } from 'src/engine/metadata-modules/calendar-channel/data-access/services/calendar-channel-data-access.service';
+import { ConnectedAccountDataAccessService } from 'src/engine/metadata-modules/connected-account/data-access/services/connected-account-data-access.service';
+import { MessageChannelDataAccessService } from 'src/engine/metadata-modules/message-channel/data-access/services/message-channel-data-access.service';
 import { MessageQueue } from 'src/engine/core-modules/message-queue/message-queue.constants';
 import { getQueueToken } from 'src/engine/core-modules/message-queue/utils/get-queue-token.util';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 import { ObjectMetadataEntity } from 'src/engine/metadata-modules/object-metadata/object-metadata.entity';
-import { TwentyORMGlobalManager } from 'src/engine/twenty-orm/twenty-orm-global.manager';
+import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
+import { CalendarChannelSyncStatusService } from 'src/modules/calendar/common/services/calendar-channel-sync-status.service';
 import {
   CalendarChannelSyncStage,
   CalendarChannelVisibility,
 } from 'src/modules/calendar/common/standard-objects/calendar-channel.workspace-entity';
 import { AccountsToReconnectService } from 'src/modules/connected-account/services/accounts-to-reconnect.service';
 import { type ConnectedAccountWorkspaceEntity } from 'src/modules/connected-account/standard-objects/connected-account.workspace-entity';
+import { MessageChannelSyncStatusService } from 'src/modules/messaging/common/services/message-channel-sync-status.service';
 import { MessageChannelVisibility } from 'src/modules/messaging/common/standard-objects/message-channel.workspace-entity';
 
 jest.mock('uuid', () => ({
@@ -30,26 +32,20 @@ jest.mock('uuid', () => ({
 
 describe('MicrosoftAPIsService', () => {
   let service: MicrosoftAPIsService;
-  let resetCalendarChannelService: ResetCalendarChannelService;
-  let resetMessageChannelService: ResetMessageChannelService;
+  let messagingChannelSyncStatusService: MessageChannelSyncStatusService;
+  let calendarChannelSyncStatusService: CalendarChannelSyncStatusService;
   let createMessageChannelService: CreateMessageChannelService;
 
-  const mockConnectedAccountRepository = {
+  const mockConnectedAccountDataAccessService = {
     findOne: jest.fn(),
-    find: jest.fn(),
-    update: jest.fn(),
   };
 
-  const mockCalendarChannelRepository = {
-    findOne: jest.fn(),
+  const mockMessageChannelDataAccessService = {
     find: jest.fn(),
-    update: jest.fn(),
   };
 
-  const mockMessageChannelRepository = {
-    findOne: jest.fn(),
+  const mockCalendarChannelDataAccessService = {
     find: jest.fn(),
-    update: jest.fn(),
   };
 
   const mockWorkspaceMemberRepository = {
@@ -77,25 +73,22 @@ describe('MicrosoftAPIsService', () => {
       providers: [
         MicrosoftAPIsService,
         {
-          provide: TwentyORMGlobalManager,
+          provide: GlobalWorkspaceOrmManager,
           useValue: {
-            getRepositoryForWorkspace: jest
+            getRepository: jest
               .fn()
               .mockImplementation((_workspaceId, entity) => {
-                if (entity === 'connectedAccount')
-                  return mockConnectedAccountRepository;
-                if (entity === 'calendarChannel')
-                  return mockCalendarChannelRepository;
-                if (entity === 'messageChannel')
-                  return mockMessageChannelRepository;
                 if (entity === 'workspaceMember')
                   return mockWorkspaceMemberRepository;
 
                 return {};
               }),
-            getDataSourceForWorkspace: jest
+            getGlobalWorkspaceDataSource: jest
               .fn()
-              .mockImplementation(() => mockWorkspaceDataSource),
+              .mockResolvedValue(mockWorkspaceDataSource),
+            executeInWorkspaceContext: jest
+              .fn()
+              .mockImplementation((fn: () => any, _authContext?: any) => fn()),
           },
         },
         {
@@ -109,21 +102,15 @@ describe('MicrosoftAPIsService', () => {
           useValue: mockTwentyConfigService,
         },
         {
-          provide: ResetCalendarChannelService,
+          provide: CalendarChannelSyncStatusService,
           useValue: {
-            resetCalendarChannels: jest.fn(),
+            resetAndMarkAsCalendarEventListFetchPending: jest.fn(),
           },
         },
         {
-          provide: ResetMessageChannelService,
+          provide: MessageChannelSyncStatusService,
           useValue: {
-            resetMessageChannels: jest.fn(),
-          },
-        },
-        {
-          provide: ResetMessageFolderService,
-          useValue: {
-            resetMessageFolders: jest.fn(),
+            resetAndMarkAsMessagesListFetchPending: jest.fn(),
           },
         },
         {
@@ -166,16 +153,30 @@ describe('MicrosoftAPIsService', () => {
           provide: getQueueToken(MessageQueue.calendarQueue),
           useValue: mockCalendarQueueService,
         },
+        {
+          provide: ConnectedAccountDataAccessService,
+          useValue: mockConnectedAccountDataAccessService,
+        },
+        {
+          provide: MessageChannelDataAccessService,
+          useValue: mockMessageChannelDataAccessService,
+        },
+        {
+          provide: CalendarChannelDataAccessService,
+          useValue: mockCalendarChannelDataAccessService,
+        },
       ],
     }).compile();
 
     service = module.get<MicrosoftAPIsService>(MicrosoftAPIsService);
-    resetCalendarChannelService = module.get<ResetCalendarChannelService>(
-      ResetCalendarChannelService,
-    );
-    resetMessageChannelService = module.get<ResetMessageChannelService>(
-      ResetMessageChannelService,
-    );
+    calendarChannelSyncStatusService =
+      module.get<CalendarChannelSyncStatusService>(
+        CalendarChannelSyncStatusService,
+      );
+    messagingChannelSyncStatusService =
+      module.get<MessageChannelSyncStatusService>(
+        MessageChannelSyncStatusService,
+      );
     createMessageChannelService = module.get<CreateMessageChannelService>(
       CreateMessageChannelService,
     );
@@ -197,7 +198,7 @@ describe('MicrosoftAPIsService', () => {
         provider: ConnectedAccountProvider.MICROSOFT,
       } as ConnectedAccountWorkspaceEntity;
 
-      mockConnectedAccountRepository.findOne.mockResolvedValue(
+      mockConnectedAccountDataAccessService.findOne.mockResolvedValue(
         existingConnectedAccount,
       );
 
@@ -213,11 +214,11 @@ describe('MicrosoftAPIsService', () => {
         syncStage: CalendarChannelSyncStage.FAILED,
       };
 
-      mockCalendarChannelRepository.find.mockResolvedValue([
+      mockCalendarChannelDataAccessService.find.mockResolvedValue([
         failedCalendarChannel,
       ]);
 
-      mockMessageChannelRepository.find.mockResolvedValue([
+      mockMessageChannelDataAccessService.find.mockResolvedValue([
         {
           id: 'message-channel-id',
           connectedAccountId: 'existing-account-id',
@@ -235,20 +236,12 @@ describe('MicrosoftAPIsService', () => {
       });
 
       expect(
-        resetCalendarChannelService.resetCalendarChannels,
-      ).toHaveBeenCalledWith({
-        workspaceId: 'workspace-id',
-        connectedAccountId: 'existing-account-id',
-        manager: expect.any(Object),
-      });
+        calendarChannelSyncStatusService.resetAndMarkAsCalendarEventListFetchPending,
+      ).toHaveBeenCalledWith([existingConnectedAccount.id], 'workspace-id');
 
       expect(
-        resetMessageChannelService.resetMessageChannels,
-      ).toHaveBeenCalledWith({
-        workspaceId: 'workspace-id',
-        connectedAccountId: 'existing-account-id',
-        manager: expect.any(Object),
-      });
+        messagingChannelSyncStatusService.resetAndMarkAsMessagesListFetchPending,
+      ).toHaveBeenCalledWith([existingConnectedAccount.id], 'workspace-id');
 
       expect(
         createMessageChannelService.createMessageChannel,

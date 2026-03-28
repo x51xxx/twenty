@@ -7,7 +7,14 @@ import {
 } from '@nestjs/graphql';
 
 import { Type } from 'class-transformer';
-import { IsNotEmpty, IsUUID, ValidateNested } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
+import GraphQLJSON from 'graphql-type-json';
+import { RelationUpdatePayload } from 'twenty-shared/types';
 
 import { UUIDScalarType } from 'src/engine/api/graphql/workspace-schema-builder/graphql-types/scalars';
 import { FieldMetadataDTO } from 'src/engine/metadata-modules/field-metadata/dtos/field-metadata.dto';
@@ -22,6 +29,8 @@ export class UpdateFieldInput extends OmitType(
     'updatedAt',
     'isCustom',
     'standardOverrides',
+    'applicationId',
+    'morphId',
   ] as const,
 ) {
   @HideField()
@@ -29,6 +38,10 @@ export class UpdateFieldInput extends OmitType(
 
   @HideField()
   workspaceId: string;
+
+  @IsOptional()
+  @Field(() => [GraphQLJSON], { nullable: true })
+  morphRelationsUpdatePayload?: RelationUpdatePayload[];
 }
 
 @InputType()

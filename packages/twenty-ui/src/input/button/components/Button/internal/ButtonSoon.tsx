@@ -1,8 +1,17 @@
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import { Pill } from '@ui/components';
 
-const StyledSoonPill = styled(Pill)`
+const StyledSoonPillContainer = styled.span`
+  display: flex;
   margin-left: auto;
 `;
 
-export const ButtonSoon = () => <StyledSoonPill label="Soon" />;
+type ButtonSoonProps = {
+  label?: string;
+};
+
+export const ButtonSoon = ({ label = 'Soon' }: ButtonSoonProps) => (
+  <StyledSoonPillContainer>
+    <Pill label={label} />
+  </StyledSoonPillContainer>
+);

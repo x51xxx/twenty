@@ -1,11 +1,14 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../lib/fixtures/screenshot';
 import { deleteWorkflow } from '../lib/requests/delete-workflow';
 import { destroyWorkflow } from '../lib/requests/destroy-workflow';
 
 test('Create workflow', async ({ page }) => {
   const NEW_WORKFLOW_NAME = 'Test Workflow';
 
-  await page.goto('/');
+  await page.goto(process.env.LINK);
+
+  const workflowsFolder = page.getByRole('button', { name: 'Workflows' });
+  await workflowsFolder.click();
 
   const workflowsLink = page.getByRole('link', { name: 'Workflows' });
   await workflowsLink.click();
@@ -25,14 +28,13 @@ test('Create workflow', async ({ page }) => {
       return requestBody.operationName === 'CreateOneWorkflow';
     }),
 
-    createWorkflowButton.click(),
+    createWorkflowButton.click()
   ]);
 
-  const recordName = page.getByTestId('top-bar-title').getByText('Untitled');
-  await recordName.click();
 
-  const nameInput = page.getByTestId('top-bar-title').getByRole('textbox');
-  await nameInput.fill(NEW_WORKFLOW_NAME);
+  const recordName = page.getByTestId('top-bar-title').getByPlaceholder('Name');
+  await expect(recordName).toBeVisible();
+  await recordName.fill(NEW_WORKFLOW_NAME);
 
   const workflowDiagramContainer = page.locator('.react-flow__renderer');
   await workflowDiagramContainer.click();
@@ -45,6 +47,8 @@ test('Create workflow', async ({ page }) => {
       .getByTestId('top-bar-title')
       .getByText(NEW_WORKFLOW_NAME);
 
+    // Wait for the name to be visible and not hidden
+    await workflowName.waitFor({ state: 'visible' });
     await expect(workflowName).toBeVisible();
 
     await expect(page).toHaveURL(`/object/workflow/${newWorkflowId}`);

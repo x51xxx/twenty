@@ -1,16 +1,12 @@
-import { expect } from '@storybook/test';
 import { renderHook } from '@testing-library/react';
 import { type ReactNode } from 'react';
-import { RecoilRoot } from 'recoil';
 
 import { useGenerateCombinedFindManyRecordsQuery } from '@/object-record/multiple-objects/hooks/useGenerateCombinedFindManyRecordsQuery';
 import { JestObjectMetadataItemSetter } from '~/testing/jest/JestObjectMetadataItemSetter';
-import { generatedMockObjectMetadataItems } from '~/testing/utils/generatedMockObjectMetadataItems';
+import { getTestEnrichedObjectMetadataItemsMock } from '~/testing/utils/getTestEnrichedObjectMetadataItemsMock';
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <RecoilRoot>
-    <JestObjectMetadataItemSetter>{children}</JestObjectMetadataItemSetter>
-  </RecoilRoot>
+  <JestObjectMetadataItemSetter>{children}</JestObjectMetadataItemSetter>
 );
 
 describe('useGenerateFindManyRecordsForMultipleMetadataItemsQuery', () => {
@@ -18,7 +14,7 @@ describe('useGenerateFindManyRecordsForMultipleMetadataItemsQuery', () => {
     const { result } = renderHook(
       () => {
         return useGenerateCombinedFindManyRecordsQuery({
-          operationSignatures: generatedMockObjectMetadataItems
+          operationSignatures: getTestEnrichedObjectMetadataItemsMock()
             .slice(0, 2)
             .map((item) => ({
               objectNameSingular: item.nameSingular,

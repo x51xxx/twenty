@@ -1,17 +1,20 @@
 import { currentRecordSortsComponentState } from '@/object-record/record-sort/states/currentRecordSortsComponentState';
-import { useSetRecoilComponentState } from '@/ui/utilities/state/component-state/hooks/useSetRecoilComponentState';
-import { type ViewSort } from '@/views/types/ViewSort';
-import { mapViewSortsToSorts } from '@/views/utils/mapViewSortsToSorts';
+import { useSetAtomComponentState } from '@/ui/utilities/state/jotai/hooks/useSetAtomComponentState';
+import { type ViewSortEssential } from '@/views/types/ViewSortEssential';
 
 export const useApplyViewSortsToCurrentRecordSorts = () => {
-  const setCurrentRecordSorts = useSetRecoilComponentState(
+  const setCurrentRecordSorts = useSetAtomComponentState(
     currentRecordSortsComponentState,
   );
 
-  const applyViewSortsToCurrentRecordSorts = (viewSorts: ViewSort[]) => {
-    const recordSortsToApply = mapViewSortsToSorts(viewSorts);
-
-    setCurrentRecordSorts(recordSortsToApply);
+  const applyViewSortsToCurrentRecordSorts = (
+    viewSorts: ViewSortEssential[],
+  ) => {
+    const recordSorts = viewSorts.map((viewSort) => {
+      const { viewId: _viewId, ...recordSort } = viewSort;
+      return recordSort;
+    });
+    setCurrentRecordSorts(recordSorts);
   };
 
   return {

@@ -1,8 +1,9 @@
-import { useMergePreview } from '@/object-record/record-merge/hooks/useMergePreview';
-import { CardComponents } from '@/object-record/record-show/components/CardComponents';
-import { SummaryCard } from '@/object-record/record-show/components/SummaryCard';
+import { usePerformMergePreview } from '@/object-record/record-merge/hooks/usePerformMergePreview';
+import { PageLayoutSingleTabRenderer } from '@/page-layout/components/PageLayoutSingleTabRenderer';
+import { usePageLayoutIdForRecord } from '@/page-layout/hooks/usePageLayoutIdForRecord';
+import { LayoutRenderingProvider } from '@/ui/layout/contexts/LayoutRenderingContext';
 import { isDefined } from 'twenty-shared/utils';
-import { Section } from 'twenty-ui/layout';
+import { PageLayoutType } from '~/generated-metadata/graphql';
 
 type MergePreviewTabProps = {
   objectNameSingular: string;
@@ -11,32 +12,37 @@ type MergePreviewTabProps = {
 export const MergePreviewTab = ({
   objectNameSingular,
 }: MergePreviewTabProps) => {
-  const { mergePreviewRecord, isGeneratingPreview } = useMergePreview({
+  const { mergePreviewRecord, isGeneratingPreview } = usePerformMergePreview({
     objectNameSingular,
   });
 
-  if (!isDefined(mergePreviewRecord) && !isGeneratingPreview) {
+  const { pageLayoutId } = usePageLayoutIdForRecord({
+    id: mergePreviewRecord?.id ?? '',
+    targetObjectNameSingular: objectNameSingular,
+  });
+
+  if (
+    !isDefined(mergePreviewRecord) ||
+    isGeneratingPreview ||
+    !isDefined(pageLayoutId)
+  ) {
     return null;
   }
 
-  const recordId = mergePreviewRecord?.id ?? 'merge-preview-loading';
+  const recordId = mergePreviewRecord.id;
 
   return (
-    <Section>
-      <SummaryCard
-        objectNameSingular={objectNameSingular}
-        objectRecordId={recordId}
-        isInRightDrawer={true}
-      />
-
-      <CardComponents.FieldCard
-        targetableObject={{
-          targetObjectNameSingular: objectNameSingular,
+    <LayoutRenderingProvider
+      value={{
+        targetRecordIdentifier: {
           id: recordId,
-        }}
-        showDuplicatesSection={false}
-        isInRightDrawer={true}
-      />
-    </Section>
+          targetObjectNameSingular: objectNameSingular,
+        },
+        layoutType: PageLayoutType.RECORD_PAGE,
+        isInSidePanel: true,
+      }}
+    >
+      <PageLayoutSingleTabRenderer pageLayoutId={pageLayoutId} />
+    </LayoutRenderingProvider>
   );
 };

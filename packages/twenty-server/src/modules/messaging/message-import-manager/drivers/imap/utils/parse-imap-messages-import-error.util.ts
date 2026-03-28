@@ -3,15 +3,26 @@ import {
   MessageImportDriverExceptionCode,
 } from 'src/modules/messaging/message-import-manager/drivers/exceptions/message-import-driver.exception';
 import { isImapFlowError } from 'src/modules/messaging/message-import-manager/drivers/imap/utils/is-imap-flow-error.util';
+import { isImapNetworkError } from 'src/modules/messaging/message-import-manager/drivers/imap/utils/is-imap-network-error.util';
 
 export const parseImapMessagesImportError = (
   error: Error,
   messageExternalId: string,
+  options?: { cause?: Error },
 ): MessageImportDriverException => {
   if (!error) {
     return new MessageImportDriverException(
       `Unknown IMAP message import error for message ${messageExternalId}: No error provided`,
       MessageImportDriverExceptionCode.UNKNOWN,
+      { cause: options?.cause },
+    );
+  }
+
+  if (isImapNetworkError(error)) {
+    return new MessageImportDriverException(
+      `IMAP network error: ${error.message}`,
+      MessageImportDriverExceptionCode.TEMPORARY_ERROR,
+      { cause: options?.cause },
     );
   }
 
@@ -21,6 +32,7 @@ export const parseImapMessagesImportError = (
     return new MessageImportDriverException(
       `Unknown IMAP message import error for message ${messageExternalId}: ${errorMessage}`,
       MessageImportDriverExceptionCode.UNKNOWN,
+      { cause: options?.cause || error },
     );
   }
 
@@ -29,6 +41,7 @@ export const parseImapMessagesImportError = (
       return new MessageImportDriverException(
         `IMAP message not found: ${messageExternalId}`,
         MessageImportDriverExceptionCode.NOT_FOUND,
+        { cause: options?.cause || error },
       );
     }
 
@@ -36,6 +49,7 @@ export const parseImapMessagesImportError = (
       return new MessageImportDriverException(
         `IMAP message no longer exists (expunged): ${messageExternalId}`,
         MessageImportDriverExceptionCode.NOT_FOUND,
+        { cause: options?.cause || error },
       );
     }
 
@@ -43,6 +57,7 @@ export const parseImapMessagesImportError = (
       return new MessageImportDriverException(
         `IMAP message fetch error for message ${messageExternalId}: ${error.responseText}`,
         MessageImportDriverExceptionCode.TEMPORARY_ERROR,
+        { cause: options?.cause || error },
       );
     }
   }
@@ -54,6 +69,7 @@ export const parseImapMessagesImportError = (
     return new MessageImportDriverException(
       `IMAP message not found: ${messageExternalId}`,
       MessageImportDriverExceptionCode.NOT_FOUND,
+      { cause: options?.cause || error },
     );
   }
 
@@ -61,11 +77,13 @@ export const parseImapMessagesImportError = (
     return new MessageImportDriverException(
       `IMAP message fetch error for message ${messageExternalId}: ${errorMessage}`,
       MessageImportDriverExceptionCode.TEMPORARY_ERROR,
+      { cause: options?.cause || error },
     );
   }
 
   return new MessageImportDriverException(
     `Unknown IMAP message import error for message ${messageExternalId}: ${errorMessage}`,
     MessageImportDriverExceptionCode.UNKNOWN,
+    { cause: options?.cause || error },
   );
 };

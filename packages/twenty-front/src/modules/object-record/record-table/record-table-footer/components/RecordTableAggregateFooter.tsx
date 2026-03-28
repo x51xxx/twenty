@@ -1,83 +1,50 @@
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 
+import {
+  RECORD_TABLE_CHECKBOX_WIDTH_CSS_VAR,
+  RECORD_TABLE_DRAG_DROP_WIDTH_CSS_VAR,
+} from '@/object-record/record-table/components/RecordTableStyleWrapper';
+import { RECORD_TABLE_COLUMN_ADD_COLUMN_BUTTON_WIDTH } from '@/object-record/record-table/constants/RecordTableColumnAddColumnButtonWidth';
+import { RECORD_TABLE_COLUMN_LAST_EMPTY_COLUMN_WIDTH_CLASS_NAME } from '@/object-record/record-table/constants/RecordTableColumnLastEmptyColumnWidthClassName';
 import { TABLE_Z_INDEX } from '@/object-record/record-table/constants/TableZIndex';
 import { useRecordTableContextOrThrow } from '@/object-record/record-table/contexts/RecordTableContext';
 import { RecordTableAggregateFooterCell } from '@/object-record/record-table/record-table-footer/components/RecordTableAggregateFooterCell';
 import { RecordTableColumnAggregateFooterCellContext } from '@/object-record/record-table/record-table-footer/components/RecordTableColumnAggregateFooterCellContext';
-import { FIRST_TH_WIDTH } from '@/object-record/record-table/record-table-header/components/RecordTableHeader';
-import { useScrollWrapperElement } from '@/ui/utilities/scroll/hooks/useScrollWrapperElement';
-import { isUndefined } from '@sniptt/guards';
-import { MOBILE_VIEWPORT } from 'twenty-ui/theme';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
-const StyledTd = styled.td`
-  background-color: ${({ theme }) => theme.background.primary};
+const StyledPlaceholderDragAndDropFooterCell = styled.div`
+  background-color: ${themeCssVariables.background.primary};
+  bottom: 0;
+  left: 0px;
+  position: sticky;
+  width: calc(
+    var(${RECORD_TABLE_DRAG_DROP_WIDTH_CSS_VAR}) +
+      var(${RECORD_TABLE_CHECKBOX_WIDTH_CSS_VAR})
+  );
+
+  z-index: ${TABLE_Z_INDEX.footer.stickyColumn};
 `;
 
-const StyledTableRow = styled.tr<{
-  hasHorizontalOverflow?: boolean;
-}>`
-  z-index: ${TABLE_Z_INDEX.footer.default};
+const StyledPlaceholderAddButtonPlaceholderFooterCell = styled.div`
+  background-color: ${themeCssVariables.background.primary};
+  bottom: 0;
   position: sticky;
-  border: none;
+  width: ${RECORD_TABLE_COLUMN_ADD_COLUMN_BUTTON_WIDTH}px;
+  z-index: ${TABLE_Z_INDEX.footer.default};
+`;
 
-  &.footer-sticky {
-    td {
-      border-top: ${({ theme }) => `1px solid ${theme.border.color.light}`};
-      z-index: ${TABLE_Z_INDEX.footer.default};
-      position: sticky;
-      bottom: 0;
-    }
-  }
-  cursor: pointer;
-  td:nth-of-type(1) {
-    width: ${FIRST_TH_WIDTH};
-    left: 0;
-    border-top: none;
-  }
-  &.first-columns-sticky {
-    td:nth-of-type(1) {
-      z-index: ${TABLE_Z_INDEX.footer.stickyColumn};
-    }
-    td:nth-of-type(2) {
-      position: sticky;
-      z-index: ${TABLE_Z_INDEX.footer.stickyColumn};
-      transition: 0.3s ease;
-      &::after {
-        content: '';
-        position: absolute;
-        top: -1px;
-        height: calc(100% + 2px);
-        width: 4px;
-        right: 0px;
-        box-shadow: ${({ theme }) => theme.boxShadow.light};
-        clip-path: inset(0px -4px 0px 0px);
-      }
-      @media (max-width: ${MOBILE_VIEWPORT}px) {
-        width: 34px;
-        max-width: 34px;
-      }
-    }
-  }
-  background: ${({ theme }) => theme.background.primary};
-  ${({ hasHorizontalOverflow }) =>
-    `.footer-sticky {
-        bottom: ${hasHorizontalOverflow ? '10px' : '0'};
-        ${
-          hasHorizontalOverflow &&
-          `
-          &::after {
-            content: '';
-            position: absolute;
-            bottom: -10px;
-            left: 0;
-            right: 0;
-            height: 10px;
-            background: inherit;
-          }
-        }
-      `
-        }
-    `}
+const StyledPlaceholderLastColumnEmptyFooterCell = styled.div`
+  background-color: ${themeCssVariables.background.primary};
+  bottom: 0;
+  position: sticky;
+  z-index: ${TABLE_Z_INDEX.footer.default};
+`;
+
+const StyledAggregateFooterContainer = styled.div`
+  bottom: 0;
+  display: flex;
+  position: sticky;
+  z-index: ${TABLE_Z_INDEX.footer.default};
 `;
 
 export const RecordTableAggregateFooter = ({
@@ -87,21 +54,9 @@ export const RecordTableAggregateFooter = ({
 }) => {
   const { visibleRecordFields } = useRecordTableContextOrThrow();
 
-  const { scrollWrapperHTMLElement } = useScrollWrapperElement();
-
-  const hasHorizontalOverflow =
-    (scrollWrapperHTMLElement?.scrollWidth ?? 0) >
-    (scrollWrapperHTMLElement?.clientWidth ?? 0);
-
   return (
-    <StyledTableRow
-      id={`record-table-footer${currentRecordGroupId ? '-' + currentRecordGroupId : ''}`}
-      data-select-disable
-      hasHorizontalOverflow={
-        hasHorizontalOverflow && isUndefined(currentRecordGroupId)
-      }
-    >
-      <StyledTd />
+    <StyledAggregateFooterContainer>
+      <StyledPlaceholderDragAndDropFooterCell />
       {visibleRecordFields.map((recordField, index) => {
         return (
           <RecordTableColumnAggregateFooterCellContext.Provider
@@ -113,14 +68,15 @@ export const RecordTableAggregateFooter = ({
           >
             <RecordTableAggregateFooterCell
               currentRecordGroupId={currentRecordGroupId}
-              isFirstCell={index === 0}
+              columnIndex={index}
             />
           </RecordTableColumnAggregateFooterCellContext.Provider>
         );
       })}
-      <td colSpan={visibleRecordFields.length - 1} />
-      <td />
-      <td />
-    </StyledTableRow>
+      <StyledPlaceholderAddButtonPlaceholderFooterCell />
+      <StyledPlaceholderLastColumnEmptyFooterCell
+        className={RECORD_TABLE_COLUMN_LAST_EMPTY_COLUMN_WIDTH_CLASS_NAME}
+      />
+    </StyledAggregateFooterContainer>
   );
 };

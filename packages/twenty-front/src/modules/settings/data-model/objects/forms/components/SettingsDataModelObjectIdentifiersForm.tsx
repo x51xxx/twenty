@@ -1,21 +1,20 @@
-import styled from '@emotion/styled';
-import { useMemo } from 'react';
-import { Controller, useForm } from 'react-hook-form';
-import { ZodError, isDirty, type z } from 'zod';
-
 import { useUpdateOneObjectMetadataItem } from '@/object-metadata/hooks/useUpdateOneObjectMetadataItem';
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import { getActiveFieldMetadataItems } from '@/object-metadata/utils/getActiveFieldMetadataItems';
 import { objectMetadataItemSchema } from '@/object-metadata/validation-schemas/objectMetadataItemSchema';
-import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
+import { isObjectMetadataReadOnly } from '@/object-record/read-only/utils/isObjectMetadataReadOnly';
 import { Select } from '@/ui/input/components/Select';
-import { ApolloError } from '@apollo/client';
+import { styled } from '@linaria/react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { t } from '@lingui/core/macro';
+import { useMemo } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { isLabelIdentifierFieldMetadataTypes } from 'twenty-shared/utils';
 import { IconCircleOff, IconPlus, useIcons } from 'twenty-ui/display';
 import { type SelectOption } from 'twenty-ui/input';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
+import { type z } from 'zod';
 
 export const settingsDataModelObjectIdentifiersFormSchema =
   objectMetadataItemSchema.pick({
@@ -29,7 +28,7 @@ export type SettingsDataModelObjectIdentifiersFormValues = z.infer<
 export type SettingsDataModelObjectIdentifiers =
   keyof SettingsDataModelObjectIdentifiersFormValues;
 type SettingsDataModelObjectIdentifiersFormProps = {
-  objectMetadataItem: ObjectMetadataItem;
+  objectMetadataItem: EnrichedObjectMetadataItem;
 };
 const LABEL_IDENTIFIER_FIELD_METADATA_ID: SettingsDataModelObjectIdentifiers =
   'labelIdentifierFieldMetadataId';
@@ -38,43 +37,31 @@ const IMAGE_IDENTIFIER_FIELD_METADATA_ID: SettingsDataModelObjectIdentifiers =
 
 const StyledContainer = styled.div`
   display: flex;
-  gap: ${({ theme }) => theme.spacing(4)};
+  gap: ${themeCssVariables.spacing[4]};
 `;
 
 export const SettingsDataModelObjectIdentifiersForm = ({
   objectMetadataItem,
 }: SettingsDataModelObjectIdentifiersFormProps) => {
+  const readonly = isObjectMetadataReadOnly({
+    objectMetadataItem,
+  });
   const formConfig = useForm<SettingsDataModelObjectIdentifiersFormValues>({
     mode: 'onTouched',
     resolver: zodResolver(settingsDataModelObjectIdentifiersFormSchema),
   });
-  const { enqueueErrorSnackBar } = useSnackBar();
   const { updateOneObjectMetadataItem } = useUpdateOneObjectMetadataItem();
 
   const handleSave = async (
     formValues: SettingsDataModelObjectIdentifiersFormValues,
   ) => {
-    if (!isDirty) {
-      return;
-    }
+    const result = await updateOneObjectMetadataItem({
+      idToUpdate: objectMetadataItem.id,
+      updatePayload: formValues,
+    });
 
-    try {
-      await updateOneObjectMetadataItem({
-        idToUpdate: objectMetadataItem.id,
-        updatePayload: formValues,
-      });
-
+    if (result.status === 'successful') {
       formConfig.reset(undefined, { keepValues: true });
-    } catch (error) {
-      if (error instanceof ZodError) {
-        enqueueErrorSnackBar({
-          message: error.issues[0].message,
-        });
-      } else {
-        enqueueErrorSnackBar({
-          apolloError: error instanceof ApolloError ? error : undefined,
-        });
-      }
     }
   };
 
@@ -98,7 +85,7 @@ export const SettingsDataModelObjectIdentifiersForm = ({
 
   const emptyOption: SelectOption<string | null> = {
     Icon: IconCircleOff,
-    label: 'None',
+    label: t`None`,
     value: null,
   };
 
@@ -134,7 +121,7 @@ export const SettingsDataModelObjectIdentifiersForm = ({
               options={options}
               value={value}
               withSearchInput={label === t`Record label`}
-              disabled={!objectMetadataItem.isCustom}
+              disabled={!objectMetadataItem.isCustom || readonly}
               callToActionButton={
                 label === t`Record label`
                   ? {

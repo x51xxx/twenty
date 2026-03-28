@@ -1,13 +1,12 @@
-import styled from '@emotion/styled';
-import { type Meta, type StoryObj } from '@storybook/react';
+import { styled } from '@linaria/react';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
 
 import { FormProviderDecorator } from '~/testing/decorators/FormProviderDecorator';
 import { IconsProviderDecorator } from '~/testing/decorators/IconsProviderDecorator';
 
+import { SettingsDataModelFieldIconLabelForm } from '@/settings/data-model/fields/forms/components/SettingsDataModelFieldIconLabelForm';
 import { ComponentDecorator } from 'twenty-ui/testing';
-import { I18nFrontDecorator } from '~/testing/decorators/I18nFrontDecorator';
-import { generatedMockObjectMetadataItems } from '~/testing/utils/generatedMockObjectMetadataItems';
-import { SettingsDataModelFieldIconLabelForm } from '../SettingsDataModelFieldIconLabelForm';
+import { getTestEnrichedObjectMetadataItemsMock } from '~/testing/utils/getTestEnrichedObjectMetadataItemsMock';
 
 const StyledContainer = styled.div`
   flex: 1;
@@ -25,7 +24,6 @@ const meta: Meta<typeof SettingsDataModelFieldIconLabelForm> = {
     FormProviderDecorator,
     IconsProviderDecorator,
     ComponentDecorator,
-    I18nFrontDecorator,
   ],
 };
 
@@ -34,9 +32,10 @@ type Story = StoryObj<typeof SettingsDataModelFieldIconLabelForm>;
 
 export const Default: Story = {};
 
-const mockedPersonObjectMetadataItem = generatedMockObjectMetadataItems.find(
-  (item) => item.namePlural === 'person',
-);
+const mockedPersonObjectMetadataItem =
+  getTestEnrichedObjectMetadataItemsMock().find(
+    (item) => item.namePlural === 'person',
+  );
 
 export const WithFieldMetadataItem: Story = {
   args: {

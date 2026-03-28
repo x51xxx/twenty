@@ -1,53 +1,40 @@
-import {
-  TEST_NOT_EXISTING_VIEW_GROUP_ID,
-  TEST_VIEW_1_ID,
-} from 'test/integration/constants/test-view-ids.constants';
 import { createOneFieldMetadata } from 'test/integration/metadata/suites/field-metadata/utils/create-one-field-metadata.util';
 import { createOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/create-one-object-metadata.util';
 import { deleteOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/delete-one-object-metadata.util';
+import { updateOneObjectMetadata } from 'test/integration/metadata/suites/object-metadata/utils/update-one-object-metadata.util';
+import { destroyOneViewGroup } from 'test/integration/metadata/suites/view-group/utils/destroy-one-view-group.util';
 import { makeRestAPIRequest } from 'test/integration/rest/utils/make-rest-api-request.util';
 import {
-  assertRestApiErrorResponse,
+  assertRestApiErrorNotFoundResponse,
   assertRestApiSuccessfulResponse,
 } from 'test/integration/rest/utils/rest-test-assertions.util';
 import {
   createTestViewGroupWithRestApi,
   createTestViewWithRestApi,
-  deleteTestViewGroupWithRestApi,
 } from 'test/integration/rest/utils/view-rest-api.util';
-import { generateRecordName } from 'test/integration/utils/generate-record-name';
-import {
-  assertViewGroupStructure,
-  cleanupViewRecords,
-} from 'test/integration/utils/view-test.util';
+import { assertViewGroupStructure } from 'test/integration/utils/view-test.util';
+import { extractRecordIdsAndDatesAsExpectAny } from 'test/utils/extract-record-ids-and-dates-as-expect-any';
 import { FieldMetadataType } from 'twenty-shared/types';
-
-import { type ViewGroupEntity } from 'src/engine/core-modules/view/entities/view-group.entity';
-import {
-  generateViewGroupExceptionMessage,
-  ViewGroupExceptionMessageKey,
-} from 'src/engine/core-modules/view/exceptions/view-group.exception';
 
 describe('View Group REST API', () => {
   let testObjectMetadataId: string;
   let testFieldMetadataId: string;
+  let testViewId: string;
+  let testViewGroupId: string | undefined;
 
   beforeAll(async () => {
-    await deleteOneObjectMetadata({
-      input: { idToDelete: testObjectMetadataId },
-    });
-
     const {
       data: {
         createOneObject: { id: objectMetadataId },
       },
     } = await createOneObjectMetadata({
+      expectToFail: false,
       input: {
-        nameSingular: 'myTestObject',
-        namePlural: 'myTestObjects',
-        labelSingular: 'My Test Object',
-        labelPlural: 'My Test Objects',
-        icon: 'Icon123',
+        nameSingular: 'testViewGroupObject',
+        namePlural: 'testViewGroupObjects',
+        labelSingular: 'Test View Group Object',
+        labelPlural: 'Test View Group Objects',
+        icon: 'IconGroup',
       },
     });
 
@@ -56,9 +43,14 @@ describe('View Group REST API', () => {
     const createFieldInput = {
       name: 'testField',
       label: 'Test Field',
-      type: FieldMetadataType.TEXT,
+      type: FieldMetadataType.SELECT,
       objectMetadataId: testObjectMetadataId,
       isLabelSyncedWithName: true,
+      options: [
+        { label: 'Option 1', value: 'OPTION_1', color: 'blue', position: 0 },
+        { label: 'Option 2', value: 'OPTION_2', color: 'red', position: 1 },
+        { label: 'Option 3', value: 'OPTION_3', color: 'green', position: 2 },
+      ],
     };
 
     const {
@@ -66,6 +58,7 @@ describe('View Group REST API', () => {
         createOneField: { id: fieldMetadataId },
       },
     } = await createOneFieldMetadata({
+      expectToFail: false,
       input: createFieldInput,
       gqlFields: `
           id
@@ -76,39 +69,45 @@ describe('View Group REST API', () => {
     });
 
     testFieldMetadataId = fieldMetadataId;
+
+    const testView = await createTestViewWithRestApi({
+      name: 'Test View for Group Integration',
+      objectMetadataId: testObjectMetadataId,
+      mainGroupByFieldMetadataId: testFieldMetadataId,
+    });
+
+    testViewId = testView.id;
   });
 
   afterAll(async () => {
+    await updateOneObjectMetadata({
+      expectToFail: false,
+      input: {
+        idToUpdate: testObjectMetadataId,
+        updatePayload: {
+          isActive: false,
+        },
+      },
+    });
     await deleteOneObjectMetadata({
+      expectToFail: false,
       input: { idToDelete: testObjectMetadataId },
     });
   });
 
-  beforeEach(async () => {
-    await cleanupViewRecords();
+  afterEach(async () => {
+    if (!testViewGroupId) return;
 
-    await createTestViewWithRestApi({
-      name: generateRecordName('Test View for Groups'),
-      objectMetadataId: testObjectMetadataId,
+    await destroyOneViewGroup({
+      input: {
+        id: testViewGroupId,
+      },
+      expectToFail: false,
     });
-  });
-
-  afterAll(async () => {
-    await cleanupViewRecords();
+    testViewGroupId = undefined;
   });
 
   describe('GET /metadata/viewGroups', () => {
-    it('should return empty array when no view groups exist', async () => {
-      const response = await makeRestAPIRequest({
-        method: 'get',
-        path: `/metadata/viewGroups?viewId=${TEST_VIEW_1_ID}`,
-        bearer: APPLE_JANE_ADMIN_ACCESS_TOKEN,
-      });
-
-      assertRestApiSuccessfulResponse(response);
-      expect(response.body).toEqual([]);
-    });
-
     it('should return all view groups for workspace when no viewId provided', async () => {
       const response = await makeRestAPIRequest({
         method: 'get',
@@ -121,88 +120,45 @@ describe('View Group REST API', () => {
     });
 
     it('should return view groups for a specific view after creating one', async () => {
-      const viewGroup = await createTestViewGroupWithRestApi({
-        fieldValue: 'test-field-value',
-        isVisible: true,
-        position: 0,
-        fieldMetadataId: testFieldMetadataId,
-      });
-
       const response = await makeRestAPIRequest({
         method: 'get',
-        path: `/metadata/viewGroups?viewId=${TEST_VIEW_1_ID}`,
+        path: `/metadata/viewGroups?viewId=${testViewId}`,
         bearer: APPLE_JANE_ADMIN_ACCESS_TOKEN,
       });
 
       assertRestApiSuccessfulResponse(response);
       expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body).toHaveLength(1);
 
-      const returnedViewGroup = response.body[0];
+      const returnedViewGroups = response.body;
 
-      assertViewGroupStructure(returnedViewGroup, {
-        id: viewGroup.id,
-        viewId: TEST_VIEW_1_ID,
-        fieldValue: 'test-field-value',
-        isVisible: true,
-        position: 0,
+      expect(returnedViewGroups).toHaveLength(4);
+      // For a nullable field with three options, we expect groups for OPTION_1, OPTION_2, OPTION_3, and '' (empty string)
+      const expectedFieldValues = ['OPTION_1', 'OPTION_2', 'OPTION_3', ''];
+
+      // Check structure and visibility for each group
+      expectedFieldValues.forEach((expectedFieldValue) => {
+        const group = returnedViewGroups.find(
+          (group: any) => group.fieldValue === expectedFieldValue,
+        );
+
+        expect(group).toBeDefined();
+        expect(group.isVisible).toBe(true);
+        expect(group.viewId).toBe(testViewId);
       });
-
-      await deleteTestViewGroupWithRestApi(viewGroup.id);
-    });
-
-    it('should return multiple view groups for a view', async () => {
-      const viewGroup1 = await createTestViewGroupWithRestApi({
-        fieldValue: 'group-1',
-        position: 0,
-        fieldMetadataId: testFieldMetadataId,
-      });
-
-      const viewGroup2 = await createTestViewGroupWithRestApi({
-        fieldValue: 'group-2',
-        position: 1,
-        fieldMetadataId: testFieldMetadataId,
-      });
-
-      const response = await makeRestAPIRequest({
-        method: 'get',
-        path: `/metadata/viewGroups?viewId=${TEST_VIEW_1_ID}`,
-        bearer: APPLE_JANE_ADMIN_ACCESS_TOKEN,
-      });
-
-      assertRestApiSuccessfulResponse(response);
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body).toHaveLength(2);
-
-      const group1 = response.body.find(
-        (group: ViewGroupEntity) => group.id === viewGroup1.id,
-      );
-      const group2 = response.body.find(
-        (group: ViewGroupEntity) => group.id === viewGroup2.id,
-      );
-
-      assertViewGroupStructure(group1, {
-        fieldValue: 'group-1',
-        position: 0,
-      });
-
-      assertViewGroupStructure(group2, {
-        fieldValue: 'group-2',
-        position: 1,
-      });
-
-      await deleteTestViewGroupWithRestApi(viewGroup1.id);
-      await deleteTestViewGroupWithRestApi(viewGroup2.id);
     });
   });
 
   describe('GET /metadata/viewGroups/:id', () => {
     it('should return a specific view group by id', async () => {
-      const viewGroup = await createTestViewGroupWithRestApi({
-        fieldValue: 'specific-group',
-        isVisible: false,
-        fieldMetadataId: testFieldMetadataId,
+      const viewGroupsFromViewReponse = await makeRestAPIRequest({
+        method: 'get',
+        path: `/metadata/viewGroups?viewId=${testViewId}`,
+        bearer: APPLE_JANE_ADMIN_ACCESS_TOKEN,
       });
+
+      const viewGroup = viewGroupsFromViewReponse.body.find(
+        (group: any) => group.fieldValue === 'OPTION_1',
+      );
 
       const response = await makeRestAPIRequest({
         method: 'get',
@@ -213,20 +169,19 @@ describe('View Group REST API', () => {
       assertRestApiSuccessfulResponse(response);
       assertViewGroupStructure(response.body, {
         id: viewGroup.id,
-        viewId: TEST_VIEW_1_ID,
-        fieldValue: 'specific-group',
-        isVisible: false,
+        viewId: testViewId,
+        fieldValue: 'OPTION_1',
+        isVisible: true,
       });
 
-      await deleteTestViewGroupWithRestApi(viewGroup.id);
+      testViewGroupId = viewGroup.id;
     });
   });
 
   describe('POST /metadata/viewGroups', () => {
     it('should create a new view group', async () => {
       const viewGroupData = {
-        viewId: TEST_VIEW_1_ID,
-        fieldMetadataId: testFieldMetadataId,
+        viewId: testViewId,
         fieldValue: 'new-group-value',
         isVisible: true,
         position: 5,
@@ -241,18 +196,18 @@ describe('View Group REST API', () => {
 
       assertRestApiSuccessfulResponse(response, 201);
       assertViewGroupStructure(response.body, {
-        viewId: TEST_VIEW_1_ID,
+        viewId: testViewId,
         fieldValue: 'new-group-value',
         isVisible: true,
         position: 5,
       });
 
-      await deleteTestViewGroupWithRestApi(response.body.id);
+      testViewGroupId = response.body.id;
     });
 
     it('should create view group with minimal required fields', async () => {
       const viewGroupData = {
-        viewId: TEST_VIEW_1_ID,
+        viewId: testViewId,
         fieldMetadataId: testFieldMetadataId,
         fieldValue: 'minimal-group',
       };
@@ -266,18 +221,18 @@ describe('View Group REST API', () => {
 
       assertRestApiSuccessfulResponse(response, 201);
       assertViewGroupStructure(response.body, {
-        viewId: TEST_VIEW_1_ID,
+        viewId: testViewId,
         fieldValue: 'minimal-group',
         isVisible: true,
         position: 0,
       });
 
-      await deleteTestViewGroupWithRestApi(response.body.id);
+      testViewGroupId = response.body.id;
     });
 
     it('should fail to create view group with missing required fields', async () => {
       const invalidData = {
-        viewId: TEST_VIEW_1_ID,
+        viewId: testViewId,
       };
 
       const response = await makeRestAPIRequest({
@@ -287,12 +242,12 @@ describe('View Group REST API', () => {
         bearer: APPLE_JANE_ADMIN_ACCESS_TOKEN,
       });
 
-      assertRestApiErrorResponse(
-        response,
-        400,
-        generateViewGroupExceptionMessage(
-          ViewGroupExceptionMessageKey.INVALID_VIEW_GROUP_DATA,
-        ),
+      expect(response.status).toBe(400);
+
+      const errorResponse = JSON.parse(response.text);
+
+      expect(errorResponse).toMatchSnapshot(
+        extractRecordIdsAndDatesAsExpectAny(errorResponse),
       );
     });
   });
@@ -300,11 +255,14 @@ describe('View Group REST API', () => {
   describe('PATCH /metadata/viewGroups/:id', () => {
     it('should update an existing view group', async () => {
       const viewGroup = await createTestViewGroupWithRestApi({
+        viewId: testViewId,
+        fieldMetadataId: testFieldMetadataId,
         fieldValue: 'original-value',
         isVisible: true,
         position: 1,
-        fieldMetadataId: testFieldMetadataId,
       });
+
+      testViewGroupId = viewGroup.id;
 
       const updateData = {
         fieldValue: 'updated-value',
@@ -322,22 +280,23 @@ describe('View Group REST API', () => {
       assertRestApiSuccessfulResponse(response);
       assertViewGroupStructure(response.body, {
         id: viewGroup.id,
-        viewId: TEST_VIEW_1_ID,
+        viewId: testViewId,
         fieldValue: 'updated-value',
         isVisible: false,
         position: 2,
       });
-
-      await deleteTestViewGroupWithRestApi(viewGroup.id);
     });
 
     it('should update only specific fields', async () => {
       const viewGroup = await createTestViewGroupWithRestApi({
+        viewId: testViewId,
+        fieldMetadataId: testFieldMetadataId,
         fieldValue: 'original-value',
         isVisible: true,
         position: 1,
-        fieldMetadataId: testFieldMetadataId,
       });
+
+      testViewGroupId = viewGroup.id;
 
       const updateData = {
         fieldValue: 'partially-updated',
@@ -357,8 +316,6 @@ describe('View Group REST API', () => {
         isVisible: true,
         position: 1,
       });
-
-      await deleteTestViewGroupWithRestApi(viewGroup.id);
     });
 
     it('should return 404 for non-existent view group', async () => {
@@ -368,28 +325,24 @@ describe('View Group REST API', () => {
 
       const response = await makeRestAPIRequest({
         method: 'patch',
-        path: `/metadata/viewGroups/${TEST_NOT_EXISTING_VIEW_GROUP_ID}`,
+        path: `/metadata/viewGroups/20202020-9c8b-4a7e-9f2d-1a2b3c4d5e6f`,
         body: updateData,
         bearer: APPLE_JANE_ADMIN_ACCESS_TOKEN,
       });
 
-      assertRestApiErrorResponse(
-        response,
-        404,
-        generateViewGroupExceptionMessage(
-          ViewGroupExceptionMessageKey.VIEW_GROUP_NOT_FOUND,
-          TEST_NOT_EXISTING_VIEW_GROUP_ID,
-        ),
-      );
+      assertRestApiErrorNotFoundResponse(response);
     });
   });
 
   describe('DELETE /metadata/viewGroups/:id', () => {
     it('should delete an existing view group', async () => {
       const viewGroup = await createTestViewGroupWithRestApi({
-        fieldValue: 'to-be-deleted',
+        viewId: testViewId,
         fieldMetadataId: testFieldMetadataId,
+        fieldValue: 'to-be-deleted',
       });
+
+      testViewGroupId = viewGroup.id;
 
       const deleteResponse = await makeRestAPIRequest({
         method: 'delete',
@@ -404,25 +357,21 @@ describe('View Group REST API', () => {
     it('should return 404 for non-existent view group', async () => {
       const response = await makeRestAPIRequest({
         method: 'delete',
-        path: `/metadata/viewGroups/${TEST_NOT_EXISTING_VIEW_GROUP_ID}`,
+        path: `/metadata/viewGroups/20202020-9c8b-4a7e-9f2d-1a2b3c4d5e6f`,
         bearer: APPLE_JANE_ADMIN_ACCESS_TOKEN,
       });
 
-      assertRestApiErrorResponse(
-        response,
-        404,
-        generateViewGroupExceptionMessage(
-          ViewGroupExceptionMessageKey.VIEW_GROUP_NOT_FOUND,
-          TEST_NOT_EXISTING_VIEW_GROUP_ID,
-        ),
-      );
+      assertRestApiErrorNotFoundResponse(response);
     });
 
     it('should return success even when group is already deleted', async () => {
       const viewGroup = await createTestViewGroupWithRestApi({
-        fieldValue: 'double-delete-test',
+        viewId: testViewId,
         fieldMetadataId: testFieldMetadataId,
+        fieldValue: 'double-delete-test',
       });
+
+      testViewGroupId = viewGroup.id;
 
       const deleteResponse = await makeRestAPIRequest({
         method: 'delete',
@@ -438,14 +387,7 @@ describe('View Group REST API', () => {
         bearer: APPLE_JANE_ADMIN_ACCESS_TOKEN,
       });
 
-      assertRestApiErrorResponse(
-        deleteResponse2,
-        404,
-        generateViewGroupExceptionMessage(
-          ViewGroupExceptionMessageKey.VIEW_GROUP_NOT_FOUND,
-          TEST_NOT_EXISTING_VIEW_GROUP_ID,
-        ),
-      );
+      assertRestApiSuccessfulResponse(deleteResponse2);
     });
   });
 });

@@ -1,6 +1,6 @@
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import { RecordFieldListCellHoveredPortalContent } from '@/object-record/record-field-list/anchored-portal/components/RecordFieldListCellHoveredPortalContent';
 import { RecordFieldListInputContextProvider } from '@/object-record/record-field-list/anchored-portal/components/RecordFieldListInputContextProvider';
 import { useFieldListFieldMetadataFromPosition } from '@/object-record/record-field-list/hooks/useFieldListFieldMetadataFromPosition';
@@ -11,7 +11,7 @@ import { useAvailableComponentInstanceIdOrThrow } from '@/ui/utilities/state/com
 import { isDefined } from 'twenty-shared/utils';
 
 type RecordFieldListCellHoveredPortalProps = {
-  objectMetadataItem: ObjectMetadataItem;
+  objectMetadataItem: EnrichedObjectMetadataItem;
   recordId: string;
 };
 
@@ -23,7 +23,7 @@ export const RecordFieldListCellHoveredPortal = ({
     RecordFieldListComponentInstanceContext,
   );
 
-  const hoverPosition = useRecoilComponentValue(
+  const recordFieldListHoverPosition = useAtomComponentStateValue(
     recordFieldListHoverPositionComponentState,
   );
 
@@ -31,19 +31,26 @@ export const RecordFieldListCellHoveredPortal = ({
     objectNameSingular: objectMetadataItem.nameSingular,
   });
 
-  if (!isDefined(hoverPosition) || !isDefined(hoveredFieldMetadataItem)) {
+  if (
+    !isDefined(recordFieldListHoverPosition) ||
+    !isDefined(hoveredFieldMetadataItem)
+  ) {
     return null;
   }
 
   return (
     <RecordInlineCellAnchoredPortal
-      position={hoverPosition}
       fieldMetadataItem={hoveredFieldMetadataItem}
       objectMetadataItem={objectMetadataItem}
       recordId={recordId}
       instanceIdPrefix={instanceId}
     >
-      <RecordFieldListInputContextProvider>
+      <RecordFieldListInputContextProvider
+        fieldMetadataItem={hoveredFieldMetadataItem}
+        objectMetadataItem={objectMetadataItem}
+        recordId={recordId}
+        instanceIdPrefix={instanceId}
+      >
         <RecordFieldListCellHoveredPortalContent />
       </RecordFieldListInputContextProvider>
     </RecordInlineCellAnchoredPortal>

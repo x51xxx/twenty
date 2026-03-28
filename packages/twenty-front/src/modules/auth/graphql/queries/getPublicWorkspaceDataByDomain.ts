@@ -22,6 +22,12 @@ export const GET_PUBLIC_WORKSPACE_DATA_BY_DOMAIN = gql`
         magicLink
         password
         microsoft
+        casdoor
+      }
+      authBypassProviders {
+        google
+        password
+        microsoft
       }
     }
   }

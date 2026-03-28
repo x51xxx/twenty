@@ -41,8 +41,8 @@ export class EmailAccountConnectionParameters {
   CALDAV?: ConnectionParameters;
 }
 
-@ObjectType()
-export class ConnectionParametersOutput {
+@ObjectType('ConnectionParametersOutput')
+export class ConnectionParametersDTO {
   @Field(() => String)
   host: string;
 
@@ -59,14 +59,14 @@ export class ConnectionParametersOutput {
   secure?: boolean;
 }
 
-@ObjectType()
-export class ImapSmtpCaldavConnectionParameters {
-  @Field(() => ConnectionParametersOutput, { nullable: true })
-  IMAP?: ConnectionParametersOutput;
+@ObjectType('ImapSmtpCaldavConnectionParameters')
+export class ImapSmtpCaldavConnectionParametersDTO {
+  @Field(() => ConnectionParametersDTO, { nullable: true })
+  IMAP?: ConnectionParametersDTO;
 
-  @Field(() => ConnectionParametersOutput, { nullable: true })
-  SMTP?: ConnectionParametersOutput;
+  @Field(() => ConnectionParametersDTO, { nullable: true })
+  SMTP?: ConnectionParametersDTO;
 
-  @Field(() => ConnectionParametersOutput, { nullable: true })
-  CALDAV?: ConnectionParametersOutput;
+  @Field(() => ConnectionParametersDTO, { nullable: true })
+  CALDAV?: ConnectionParametersDTO;
 }

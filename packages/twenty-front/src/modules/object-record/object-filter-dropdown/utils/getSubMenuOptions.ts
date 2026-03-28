@@ -1,4 +1,4 @@
-import { type FilterableFieldType } from '@/object-record/record-filter/types/FilterableFieldType';
+import { type FilterableFieldType } from 'twenty-shared/types';
 
 export const getSubMenuOptions = (subMenu: FilterableFieldType | null) => {
   switch (subMenu) {
@@ -13,6 +13,11 @@ export const getSubMenuOptions = (subMenu: FilterableFieldType | null) => {
           name: 'Creator Name',
           icon: 'IconId',
           type: 'ACTOR',
+        },
+        {
+          name: 'Workspace Member',
+          icon: 'IconUserCircle',
+          type: 'WORKSPACE_MEMBER',
         },
       ];
     default:

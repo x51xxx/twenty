@@ -10,10 +10,6 @@ import { selectedRecordSortDirectionComponentState } from '@/object-record/objec
 import { visibleRecordFieldsComponentSelector } from '@/object-record/record-field/states/visibleRecordFieldsComponentSelector';
 import { useRecordIndexContextOrThrow } from '@/object-record/record-index/contexts/RecordIndexContext';
 import { useUpsertRecordSort } from '@/object-record/record-sort/hooks/useUpsertRecordSort';
-import {
-  RECORD_SORT_DIRECTIONS,
-  type RecordSortDirection,
-} from '@/object-record/record-sort/types/RecordSortDirection';
 import { Dropdown } from '@/ui/layout/dropdown/components/Dropdown';
 import { DropdownContent } from '@/ui/layout/dropdown/components/DropdownContent';
 import { DropdownMenuHeader } from '@/ui/layout/dropdown/components/DropdownMenuHeader/DropdownMenuHeader';
@@ -29,21 +25,23 @@ import { isDropdownOpenComponentState } from '@/ui/layout/dropdown/states/isDrop
 import { SelectableList } from '@/ui/layout/selectable-list/components/SelectableList';
 import { SelectableListItem } from '@/ui/layout/selectable-list/components/SelectableListItem';
 import { selectedItemIdComponentState } from '@/ui/layout/selectable-list/states/selectedItemIdComponentState';
-import { useRecoilComponentState } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentState';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
-import { useSetRecoilComponentState } from '@/ui/utilities/state/component-state/hooks/useSetRecoilComponentState';
+import { useAtomComponentSelectorValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentSelectorValue';
+import { useAtomComponentState } from '@/ui/utilities/state/jotai/hooks/useAtomComponentState';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+import { useSetAtomComponentState } from '@/ui/utilities/state/jotai/hooks/useSetAtomComponentState';
+import { useAtomFamilySelectorValue } from '@/ui/utilities/state/jotai/hooks/useAtomFamilySelectorValue';
 import { Trans, useLingui } from '@lingui/react/macro';
-import { useRecoilValue } from 'recoil';
 import { findByProperty } from 'twenty-shared/utils';
 import { IconX, useIcons } from 'twenty-ui/display';
 import { MenuItem } from 'twenty-ui/navigation';
 import { v4 } from 'uuid';
+import { ViewSortDirection } from '~/generated-metadata/graphql';
 
 export const ObjectSortDropdownButton = () => {
   const { resetRecordSortDropdownSearchInput } =
     useResetRecordSortDropdownSearchInput();
 
-  const setObjectSortDropdownSearchInput = useSetRecoilComponentState(
+  const setObjectSortDropdownSearchInput = useSetAtomComponentState(
     objectSortDropdownSearchInputComponentState,
   );
 
@@ -51,19 +49,20 @@ export const ObjectSortDropdownButton = () => {
 
   const { recordIndexId, objectMetadataItem } = useRecordIndexContextOrThrow();
 
-  const objectSortDropdownSearchInput = useRecoilComponentValue(
+  const objectSortDropdownSearchInput = useAtomComponentStateValue(
     objectSortDropdownSearchInputComponentState,
   );
 
-  const sortableFieldMetadataItems = useRecoilValue(
-    availableFieldMetadataItemsForSortFamilySelector({
+  const sortableFieldMetadataItems = useAtomFamilySelectorValue(
+    availableFieldMetadataItemsForSortFamilySelector,
+    {
       objectMetadataItemId: objectMetadataItem.id,
-    }),
+    },
   );
 
   const { getIcon } = useIcons();
 
-  const visibleRecordFields = useRecoilComponentValue(
+  const visibleRecordFields = useAtomComponentSelectorValue(
     visibleRecordFieldsComponentSelector,
     recordIndexId,
   );
@@ -130,18 +129,18 @@ export const ObjectSortDropdownButton = () => {
   };
 
   const [selectedRecordSortDirection, setSelectedRecordSortDirection] =
-    useRecoilComponentState(selectedRecordSortDirectionComponentState);
+    useAtomComponentState(selectedRecordSortDirectionComponentState);
 
-  const setIsRecordSortDirectionMenuUnfolded = useSetRecoilComponentState(
+  const setIsRecordSortDirectionDropdownMenuUnfolded = useSetAtomComponentState(
     isRecordSortDirectionDropdownMenuUnfoldedComponentState,
   );
 
-  const handleSortDirectionClick = (sortDirection: RecordSortDirection) => {
+  const handleSortDirectionClick = (sortDirection: ViewSortDirection) => {
     setSelectedRecordSortDirection(sortDirection);
-    setIsRecordSortDirectionMenuUnfolded(false);
+    setIsRecordSortDirectionDropdownMenuUnfolded(false);
   };
 
-  const isDropdownOpen = useRecoilComponentValue(
+  const isDropdownOpen = useAtomComponentStateValue(
     isDropdownOpenComponentState,
     OBJECT_SORT_DROPDOWN_ID,
   );
@@ -153,12 +152,12 @@ export const ObjectSortDropdownButton = () => {
     ...hiddenFieldMetadataItemsSorted.map((item) => item.id),
   ];
 
-  const selectedItemId = useRecoilComponentValue(
+  const selectedItemId = useAtomComponentStateValue(
     selectedItemIdComponentState,
     OBJECT_SORT_DROPDOWN_ID,
   );
 
-  const setSelectedItemId = useSetRecoilComponentState(
+  const setSelectedItemId = useSetAtomComponentState(
     selectedItemIdComponentState,
     OBJECT_SORT_DROPDOWN_ID,
   );
@@ -190,21 +189,24 @@ export const ObjectSortDropdownButton = () => {
           </DropdownMenuHeader>
           <DropdownMenuInnerSelect
             dropdownId="record-sort-direction-dropdown"
-            options={RECORD_SORT_DIRECTIONS.map((sortDirection) => ({
-              value: sortDirection,
-              label: sortDirection === 'asc' ? t`Ascending` : t`Descending`,
-            }))}
+            options={[ViewSortDirection.ASC, ViewSortDirection.DESC].map(
+              (sortDirection) => ({
+                value: sortDirection,
+                label:
+                  sortDirection === ViewSortDirection.ASC
+                    ? t`Ascending`
+                    : t`Descending`,
+              }),
+            )}
             selectedOption={{
               value: selectedRecordSortDirection,
               label:
-                selectedRecordSortDirection === 'asc'
+                selectedRecordSortDirection === ViewSortDirection.ASC
                   ? t`Ascending`
                   : t`Descending`,
             }}
             onChange={(sortDirection) =>
-              handleSortDirectionClick(
-                sortDirection.value as RecordSortDirection,
-              )
+              handleSortDirectionClick(sortDirection.value as ViewSortDirection)
             }
             widthInPixels={GenericDropdownContentWidth.ExtraLarge}
           />

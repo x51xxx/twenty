@@ -1,4 +1,4 @@
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import { getLabelIdentifierFieldMetadataItem } from '@/object-metadata/utils/getLabelIdentifierFieldMetadataItem';
 import { type ObjectRecord } from '@/object-record/types/ObjectRecord';
 import { type ObjectRecordIdentifier } from '@/object-record/types/ObjectRecordIdentifier';
@@ -11,15 +11,17 @@ import { getLinkToShowPage } from './getLinkToShowPage';
 export const getObjectRecordIdentifier = ({
   objectMetadataItem,
   record,
+  allowRequestsToTwentyIcons,
 }: {
   objectMetadataItem: Pick<
-    ObjectMetadataItem,
+    EnrichedObjectMetadataItem,
     | 'fields'
     | 'labelIdentifierFieldMetadataId'
     | 'nameSingular'
     | 'imageIdentifierFieldMetadataId'
   >;
   record: ObjectRecord;
+  allowRequestsToTwentyIcons: boolean;
 }): ObjectRecordIdentifier => {
   const labelIdentifierFieldMetadataItem =
     getLabelIdentifierFieldMetadataItem(objectMetadataItem);
@@ -27,7 +29,6 @@ export const getObjectRecordIdentifier = ({
   const labelIdentifierFieldValue = getLabelIdentifierFieldValue(
     record,
     labelIdentifierFieldMetadataItem,
-    objectMetadataItem.nameSingular,
   );
 
   const imageIdentifierFieldMetadata = objectMetadataItem.fields.find(
@@ -41,6 +42,7 @@ export const getObjectRecordIdentifier = ({
     objectMetadataItem.nameSingular,
     record,
     imageIdentifierFieldMetadata,
+    allowRequestsToTwentyIcons,
   );
 
   const linkToShowPage = getLinkToShowPage(

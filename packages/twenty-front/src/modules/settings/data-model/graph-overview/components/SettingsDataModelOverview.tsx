@@ -2,7 +2,7 @@ import { SettingsDataModelOverviewEffect } from '@/settings/data-model/graph-ove
 import { SettingsDataModelOverviewObject } from '@/settings/data-model/graph-overview/components/SettingsDataModelOverviewObject';
 import { SettingsDataModelOverviewRelationMarkers } from '@/settings/data-model/graph-overview/components/SettingsDataModelOverviewRelationMarkers';
 import { calculateHandlePosition } from '@/settings/data-model/graph-overview/utils/calculateHandlePosition';
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import {
   Background,
   type Edge,
@@ -20,8 +20,8 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import { useCallback, useState } from 'react';
-import { isDefined } from 'twenty-shared/utils';
-import { Button, IconButtonGroup } from 'twenty-ui/input';
+import { SettingsPath } from 'twenty-shared/types';
+import { getSettingsPath, isDefined } from 'twenty-shared/utils';
 import {
   IconLock,
   IconLockOpen,
@@ -30,6 +30,8 @@ import {
   IconPlus,
   IconX,
 } from 'twenty-ui/display';
+import { Button, IconButtonGroup } from 'twenty-ui/input';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 const nodeTypes: NodeTypes = {
   object: SettingsDataModelOverviewObject,
@@ -61,9 +63,9 @@ const StyledContainer = styled.div`
 `;
 
 const StyledCloseButton = styled.div`
+  left: ${themeCssVariables.spacing[3]};
   position: absolute;
-  top: ${({ theme }) => theme.spacing(3)};
-  left: ${({ theme }) => theme.spacing(3)};
+  top: ${themeCssVariables.spacing[3]};
   z-index: 5;
 `;
 
@@ -184,7 +186,10 @@ export const SettingsDataModelOverview = () => {
   return (
     <StyledContainer>
       <StyledCloseButton>
-        <Button Icon={IconX} to="/settings/objects"></Button>
+        <Button
+          Icon={IconX}
+          to={getSettingsPath(SettingsPath.Objects)}
+        ></Button>
       </StyledCloseButton>
       <SettingsDataModelOverviewEffect
         setEdges={setEdges}

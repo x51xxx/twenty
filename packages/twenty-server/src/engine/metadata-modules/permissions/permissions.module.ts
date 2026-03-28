@@ -1,31 +1,33 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { ApiKeyRoleService } from 'src/engine/core-modules/api-key/api-key-role.service';
-import { ApiKey } from 'src/engine/core-modules/api-key/api-key.entity';
+import { ApiKeyEntity } from 'src/engine/core-modules/api-key/api-key.entity';
+import { ApiKeyRoleService } from 'src/engine/core-modules/api-key/services/api-key-role.service';
+import { ApplicationEntity } from 'src/engine/core-modules/application/application.entity';
 import { FeatureFlagModule } from 'src/engine/core-modules/feature-flag/feature-flag.module';
-import { UserWorkspace } from 'src/engine/core-modules/user-workspace/user-workspace.entity';
-import { Workspace } from 'src/engine/core-modules/workspace/workspace.entity';
+import { UserWorkspaceEntity } from 'src/engine/core-modules/user-workspace/user-workspace.entity';
 import { PermissionsService } from 'src/engine/metadata-modules/permissions/permissions.service';
-import { RoleTargetsEntity } from 'src/engine/metadata-modules/role/role-targets.entity';
+import { RoleTargetEntity } from 'src/engine/metadata-modules/role-target/role-target.entity';
+import { RoleTargetModule } from 'src/engine/metadata-modules/role-target/role-target.module';
 import { RoleEntity } from 'src/engine/metadata-modules/role/role.entity';
 import { UserRoleModule } from 'src/engine/metadata-modules/user-role/user-role.module';
-import { WorkspacePermissionsCacheModule } from 'src/engine/metadata-modules/workspace-permissions-cache/workspace-permissions-cache.module';
+import { WorkspaceCacheModule } from 'src/engine/workspace-cache/workspace-cache.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       RoleEntity,
-      RoleTargetsEntity,
-      ApiKey,
-      Workspace,
+      RoleTargetEntity,
+      ApiKeyEntity,
+      ApplicationEntity,
     ]),
     FeatureFlagModule,
-    TypeOrmModule.forFeature([UserWorkspace]),
+    TypeOrmModule.forFeature([UserWorkspaceEntity]),
     UserRoleModule,
-    WorkspacePermissionsCacheModule,
+    WorkspaceCacheModule,
+    RoleTargetModule,
   ],
-  providers: [PermissionsService, ApiKeyRoleService],
-  exports: [PermissionsService],
+  providers: [ApiKeyRoleService, PermissionsService],
+  exports: [PermissionsService, ApiKeyRoleService],
 })
 export class PermissionsModule {}

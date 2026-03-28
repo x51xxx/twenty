@@ -1,4 +1,3 @@
-import { useSSO } from '@/auth/sign-in-up/hooks/useSSO';
 import { useSignInUp } from '@/auth/sign-in-up/hooks/useSignInUp';
 import { useSignInUpForm } from '@/auth/sign-in-up/hooks/useSignInUpForm';
 import {
@@ -8,8 +7,9 @@ import {
 import { isRequestingCaptchaTokenState } from '@/captcha/states/isRequestingCaptchaTokenState';
 import { captchaState } from '@/client-config/states/captchaState';
 import { workspaceAuthProvidersState } from '@/workspace/states/workspaceAuthProvidersState';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
+import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
 import { useEffect, useState } from 'react';
-import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { isDefined } from 'twenty-shared/utils';
 
 const searchParams = new URLSearchParams(window.location.search);
@@ -22,25 +22,24 @@ enum LoadingStatus {
 }
 
 export const SignInUpWorkspaceScopeFormEffect = () => {
-  const workspaceAuthProviders = useRecoilValue(workspaceAuthProvidersState);
+  const workspaceAuthProviders = useAtomStateValue(workspaceAuthProvidersState);
 
-  const isRequestingCaptchaToken = useRecoilValue(
+  const isRequestingCaptchaToken = useAtomStateValue(
     isRequestingCaptchaTokenState,
   );
 
-  const captcha = useRecoilValue(captchaState);
+  const captcha = useAtomStateValue(captchaState);
 
   const [loadingStatus, setLoadingStatus] = useState<LoadingStatus>(
     LoadingStatus.Loading,
   );
 
   const { form } = useSignInUpForm();
-  const { redirectToSSOLoginPage } = useSSO();
 
   const { signInUpStep, continueWithEmail, continueWithCredentials } =
     useSignInUp(form);
 
-  const setSignInUpStep = useSetRecoilState(signInUpStepState);
+  const setSignInUpStep = useSetAtomState(signInUpStepState);
 
   useEffect(() => {
     if (!workspaceAuthProviders) {
@@ -55,11 +54,7 @@ export const SignInUpWorkspaceScopeFormEffect = () => {
     if (hasOnlySSOProvidersEnabled && workspaceAuthProviders.sso.length > 1) {
       return setSignInUpStep(SignInUpStep.SSOIdentityProviderSelection);
     }
-
-    if (hasOnlySSOProvidersEnabled && workspaceAuthProviders.sso.length === 1) {
-      redirectToSSOLoginPage(workspaceAuthProviders.sso[0].id);
-    }
-  }, [redirectToSSOLoginPage, setSignInUpStep, workspaceAuthProviders]);
+  }, [setSignInUpStep, workspaceAuthProviders]);
 
   useEffect(() => {
     if (loadingStatus === LoadingStatus.Done) {
@@ -90,7 +85,7 @@ export const SignInUpWorkspaceScopeFormEffect = () => {
       signInUpStep === SignInUpStep.Init &&
       !workspaceAuthProviders.google &&
       !workspaceAuthProviders.microsoft &&
-      !workspaceAuthProviders.sso
+      workspaceAuthProviders.sso.length === 0
     ) {
       continueWithEmail();
       return;

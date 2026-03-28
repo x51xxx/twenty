@@ -1,6 +1,7 @@
 import { type CalendarEvent } from '@/activities/calendar/types/CalendarEvent';
 import { useUpsertRecordsInStore } from '@/object-record/record-store/hooks/useUpsertRecordsInStore';
 import { useEffect } from 'react';
+import { isDefined } from 'twenty-shared/utils';
 
 type CalendarEventDetailsEffectProps = {
   record: CalendarEvent;
@@ -9,15 +10,15 @@ type CalendarEventDetailsEffectProps = {
 export const CalendarEventDetailsEffect = ({
   record,
 }: CalendarEventDetailsEffectProps) => {
-  const { upsertRecords } = useUpsertRecordsInStore();
+  const { upsertRecordsInStore } = useUpsertRecordsInStore();
 
   useEffect(() => {
-    if (!record) {
+    if (!isDefined(record)) {
       return;
     }
 
-    upsertRecords([record]);
-  }, [record, upsertRecords]);
+    upsertRecordsInStore({ partialRecords: [record] });
+  }, [record, upsertRecordsInStore]);
 
   return <></>;
 };

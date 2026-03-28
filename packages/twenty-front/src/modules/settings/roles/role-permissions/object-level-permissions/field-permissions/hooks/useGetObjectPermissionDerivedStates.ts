@@ -1,5 +1,5 @@
 import { settingsDraftRoleFamilyState } from '@/settings/roles/states/settingsDraftRoleFamilyState';
-import { useRecoilValue } from 'recoil';
+import { useAtomFamilyStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomFamilyStateValue';
 import { isDefined } from 'twenty-shared/utils';
 
 export const useGetObjectPermissionDerivedStates = ({
@@ -7,8 +7,9 @@ export const useGetObjectPermissionDerivedStates = ({
 }: {
   roleId: string;
 }) => {
-  const settingsDraftRole = useRecoilValue(
-    settingsDraftRoleFamilyState(roleId),
+  const settingsDraftRole = useAtomFamilyStateValue(
+    settingsDraftRoleFamilyState,
+    roleId,
   );
 
   const getObjectPermissionDerivedStates = (objectMetadataItemId: string) => {
@@ -163,6 +164,19 @@ export const useGetObjectPermissionDerivedStates = ({
       ((isThereAnyFieldPermissionThatRevokeRead && canRestrictFieldRead) ||
         (isThereAnyFieldPermissionThatRevokeUpdate && canRestrictFieldUpdate));
 
+    const rowLevelPermissionPredicatesForThisObject =
+      settingsDraftRole.rowLevelPermissionPredicates?.filter(
+        (predicateToFilter) =>
+          predicateToFilter.objectMetadataId === objectMetadataItemId,
+      ) ?? [];
+
+    const isThereAnyRowLevelPermissionPredicateForThisObject =
+      rowLevelPermissionPredicatesForThisObject.length > 0;
+
+    const objectHasNoOverrideButRowLevelPermissionShouldBeTakenIntoAccount =
+      objectHasNoOverrideOnObjectPermission &&
+      isThereAnyRowLevelPermissionPredicateForThisObject;
+
     const objectHasOverrideOnObjectPermissions =
       !objectHasNoOverrideOnObjectPermission;
 
@@ -182,6 +196,7 @@ export const useGetObjectPermissionDerivedStates = ({
       objectHasNoOverrideOnObjectPermission,
       thereAreFieldPermissionsButTheyShouldntBeTakenIntoAccountBecauseObjectPermissionsDontAllowIt,
       objectHasNoOverrideButFieldPermissionsShouldBeTakenIntoAccount,
+      objectHasNoOverrideButRowLevelPermissionShouldBeTakenIntoAccount,
       objectPermissionHasOnlyNullPermissions,
       objectHasOverrideOnObjectPermissions,
     };

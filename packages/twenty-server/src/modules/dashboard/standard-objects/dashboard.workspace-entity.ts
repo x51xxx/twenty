@@ -1,43 +1,26 @@
-import { msg } from '@lingui/core/macro';
-import { FieldMetadataType } from 'twenty-shared/types';
+import { type ActorMetadata, FieldMetadataType } from 'twenty-shared/types';
 
-import { FeatureFlagKey } from 'src/engine/core-modules/feature-flag/enums/feature-flag-key.enum';
 import { BaseWorkspaceEntity } from 'src/engine/twenty-orm/base.workspace-entity';
-import { WorkspaceEntity } from 'src/engine/twenty-orm/decorators/workspace-entity.decorator';
-import { WorkspaceField } from 'src/engine/twenty-orm/decorators/workspace-field.decorator';
-import { WorkspaceGate } from 'src/engine/twenty-orm/decorators/workspace-gate.decorator';
-import { DASHBOARD_STANDARD_FIELD_IDS } from 'src/engine/workspace-manager/workspace-sync-metadata/constants/standard-field-ids';
-import { STANDARD_OBJECT_ICONS } from 'src/engine/workspace-manager/workspace-sync-metadata/constants/standard-object-icons';
-import { STANDARD_OBJECT_IDS } from 'src/engine/workspace-manager/workspace-sync-metadata/constants/standard-object-ids';
+import { type FieldTypeAndNameMetadata } from 'src/engine/workspace-manager/utils/get-ts-vector-column-expression.util';
+import { type EntityRelation } from 'src/engine/workspace-manager/workspace-migration/types/entity-relation.interface';
+import { type AttachmentWorkspaceEntity } from 'src/modules/attachment/standard-objects/attachment.workspace-entity';
+import { type FavoriteWorkspaceEntity } from 'src/modules/favorite/standard-objects/favorite.workspace-entity';
+import { type TimelineActivityWorkspaceEntity } from 'src/modules/timeline/standard-objects/timeline-activity.workspace-entity';
 
-@WorkspaceEntity({
-  standardId: STANDARD_OBJECT_IDS.dashboard,
-  namePlural: 'dashboards',
-  labelSingular: msg`Dashboard`,
-  labelPlural: msg`Dashboards`,
-  description: msg`A dashboard`,
-  icon: STANDARD_OBJECT_ICONS.dashboard,
-  labelIdentifierStandardId: DASHBOARD_STANDARD_FIELD_IDS.title,
-})
-@WorkspaceGate({
-  featureFlag: FeatureFlagKey.IS_PAGE_LAYOUT_ENABLED,
-})
+const TITLE_FIELD_NAME = 'title';
+
+export const SEARCH_FIELDS_FOR_DASHBOARD: FieldTypeAndNameMetadata[] = [
+  { name: TITLE_FIELD_NAME, type: FieldMetadataType.TEXT },
+];
+
 export class DashboardWorkspaceEntity extends BaseWorkspaceEntity {
-  @WorkspaceField({
-    standardId: DASHBOARD_STANDARD_FIELD_IDS.title,
-    type: FieldMetadataType.TEXT,
-    label: msg`Title`,
-    description: msg`Dashboard title`,
-    icon: 'IconNotes',
-  })
-  title: string;
-
-  @WorkspaceField({
-    standardId: DASHBOARD_STANDARD_FIELD_IDS.pageLayoutId,
-    type: FieldMetadataType.UUID,
-    label: msg`Page Layout ID`,
-    description: msg`Dashboard page layout`,
-    icon: 'IconLayout',
-  })
-  pageLayoutId: string;
+  title: string | null;
+  pageLayoutId: string | null;
+  position: number;
+  createdBy: ActorMetadata;
+  updatedBy: ActorMetadata;
+  timelineActivities: EntityRelation<TimelineActivityWorkspaceEntity[]>;
+  favorites: EntityRelation<FavoriteWorkspaceEntity[]>;
+  attachments: EntityRelation<AttachmentWorkspaceEntity[]>;
+  searchVector: string;
 }

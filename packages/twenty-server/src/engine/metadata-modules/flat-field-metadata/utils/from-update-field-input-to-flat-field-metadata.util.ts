@@ -1,159 +1,244 @@
-import { t } from '@lingui/core/macro';
+import { msg } from '@lingui/core/macro';
+import { FieldMetadataType } from 'twenty-shared/types';
 import {
   extractAndSanitizeObjectStringFields,
   isDefined,
 } from 'twenty-shared/utils';
-import { v4 } from 'uuid';
 
-import { FIELD_METADATA_STANDARD_OVERRIDES_PROPERTIES } from 'src/engine/metadata-modules/field-metadata/constants/field-metadata-standard-overrides-properties.constant';
+import { type FlatApplication } from 'src/engine/core-modules/application/types/flat-application.type';
 import { type UpdateFieldInput } from 'src/engine/metadata-modules/field-metadata/dtos/update-field.input';
 import { FieldMetadataExceptionCode } from 'src/engine/metadata-modules/field-metadata/field-metadata.exception';
-import { type FieldMetadataStandardOverridesProperties } from 'src/engine/metadata-modules/field-metadata/types/field-metadata-standard-overrides-properties.type';
-import { FLAT_FIELD_METADATA_PROPERTIES_TO_COMPARE } from 'src/engine/metadata-modules/flat-field-metadata/constants/flat-field-metadata-properties-to-compare.constant';
+import { type AllFlatEntityMaps } from 'src/engine/metadata-modules/flat-entity/types/all-flat-entity-maps.type';
+import { findFlatEntityByIdInFlatEntityMaps } from 'src/engine/metadata-modules/flat-entity/utils/find-flat-entity-by-id-in-flat-entity-maps.util';
 import { type FieldInputTranspilationResult } from 'src/engine/metadata-modules/flat-field-metadata/types/field-input-transpilation-result.type';
-import { type FlatFieldMetadataPropertiesToCompare } from 'src/engine/metadata-modules/flat-field-metadata/types/flat-field-metadata-properties-to-compare.type';
-import { type FlatFieldMetadata } from 'src/engine/metadata-modules/flat-field-metadata/types/flat-field-metadata.type';
-import {} from 'src/engine/metadata-modules/flat-field-metadata/utils/compare-two-flat-field-metadata.util';
-import { type FlatObjectMetadataMaps } from 'src/engine/metadata-modules/flat-object-metadata-maps/types/flat-object-metadata-maps.type';
-import { findFlatFieldMetadataInFlatObjectMetadataMapsWithOnlyFieldId } from 'src/engine/metadata-modules/flat-object-metadata-maps/utils/find-flat-field-metadata-in-flat-object-metadata-maps-with-field-id-only.util';
-import { isStandardMetadata } from 'src/engine/metadata-modules/utils/is-standard-metadata.util';
-
-const fieldMetadataEditableProperties =
-  FLAT_FIELD_METADATA_PROPERTIES_TO_COMPARE.filter(
-    (
-      property,
-    ): property is Exclude<
-      FlatFieldMetadataPropertiesToCompare,
-      'standardOverrides'
-    > => property !== 'standardOverrides',
-  );
+import { type FlatFieldMetadataValidationError } from 'src/engine/metadata-modules/flat-field-metadata/types/flat-field-metadata-validation-error.type';
+import { computeFlatFieldToUpdateAndRelatedFlatFieldToUpdate } from 'src/engine/metadata-modules/flat-field-metadata/utils/compute-flat-field-to-update-and-related-flat-field-to-update.util';
+import { computeFlatFieldToUpdateFromMorphRelationUpdatePayload } from 'src/engine/metadata-modules/flat-field-metadata/utils/compute-flat-field-to-update-from-morph-relation-update-payload.util';
+import {
+  FLAT_FIELD_METADATA_UPDATE_EMPTY_SIDE_EFFECTS,
+  type FlatFieldMetadataUpdateSideEffects,
+  handleFlatFieldMetadataUpdateSideEffect,
+} from 'src/engine/metadata-modules/flat-field-metadata/utils/handle-flat-field-metadata-update-side-effect.util';
+import { isFlatFieldMetadataOfType } from 'src/engine/metadata-modules/flat-field-metadata/utils/is-flat-field-metadata-of-type.util';
+import { type UniversalFlatFieldMetadata } from 'src/engine/workspace-manager/workspace-migration/universal-flat-entity/types/universal-flat-field-metadata.type';
 
 type FromUpdateFieldInputToFlatFieldMetadataArgs = {
-  existingFlatObjectMetadataMaps: FlatObjectMetadataMaps;
   updateFieldInput: UpdateFieldInput;
-};
+  flatApplication: FlatApplication;
+  isSystemBuild: boolean;
+} & Pick<
+  AllFlatEntityMaps,
+  | 'flatObjectMetadataMaps'
+  | 'flatIndexMaps'
+  | 'flatFieldMetadataMaps'
+  | 'flatViewFilterMaps'
+  | 'flatViewGroupMaps'
+  | 'flatViewMaps'
+  | 'flatViewFieldMaps'
+>;
+
+type FlatFieldMetadataAndIndexToUpdate = {
+  flatFieldMetadatasToUpdate: UniversalFlatFieldMetadata[];
+  flatFieldMetadatasToCreate: UniversalFlatFieldMetadata[];
+} & FlatFieldMetadataUpdateSideEffects;
 export const fromUpdateFieldInputToFlatFieldMetadata = ({
-  existingFlatObjectMetadataMaps,
+  flatApplication,
+  flatIndexMaps,
+  flatObjectMetadataMaps: existingFlatObjectMetadataMaps,
+  flatFieldMetadataMaps,
   updateFieldInput: rawUpdateFieldInput,
-}: FromUpdateFieldInputToFlatFieldMetadataArgs): FieldInputTranspilationResult<FlatFieldMetadata> => {
+  flatViewFilterMaps,
+  flatViewGroupMaps,
+  flatViewMaps,
+  flatViewFieldMaps,
+  isSystemBuild,
+}: FromUpdateFieldInputToFlatFieldMetadataArgs): FieldInputTranspilationResult<FlatFieldMetadataAndIndexToUpdate> => {
   const updateFieldInputInformalProperties =
     extractAndSanitizeObjectStringFields(rawUpdateFieldInput, [
       'objectMetadataId',
       'id',
     ]);
-  const updatedEditableFieldProperties = extractAndSanitizeObjectStringFields(
-    rawUpdateFieldInput,
-    fieldMetadataEditableProperties,
-  );
 
-  const relatedFlatFieldMetadata =
-    findFlatFieldMetadataInFlatObjectMetadataMapsWithOnlyFieldId({
-      fieldMetadataId: updateFieldInputInformalProperties.id,
-      flatObjectMetadataMaps: existingFlatObjectMetadataMaps,
+  const existingFlatFieldMetadataToUpdate = findFlatEntityByIdInFlatEntityMaps({
+    flatEntityId: updateFieldInputInformalProperties.id,
+    flatEntityMaps: flatFieldMetadataMaps,
+  });
+
+  if (!isDefined(existingFlatFieldMetadataToUpdate)) {
+    return {
+      status: 'fail',
+      errors: [
+        {
+          code: FieldMetadataExceptionCode.FIELD_METADATA_NOT_FOUND,
+          message: 'Field metadata to update not found',
+          userFriendlyMessage: msg`Field metadata to update not found`,
+        },
+      ],
+    };
+  }
+
+  const flatObjectMetadata = findFlatEntityByIdInFlatEntityMaps({
+    flatEntityId: existingFlatFieldMetadataToUpdate.objectMetadataId,
+    flatEntityMaps: existingFlatObjectMetadataMaps,
+  });
+
+  if (!isDefined(flatObjectMetadata)) {
+    return {
+      status: 'fail',
+      errors: [
+        {
+          code: FieldMetadataExceptionCode.OBJECT_METADATA_NOT_FOUND,
+          message: 'Field to update object metadata not found',
+          userFriendlyMessage: msg`Field to update object metadata not found`,
+        },
+      ],
+    };
+  }
+
+  const { flatFieldMetadataFromTo, relatedFlatFieldMetadatasFromTo } =
+    computeFlatFieldToUpdateAndRelatedFlatFieldToUpdate({
+      flatFieldMetadataMaps,
+      flatObjectMetadata,
+      fromFlatFieldMetadata: existingFlatFieldMetadataToUpdate,
+      rawUpdateFieldInput,
+      isSystemBuild,
     });
 
-  if (!isDefined(relatedFlatFieldMetadata)) {
-    return {
-      status: 'fail',
-      error: {
-        code: FieldMetadataExceptionCode.FIELD_METADATA_NOT_FOUND,
-        message: 'Field metadata to update not found',
-        userFriendlyMessage: t`Field metadata to update not found`,
-      },
-    };
-  }
+  const { flatFieldMetadatasToCreate, flatIndexMetadatasToCreate } =
+    isFlatFieldMetadataOfType(
+      flatFieldMetadataFromTo.toFlatFieldMetadata,
+      FieldMetadataType.MORPH_RELATION,
+    )
+      ? computeFlatFieldToUpdateFromMorphRelationUpdatePayload({
+          flatApplication,
+          morphRelationsUpdatePayload:
+            rawUpdateFieldInput?.morphRelationsUpdatePayload,
+          flatFieldMetadataMaps: flatFieldMetadataMaps,
+          fieldMetadataToUpdate: flatFieldMetadataFromTo.toFlatFieldMetadata,
+          flatObjectMetadataMaps: existingFlatObjectMetadataMaps,
+        })
+      : {
+          flatFieldMetadatasToCreate: [],
+          flatIndexMetadatasToCreate: [],
+        };
 
-  const flatObjectMetadataWithFlatFieldMaps =
-    existingFlatObjectMetadataMaps.byId[
-      relatedFlatFieldMetadata.objectMetadataId
-    ];
+  const initialAccumulator: FlatFieldMetadataAndIndexToUpdate & {
+    errors: FlatFieldMetadataValidationError[];
+  } = {
+    ...structuredClone(FLAT_FIELD_METADATA_UPDATE_EMPTY_SIDE_EFFECTS),
+    flatFieldMetadatasToUpdate: [],
+    flatFieldMetadatasToCreate: flatFieldMetadatasToCreate,
+    flatIndexMetadatasToCreate: flatIndexMetadatasToCreate,
+    errors: [],
+  };
 
-  if (!isDefined(flatObjectMetadataWithFlatFieldMaps)) {
-    return {
-      status: 'fail',
-      error: {
-        code: FieldMetadataExceptionCode.FIELD_METADATA_NOT_FOUND,
-        message: 'Field metadata to update object metadata not found',
-        userFriendlyMessage: t`Field metadata to update object metadata not found`,
-      },
-    };
-  }
+  const { errors: sideEffectErrors, ...sideEffectFlatEntityOperations } = [
+    flatFieldMetadataFromTo,
+    ...relatedFlatFieldMetadatasFromTo,
+  ].reduce<
+    FlatFieldMetadataAndIndexToUpdate & {
+      errors: FlatFieldMetadataValidationError[];
+    }
+  >((accumulator, { fromFlatFieldMetadata, toFlatFieldMetadata }) => {
+    const sideEffectResult = handleFlatFieldMetadataUpdateSideEffect({
+      flatViewFilterMaps,
+      flatViewGroupMaps,
+      flatObjectMetadataMaps: existingFlatObjectMetadataMaps,
+      fromFlatFieldMetadata,
+      flatFieldMetadataMaps,
+      flatIndexMaps,
+      toFlatFieldMetadata,
+      flatViewMaps,
+      flatViewFieldMaps,
+      flatApplication,
+    });
 
-  if (flatObjectMetadataWithFlatFieldMaps.isRemote) {
-    return {
-      status: 'fail',
-      error: {
-        code: FieldMetadataExceptionCode.FIELD_MUTATION_NOT_ALLOWED,
-        message: 'Remote objects are read-only',
-      },
-    };
-  }
-
-  if (isStandardMetadata(relatedFlatFieldMetadata)) {
-    const invalidUpdatedProperties = Object.keys(
-      updatedEditableFieldProperties,
-    ).filter((property) =>
-      FIELD_METADATA_STANDARD_OVERRIDES_PROPERTIES.includes(
-        property as FieldMetadataStandardOverridesProperties,
-      ),
-    );
-
-    if (invalidUpdatedProperties.length > 0) {
-      const invalidProperties = invalidUpdatedProperties.join(', ');
-
+    if (sideEffectResult.status === 'fail') {
       return {
-        status: 'fail',
-        error: {
-          code: FieldMetadataExceptionCode.INVALID_FIELD_INPUT,
-          message: `Cannot update standard field metadata properties: ${invalidProperties}`,
-          userFriendlyMessage: t`Cannot update standard field properties: ${invalidProperties}`,
-        },
+        ...accumulator,
+        errors: [...accumulator.errors, ...sideEffectResult.errors],
       };
     }
 
-    const updatedStandardFlatFieldMetadata =
-      FIELD_METADATA_STANDARD_OVERRIDES_PROPERTIES.reduce((acc, property) => {
-        const isPropertyUpdated =
-          updatedEditableFieldProperties[property] !== undefined;
-
-        return {
-          ...acc,
-          standardOverrides: {
-            ...acc.standardOverrides,
-            ...(isPropertyUpdated
-              ? { [property]: updatedEditableFieldProperties[property] }
-              : {}),
-          },
-        };
-      }, relatedFlatFieldMetadata);
+    const {
+      flatViewGroupsToCreate,
+      flatViewGroupsToDelete,
+      flatViewGroupsToUpdate,
+      flatIndexMetadatasToUpdate,
+      flatViewFiltersToDelete,
+      flatViewFiltersToUpdate,
+      flatIndexMetadatasToCreate,
+      flatIndexMetadatasToDelete,
+      flatViewsToDelete,
+      flatViewFieldsToDelete,
+      flatViewsToUpdate,
+      flatFieldMetadatasToUpdate: flatFieldMetadatasToUpdateFromSideEffect,
+    } = sideEffectResult.result;
 
     return {
-      status: 'success',
-      result: updatedStandardFlatFieldMetadata,
+      flatFieldMetadatasToUpdate: [
+        ...accumulator.flatFieldMetadatasToUpdate,
+        toFlatFieldMetadata,
+        ...flatFieldMetadatasToUpdateFromSideEffect,
+      ],
+      flatIndexMetadatasToUpdate: [
+        ...accumulator.flatIndexMetadatasToUpdate,
+        ...flatIndexMetadatasToUpdate,
+      ],
+      flatFieldMetadatasToCreate: [...accumulator.flatFieldMetadatasToCreate],
+      flatViewFiltersToDelete: [
+        ...accumulator.flatViewFiltersToDelete,
+        ...flatViewFiltersToDelete,
+      ],
+      flatViewFiltersToUpdate: [
+        ...accumulator.flatViewFiltersToUpdate,
+        ...flatViewFiltersToUpdate,
+      ],
+      flatViewGroupsToCreate: [
+        ...accumulator.flatViewGroupsToCreate,
+        ...flatViewGroupsToCreate,
+      ],
+      flatViewGroupsToDelete: [
+        ...accumulator.flatViewGroupsToDelete,
+        ...flatViewGroupsToDelete,
+      ],
+      flatViewGroupsToUpdate: [
+        ...accumulator.flatViewGroupsToUpdate,
+        ...flatViewGroupsToUpdate,
+      ],
+      flatIndexMetadatasToDelete: [
+        ...accumulator.flatIndexMetadatasToDelete,
+        ...flatIndexMetadatasToDelete,
+      ],
+      flatIndexMetadatasToCreate: [
+        ...accumulator.flatIndexMetadatasToCreate,
+        ...flatIndexMetadatasToCreate,
+      ],
+      flatViewsToDelete: [
+        ...accumulator.flatViewsToDelete,
+        ...flatViewsToDelete,
+      ],
+      flatViewFieldsToDelete: [
+        ...accumulator.flatViewFieldsToDelete,
+        ...flatViewFieldsToDelete,
+      ],
+      flatViewsToUpdate: [
+        ...accumulator.flatViewsToUpdate,
+        ...flatViewsToUpdate,
+      ],
+      errors: accumulator.errors,
+    };
+  }, initialAccumulator);
+
+  if (sideEffectErrors.length > 0) {
+    return {
+      status: 'fail',
+      errors: sideEffectErrors,
     };
   }
 
-  const updatedFlatFieldMetadata = fieldMetadataEditableProperties.reduce(
-    (acc, property) => {
-      let newValue = updatedEditableFieldProperties[property];
-
-      if (property === 'options' && isDefined(newValue)) {
-        newValue = updatedEditableFieldProperties[property]?.map((option) => ({
-          id: v4(),
-          ...option,
-        }));
-      }
-
-      return {
-        ...acc,
-        ...(newValue !== undefined ? { [property]: newValue } : {}),
-      };
-    },
-    relatedFlatFieldMetadata,
-  );
-
   return {
     status: 'success',
-    result: updatedFlatFieldMetadata,
+    result: sideEffectFlatEntityOperations,
   };
 };

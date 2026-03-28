@@ -1,30 +1,29 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useRegisterInputEvents } from '@/object-record/record-field/ui/meta-types/input/hooks/useRegisterInputEvents';
+import { DatePicker } from '@/ui/input/components/internal/date/components/DatePicker';
 import {
-  DateTimePicker,
   MONTH_AND_YEAR_DROPDOWN_MONTH_SELECT_ID,
   MONTH_AND_YEAR_DROPDOWN_YEAR_SELECT_ID,
-} from '@/ui/input/components/internal/date/components/InternalDatePicker';
+} from '@/ui/input/components/internal/date/components/DateTimePicker';
 import { useCloseDropdown } from '@/ui/layout/dropdown/hooks/useCloseDropdown';
 import { currentFocusIdSelector } from '@/ui/utilities/focus/states/currentFocusIdSelector';
-import { useRecoilCallback } from 'recoil';
+import { useStore } from 'jotai';
 import { type Nullable } from 'twenty-ui/utilities';
 
 export type DateInputProps = {
   instanceId: string;
-  value: Nullable<Date>;
-  onEnter: (newDate: Nullable<Date>) => void;
-  onEscape: (newDate: Nullable<Date>) => void;
+  value: Nullable<string>;
+  onEnter: (newDate: Nullable<string>) => void;
+  onEscape: (newDate: Nullable<string>) => void;
   onClickOutside: (
     event: MouseEvent | TouchEvent,
-    newDate: Nullable<Date>,
+    newDate: Nullable<string>,
   ) => void;
   clearable?: boolean;
-  onChange?: (newDate: Nullable<Date>) => void;
-  isDateTimeInput?: boolean;
+  onChange?: (newDate: Nullable<string>) => void;
   onClear?: () => void;
-  onSubmit?: (newDate: Nullable<Date>) => void;
+  onSubmit?: (newDate: Nullable<string>) => void;
   hideHeaderInput?: boolean;
 };
 
@@ -36,16 +35,17 @@ export const DateInput = ({
   onClickOutside,
   clearable,
   onChange,
-  isDateTimeInput,
   onClear,
   onSubmit,
   hideHeaderInput,
 }: DateInputProps) => {
+  const store = useStore();
+
   const [internalValue, setInternalValue] = useState(value);
 
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  const handleChange = (newDate: Date | null) => {
+  const handleChange = (newDate: string | null) => {
     setInternalValue(newDate);
     onChange?.(newDate);
   };
@@ -55,7 +55,7 @@ export const DateInput = ({
     onClear?.();
   };
 
-  const handleClose = (newDate: Date | null) => {
+  const handleClose = (newDate: string | null) => {
     setInternalValue(newDate);
     onSubmit?.(newDate);
   };
@@ -77,25 +77,23 @@ export const DateInput = ({
     onEscape(internalValue);
   };
 
-  const handleClickOutside = useRecoilCallback(
-    ({ snapshot }) =>
-      (event: MouseEvent | TouchEvent) => {
-        const currentFocusId = snapshot
-          .getLoadable(currentFocusIdSelector)
-          .getValue();
+  const handleClickOutside = useCallback(
+    (event: MouseEvent | TouchEvent) => {
+      const currentFocusId = store.get(currentFocusIdSelector.atom);
 
-        if (currentFocusId === instanceId) {
-          closeDropdownYearSelect(MONTH_AND_YEAR_DROPDOWN_YEAR_SELECT_ID);
-          closeDropdownMonthSelect(MONTH_AND_YEAR_DROPDOWN_MONTH_SELECT_ID);
-          onClickOutside(event, internalValue);
-        }
-      },
+      if (currentFocusId === instanceId) {
+        closeDropdownYearSelect(MONTH_AND_YEAR_DROPDOWN_YEAR_SELECT_ID);
+        closeDropdownMonthSelect(MONTH_AND_YEAR_DROPDOWN_MONTH_SELECT_ID);
+        onClickOutside(event, internalValue);
+      }
+    },
     [
       instanceId,
       closeDropdownYearSelect,
       closeDropdownMonthSelect,
       onClickOutside,
       internalValue,
+      store,
     ],
   );
 
@@ -110,8 +108,9 @@ export const DateInput = ({
 
   return (
     <div ref={wrapperRef}>
-      <DateTimePicker
-        date={internalValue ?? null}
+      <DatePicker
+        instanceId={instanceId}
+        plainDateString={internalValue ?? null}
         onChange={handleChange}
         onClose={handleClose}
         clearable={clearable ?? false}
@@ -119,7 +118,6 @@ export const DateInput = ({
         onEscape={onEscape}
         onClear={handleClear}
         hideHeaderInput={hideHeaderInput}
-        isDateTimeInput={isDateTimeInput}
       />
     </div>
   );

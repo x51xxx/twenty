@@ -1,10 +1,14 @@
 import { type FieldMetadataItem } from '@/object-metadata/types/FieldMetadataItem';
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
-import { type RecordGqlOperationOrderBy } from '@/object-record/graphql/types/RecordGqlOperationOrderBy';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
+import { type RecordGqlOperationOrderBy } from 'twenty-shared/types';
 import { turnSortsIntoOrderBy } from '@/object-record/object-sort-dropdown/utils/turnSortsIntoOrderBy';
 import { type RecordSort } from '@/object-record/record-sort/types/RecordSort';
 import { type EachTestingContext } from 'twenty-shared/testing';
-import { FieldMetadataType } from '~/generated-metadata/graphql';
+import {
+  FieldMetadataType,
+  RelationType,
+  ViewSortDirection,
+} from '~/generated-metadata/graphql';
 
 const fields = [
   {
@@ -12,13 +16,15 @@ const fields = [
     updatedAt: '2021-01-01',
     createdAt: '2021-01-01',
     id: '20202020-18b3-4099-86e3-c46b2d5d42f2',
+    universalIdentifier: '20202020-18b3-4099-86e3-c46b2d5d42f2',
     type: FieldMetadataType.POSITION,
     label: 'label',
   },
 ];
 
-const objectMetadataItemWithPositionField: ObjectMetadataItem = {
+const objectMetadataItemWithPositionField: EnrichedObjectMetadataItem = {
   id: 'object1',
+  universalIdentifier: 'object1',
   fields,
   readableFields: fields,
   updatableFields: fields,
@@ -46,6 +52,7 @@ const getMockFieldMetadataItem = (
   overrides: PartialFieldMetadaItemWithRequiredId,
 ): FieldMetadataItem => ({
   name: 'name',
+  universalIdentifier: overrides.id,
   updatedAt: '2021-01-01',
   createdAt: '2021-01-01',
   type: FieldMetadataType.TEXT,
@@ -57,7 +64,9 @@ type TurnSortsIntoOrderTestContext = EachTestingContext<{
   fields: PartialFieldMetadaItemWithRequiredId[];
   expected: RecordGqlOperationOrderBy;
   sort: RecordSort[];
-  objectMetadataItemOverrides?: Partial<Omit<ObjectMetadataItem, 'fields'>>;
+  objectMetadataItemOverrides?: Partial<
+    Omit<EnrichedObjectMetadataItem, 'fields'>
+  >;
 }>;
 
 const turnSortsIntoOrderByTestUseCases: TurnSortsIntoOrderTestContext[] = [
@@ -81,7 +90,7 @@ const turnSortsIntoOrderByTestUseCases: TurnSortsIntoOrderTestContext[] = [
         {
           id: 'id',
           fieldMetadataId: 'field1',
-          direction: 'asc',
+          direction: ViewSortDirection.ASC,
         },
       ],
       expected: [{ field1: 'AscNullsFirst' }, { position: 'AscNullsFirst' }],
@@ -98,12 +107,12 @@ const turnSortsIntoOrderByTestUseCases: TurnSortsIntoOrderTestContext[] = [
         {
           id: 'id',
           fieldMetadataId: 'field1',
-          direction: 'asc',
+          direction: ViewSortDirection.ASC,
         },
         {
           id: 'id',
           fieldMetadataId: 'field2',
-          direction: 'desc',
+          direction: ViewSortDirection.DESC,
         },
       ],
       expected: [
@@ -121,7 +130,7 @@ const turnSortsIntoOrderByTestUseCases: TurnSortsIntoOrderTestContext[] = [
         {
           id: 'id',
           fieldMetadataId: 'invalidField',
-          direction: 'asc',
+          direction: ViewSortDirection.ASC,
         },
       ],
       expected: [{ position: 'AscNullsFirst' }],
@@ -135,7 +144,7 @@ const turnSortsIntoOrderByTestUseCases: TurnSortsIntoOrderTestContext[] = [
         {
           id: 'id',
           fieldMetadataId: 'invalidField',
-          direction: 'asc',
+          direction: ViewSortDirection.ASC,
         },
       ],
       expected: [],
@@ -162,4 +171,149 @@ describe('turnSortsIntoOrderBy', () => {
       ).toEqual(expected);
     },
   );
+
+  describe('relation field sorting', () => {
+    const companyObjectMetadataItem: EnrichedObjectMetadataItem = {
+      id: 'company-object-id',
+      universalIdentifier: 'company-object-id',
+      fields: [
+        {
+          id: 'company-name-field-id',
+          universalIdentifier: 'company-name-field-id',
+          name: 'name',
+          type: FieldMetadataType.TEXT,
+          label: 'Name',
+          createdAt: '2021-01-01',
+          updatedAt: '2021-01-01',
+          isActive: true,
+        } as FieldMetadataItem,
+      ],
+      readableFields: [],
+      updatableFields: [],
+      indexMetadatas: [],
+      createdAt: '2021-01-01',
+      updatedAt: '2021-01-01',
+      nameSingular: 'company',
+      namePlural: 'companies',
+      labelIdentifierFieldMetadataId: 'company-name-field-id',
+      icon: 'IconBuildingSkyscraper',
+      isActive: true,
+      isSystem: false,
+      isUIReadOnly: false,
+      isCustom: false,
+      isRemote: false,
+      isSearchable: false,
+      labelPlural: 'Companies',
+      labelSingular: 'Company',
+      isLabelSyncedWithName: true,
+    };
+
+    const personObjectMetadataItem: EnrichedObjectMetadataItem = {
+      id: 'person-object-id',
+      universalIdentifier: 'person-object-id',
+      fields: [
+        {
+          id: 'company-relation-field-id',
+          universalIdentifier: 'company-relation-field-id',
+          name: 'company',
+          type: FieldMetadataType.RELATION,
+          label: 'Company',
+          createdAt: '2021-01-01',
+          updatedAt: '2021-01-01',
+          isActive: true,
+          relation: {
+            type: RelationType.MANY_TO_ONE,
+            targetObjectMetadata: {
+              nameSingular: 'company',
+            },
+          },
+        } as unknown as FieldMetadataItem,
+        {
+          id: 'position-field-id',
+          universalIdentifier: 'position-field-id',
+          name: 'position',
+          type: FieldMetadataType.POSITION,
+          label: 'Position',
+          createdAt: '2021-01-01',
+          updatedAt: '2021-01-01',
+        } as FieldMetadataItem,
+      ],
+      readableFields: [],
+      updatableFields: [],
+      indexMetadatas: [],
+      createdAt: '2021-01-01',
+      updatedAt: '2021-01-01',
+      nameSingular: 'person',
+      namePlural: 'people',
+      labelIdentifierFieldMetadataId: 'person-name-field-id',
+      icon: 'IconUser',
+      isActive: true,
+      isSystem: false,
+      isUIReadOnly: false,
+      isCustom: false,
+      isRemote: false,
+      isSearchable: false,
+      labelPlural: 'People',
+      labelSingular: 'Person',
+      isLabelSyncedWithName: true,
+    };
+
+    it('should sort by relation field using label identifier', () => {
+      const sorts: RecordSort[] = [
+        {
+          id: 'sort-1',
+          fieldMetadataId: 'company-relation-field-id',
+          direction: ViewSortDirection.ASC,
+        },
+      ];
+
+      const result = turnSortsIntoOrderBy(personObjectMetadataItem, sorts, [
+        companyObjectMetadataItem,
+      ]);
+
+      // Should produce nested structure for GraphQL: { company: { name: 'AscNullsFirst' } }
+      expect(result).toEqual([
+        { company: { name: 'AscNullsFirst' } },
+        { position: 'AscNullsFirst' },
+      ]);
+    });
+
+    it('should sort by relation field descending', () => {
+      const sorts: RecordSort[] = [
+        {
+          id: 'sort-1',
+          fieldMetadataId: 'company-relation-field-id',
+          direction: ViewSortDirection.DESC,
+        },
+      ];
+
+      const result = turnSortsIntoOrderBy(personObjectMetadataItem, sorts, [
+        companyObjectMetadataItem,
+      ]);
+
+      // Should produce nested structure for GraphQL: { company: { name: 'DescNullsLast' } }
+      expect(result).toEqual([
+        { company: { name: 'DescNullsLast' } },
+        { position: 'AscNullsFirst' },
+      ]);
+    });
+
+    it('should fallback to FK when related object not found', () => {
+      const sorts: RecordSort[] = [
+        {
+          id: 'sort-1',
+          fieldMetadataId: 'company-relation-field-id',
+          direction: ViewSortDirection.ASC,
+        },
+      ];
+
+      // Pass empty objectMetadataItems array - related object not found
+      const result = turnSortsIntoOrderBy(personObjectMetadataItem, sorts, []);
+
+      expect(result).toEqual([
+        { companyId: 'AscNullsFirst' },
+        { position: 'AscNullsFirst' },
+      ]);
+    });
+  });
 });

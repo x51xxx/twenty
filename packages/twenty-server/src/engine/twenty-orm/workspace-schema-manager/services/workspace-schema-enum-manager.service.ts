@@ -6,10 +6,12 @@ import {
 } from 'src/engine/twenty-orm/workspace-schema-manager/exceptions/workspace-schema-manager.exception';
 import { type WorkspaceSchemaColumnDefinition } from 'src/engine/twenty-orm/workspace-schema-manager/types/workspace-schema-column-definition.type';
 import { buildSqlColumnDefinition } from 'src/engine/twenty-orm/workspace-schema-manager/utils/build-sql-column-definition.util';
-import { computePostgresEnumName } from 'src/engine/workspace-manager/workspace-migration-runner/utils/compute-postgres-enum-name.util';
-import { removeSqlDDLInjection } from 'src/engine/workspace-manager/workspace-migration-runner/utils/remove-sql-injection.util';
+import { computePostgresEnumName } from 'src/engine/workspace-manager/workspace-migration/utils/compute-postgres-enum-name.util';
+import {
+  escapeIdentifier,
+  escapeLiteral,
+} from 'src/engine/workspace-manager/workspace-migration/utils/remove-sql-injection.util';
 
-// TODO: upstream does not guarantee transactionality, implement IF EXISTS or equivalent for idempotency
 export class WorkspaceSchemaEnumManagerService {
   async createEnum({
     queryRunner,
@@ -30,13 +32,10 @@ export class WorkspaceSchemaEnumManagerService {
     }
 
     const sanitizedValues = values
-      .map((value) => removeSqlDDLInjection(value.toString()))
-      .map((value) => `'${value}'`)
+      .map((value) => escapeLiteral(value.toString()))
       .join(', ');
 
-    const safeSchemaName = removeSqlDDLInjection(schemaName);
-    const safeEnumName = removeSqlDDLInjection(enumName);
-    const sql = `CREATE TYPE "${safeSchemaName}"."${safeEnumName}" AS ENUM (${sanitizedValues})`;
+    const sql = `CREATE TYPE ${escapeIdentifier(schemaName)}.${escapeIdentifier(enumName)} AS ENUM (${sanitizedValues})`;
 
     await queryRunner.query(sql);
   }
@@ -50,9 +49,7 @@ export class WorkspaceSchemaEnumManagerService {
     schemaName: string;
     enumName: string;
   }): Promise<void> {
-    const safeSchemaName = removeSqlDDLInjection(schemaName);
-    const safeEnumName = removeSqlDDLInjection(enumName);
-    const sql = `DROP TYPE IF EXISTS "${safeSchemaName}"."${safeEnumName}"`;
+    const sql = `DROP TYPE IF EXISTS ${escapeIdentifier(schemaName)}.${escapeIdentifier(enumName)}`;
 
     await queryRunner.query(sql);
   }
@@ -68,10 +65,7 @@ export class WorkspaceSchemaEnumManagerService {
     oldEnumName: string;
     newEnumName: string;
   }): Promise<void> {
-    const safeSchemaName = removeSqlDDLInjection(schemaName);
-    const safeOldEnumName = removeSqlDDLInjection(oldEnumName);
-    const safeNewEnumName = removeSqlDDLInjection(newEnumName);
-    const sql = `ALTER TYPE "${safeSchemaName}"."${safeOldEnumName}" RENAME TO "${safeNewEnumName}"`;
+    const sql = `ALTER TYPE ${escapeIdentifier(schemaName)}.${escapeIdentifier(oldEnumName)} RENAME TO ${escapeIdentifier(newEnumName)}`;
 
     await queryRunner.query(sql);
   }
@@ -91,19 +85,12 @@ export class WorkspaceSchemaEnumManagerService {
     beforeValue?: string;
     afterValue?: string;
   }): Promise<void> {
-    const sanitizedValue = removeSqlDDLInjection(value);
-    const safeSchemaName = removeSqlDDLInjection(schemaName);
-    const safeEnumName = removeSqlDDLInjection(enumName);
-    let sql = `ALTER TYPE "${safeSchemaName}"."${safeEnumName}" ADD VALUE '${sanitizedValue}'`;
+    let sql = `ALTER TYPE ${escapeIdentifier(schemaName)}.${escapeIdentifier(enumName)} ADD VALUE ${escapeLiteral(value)}`;
 
     if (beforeValue) {
-      const sanitizedBeforeValue = removeSqlDDLInjection(beforeValue);
-
-      sql += ` BEFORE '${sanitizedBeforeValue}'`;
+      sql += ` BEFORE ${escapeLiteral(beforeValue)}`;
     } else if (afterValue) {
-      const sanitizedAfterValue = removeSqlDDLInjection(afterValue);
-
-      sql += ` AFTER '${sanitizedAfterValue}'`;
+      sql += ` AFTER ${escapeLiteral(afterValue)}`;
     }
 
     await queryRunner.query(sql);
@@ -122,16 +109,11 @@ export class WorkspaceSchemaEnumManagerService {
     oldValue: string;
     newValue: string;
   }): Promise<void> {
-    const sanitizedOldValue = removeSqlDDLInjection(oldValue);
-    const sanitizedNewValue = removeSqlDDLInjection(newValue);
-    const safeSchemaName = removeSqlDDLInjection(schemaName);
-    const safeEnumName = removeSqlDDLInjection(enumName);
-    const sql = `ALTER TYPE "${safeSchemaName}"."${safeEnumName}" RENAME VALUE '${sanitizedOldValue}' TO '${sanitizedNewValue}'`;
+    const sql = `ALTER TYPE ${escapeIdentifier(schemaName)}.${escapeIdentifier(enumName)} RENAME VALUE ${escapeLiteral(oldValue)} TO ${escapeLiteral(newValue)}`;
 
     await queryRunner.query(sql);
   }
 
-  // TODO: optimize this to not create a temp enum and column if not necessary (e.g. using ADD VALUE)
   async alterEnumValues({
     queryRunner,
     schemaName,
@@ -213,6 +195,8 @@ export class WorkspaceSchemaEnumManagerService {
           oldColumnName,
           newColumnName: columnName,
           oldToNewEnumOptionMap,
+          columnDefinition,
+          oldEnumTypeName: oldEnumName,
         });
       }
 
@@ -229,7 +213,12 @@ export class WorkspaceSchemaEnumManagerService {
       }
     } catch (error) {
       if (!isTransactionAlreadyActive) {
-        await queryRunner.rollbackTransaction();
+        try {
+          await queryRunner.rollbackTransaction();
+        } catch (error) {
+          // oxlint-disable-next-line no-console
+          console.trace(`Failed to rollback transaction: ${error.message}`);
+        }
       }
       throw error;
     }
@@ -248,11 +237,7 @@ export class WorkspaceSchemaEnumManagerService {
     oldColumnName: string;
     newColumnName: string;
   }): Promise<void> {
-    const safeSchemaName = removeSqlDDLInjection(schemaName);
-    const safeTableName = removeSqlDDLInjection(tableName);
-    const safeOldColumnName = removeSqlDDLInjection(oldColumnName);
-    const safeNewColumnName = removeSqlDDLInjection(newColumnName);
-    const sql = `ALTER TABLE "${safeSchemaName}"."${safeTableName}" RENAME COLUMN "${safeOldColumnName}" TO "${safeNewColumnName}"`;
+    const sql = `ALTER TABLE ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)} RENAME COLUMN ${escapeIdentifier(oldColumnName)} TO ${escapeIdentifier(newColumnName)}`;
 
     await queryRunner.query(sql);
   }
@@ -270,15 +255,12 @@ export class WorkspaceSchemaEnumManagerService {
     columnDefinition: WorkspaceSchemaColumnDefinition;
     enumTypeName: string;
   }): Promise<void> {
-    const safeSchemaName = removeSqlDDLInjection(schemaName);
-    const safeTableName = removeSqlDDLInjection(tableName);
-
     const columnDef = buildSqlColumnDefinition({
       ...columnDefinition,
-      type: `"${safeSchemaName}"."${enumTypeName}"`,
+      type: `${escapeIdentifier(schemaName)}.${escapeIdentifier(enumTypeName)}`,
     });
 
-    const sql = `ALTER TABLE "${safeSchemaName}"."${safeTableName}" ADD COLUMN ${columnDef}`;
+    const sql = `ALTER TABLE ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)} ADD COLUMN ${columnDef}`;
 
     await queryRunner.query(sql);
   }
@@ -294,15 +276,11 @@ export class WorkspaceSchemaEnumManagerService {
     tableName: string;
     columnName: string;
   }): Promise<void> {
-    const safeSchemaName = removeSqlDDLInjection(schemaName);
-    const safeTableName = removeSqlDDLInjection(tableName);
-    const safeColumnName = removeSqlDDLInjection(columnName);
-    const sql = `ALTER TABLE "${safeSchemaName}"."${safeTableName}" DROP COLUMN "${safeColumnName}"`;
+    const sql = `ALTER TABLE ${escapeIdentifier(schemaName)}.${escapeIdentifier(tableName)} DROP COLUMN ${escapeIdentifier(columnName)}`;
 
     await queryRunner.query(sql);
   }
 
-  // TODO: explore USING clause to avoid the need for this function
   private async migrateEnumData({
     queryRunner,
     schemaName,
@@ -310,49 +288,116 @@ export class WorkspaceSchemaEnumManagerService {
     oldColumnName,
     newColumnName,
     oldToNewEnumOptionMap,
+    columnDefinition,
+    oldEnumTypeName,
   }: {
     queryRunner: QueryRunner;
     schemaName: string;
     tableName: string;
     oldColumnName: string;
     newColumnName: string;
+    oldEnumTypeName: string;
     oldToNewEnumOptionMap: Record<string, string>;
+    columnDefinition: WorkspaceSchemaColumnDefinition;
   }): Promise<void> {
-    const safeSchemaName = removeSqlDDLInjection(schemaName);
-    const safeTableName = removeSqlDDLInjection(tableName);
-    const safeOldColumnName = removeSqlDDLInjection(oldColumnName);
-    const safeNewColumnName = removeSqlDDLInjection(newColumnName);
-
     const newEnumTypeName = computePostgresEnumName({
       tableName,
       columnName: newColumnName,
     });
 
-    if (Object.keys(oldToNewEnumOptionMap).length === 0) {
-      return;
-    }
+    const escapedSchema = escapeIdentifier(schemaName);
+    const escapedTable = escapeIdentifier(tableName);
+    const escapedOldColumn = escapeIdentifier(oldColumnName);
+    const escapedNewColumn = escapeIdentifier(newColumnName);
+    const escapedNewEnumType = `${escapedSchema}.${escapeIdentifier(newEnumTypeName)}`;
 
     const caseStatements = Object.entries(oldToNewEnumOptionMap)
       .map(
         ([oldEnumOption, newEnumOption]) =>
-          `WHEN '${removeSqlDDLInjection(oldEnumOption)}' THEN '${removeSqlDDLInjection(newEnumOption)}'::"${safeSchemaName}"."${newEnumTypeName}"`,
+          `WHEN ${escapeLiteral(oldEnumOption)} THEN ${escapeLiteral(newEnumOption)}::${escapedNewEnumType}`,
       )
       .join(' ');
-
     const mappedValuesCondition = Object.keys(oldToNewEnumOptionMap)
-      .map((oldValue) => `'${removeSqlDDLInjection(oldValue)}'`)
+      .map((oldValue) => escapeLiteral(oldValue))
       .join(', ');
 
-    // Update rows with mapped enum values
-    const updateMappedSql = `
-        UPDATE "${safeSchemaName}"."${safeTableName}" 
-        SET "${safeNewColumnName}" = 
-          CASE "${safeOldColumnName}"::text 
-            ${caseStatements}
-          END
-        WHERE "${safeOldColumnName}" IS NOT NULL 
-          AND "${safeOldColumnName}"::text IN (${mappedValuesCondition})`;
+    const sqlQuery = columnDefinition.isArray
+      ? this.updateArrayEnum({
+          escapedSchema,
+          escapedTable,
+          escapedOldColumn,
+          escapedNewColumn,
+          escapedOldEnumType: `${escapedSchema}.${escapeIdentifier(oldEnumTypeName)}`,
+          caseStatements,
+          mappedValuesCondition,
+        })
+      : this.updateAtomicEnum({
+          escapedSchema,
+          escapedTable,
+          escapedOldColumn,
+          escapedNewColumn,
+          caseStatements,
+          mappedValuesCondition,
+        });
 
-    await queryRunner.query(updateMappedSql);
+    await queryRunner.query(sqlQuery);
+  }
+
+  private updateArrayEnum({
+    escapedNewColumn,
+    escapedOldColumn,
+    escapedSchema,
+    escapedTable,
+    escapedOldEnumType,
+    caseStatements,
+    mappedValuesCondition,
+  }: {
+    escapedSchema: string;
+    escapedTable: string;
+    escapedOldColumn: string;
+    escapedNewColumn: string;
+    escapedOldEnumType: string;
+    caseStatements: string;
+    mappedValuesCondition: string;
+  }) {
+    return `
+          UPDATE ${escapedSchema}.${escapedTable}
+          SET ${escapedNewColumn} = (
+            SELECT array_agg(mapped_value) FILTER (WHERE mapped_value IS NOT NULL)
+            FROM (
+              SELECT
+                CASE unnest_value::text
+                  ${caseStatements}
+                END AS mapped_value
+              FROM unnest(${escapedOldColumn}) AS unnest_value
+            ) enum_mapping
+          )
+          WHERE ${escapedOldColumn} IS NOT NULL
+            AND ${escapedOldColumn} && ARRAY[${mappedValuesCondition}]::${escapedOldEnumType}[]`;
+  }
+
+  private updateAtomicEnum({
+    escapedNewColumn,
+    escapedOldColumn,
+    escapedSchema,
+    escapedTable,
+    caseStatements,
+    mappedValuesCondition,
+  }: {
+    caseStatements: string;
+    mappedValuesCondition: string;
+    escapedSchema: string;
+    escapedTable: string;
+    escapedOldColumn: string;
+    escapedNewColumn: string;
+  }) {
+    return `
+          UPDATE ${escapedSchema}.${escapedTable}
+          SET ${escapedNewColumn} =
+            CASE ${escapedOldColumn}::text
+              ${caseStatements}
+            END
+          WHERE ${escapedOldColumn} IS NOT NULL
+            AND ${escapedOldColumn}::text IN (${mappedValuesCondition})`;
   }
 }

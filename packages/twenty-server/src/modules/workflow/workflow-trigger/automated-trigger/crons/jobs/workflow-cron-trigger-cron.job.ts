@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 
 import { isDefined } from 'twenty-shared/utils';
@@ -11,7 +12,7 @@ import { Process } from 'src/engine/core-modules/message-queue/decorators/proces
 import { Processor } from 'src/engine/core-modules/message-queue/decorators/processor.decorator';
 import { MessageQueue } from 'src/engine/core-modules/message-queue/message-queue.constants';
 import { MessageQueueService } from 'src/engine/core-modules/message-queue/services/message-queue.service';
-import { Workspace } from 'src/engine/core-modules/workspace/workspace.entity';
+import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { getWorkspaceSchemaName } from 'src/engine/workspace-datasource/utils/get-workspace-schema-name.util';
 import { AutomatedTriggerType } from 'src/modules/workflow/common/standard-objects/workflow-automated-trigger.workspace-entity';
 import { type CronTriggerSettings } from 'src/modules/workflow/workflow-trigger/automated-trigger/constants/automated-trigger-settings';
@@ -25,11 +26,13 @@ export const WORKFLOW_CRON_TRIGGER_CRON_PATTERN = '* * * * *';
 
 @Processor(MessageQueue.cronQueue)
 export class WorkflowCronTriggerCronJob {
+  private readonly logger = new Logger(WorkflowCronTriggerCronJob.name);
+
   constructor(
     @InjectDataSource()
     private readonly coreDataSource: DataSource,
-    @InjectRepository(Workspace)
-    private readonly workspaceRepository: Repository<Workspace>,
+    @InjectRepository(WorkspaceEntity)
+    private readonly workspaceRepository: Repository<WorkspaceEntity>,
     @InjectMessageQueue(MessageQueue.workflowQueue)
     private readonly messageQueueService: MessageQueueService,
     private readonly exceptionHandlerService: ExceptionHandlerService,
@@ -41,11 +44,15 @@ export class WorkflowCronTriggerCronJob {
     WORKFLOW_CRON_TRIGGER_CRON_PATTERN,
   )
   async handle() {
+    this.logger.log('WorkflowCronTriggerCronJob started');
+
     const activeWorkspaces = await this.workspaceRepository.find({
       where: {
         activationStatus: WorkspaceActivationStatus.ACTIVE,
       },
     });
+
+    this.logger.log(`Found ${activeWorkspaces.length} active workspaces`);
 
     const now = new Date();
 
@@ -57,17 +64,38 @@ export class WorkflowCronTriggerCronJob {
           `SELECT * FROM ${schemaName}."workflowAutomatedTrigger" WHERE type = '${AutomatedTriggerType.CRON}'`,
         );
 
+        this.logger.log(
+          `Workspace ${activeWorkspace.id}: found ${workflowAutomatedCronTriggers.length} cron triggers`,
+        );
+
         for (const workflowAutomatedCronTrigger of workflowAutomatedCronTriggers) {
           const settings =
             workflowAutomatedCronTrigger.settings as CronTriggerSettings;
 
+          this.logger.log(
+            `Trigger ${workflowAutomatedCronTrigger.id} for workflow ${workflowAutomatedCronTrigger.workflowId}: pattern=${settings.pattern}`,
+          );
+
           if (!isDefined(settings.pattern)) {
+            this.logger.warn(
+              `Trigger ${workflowAutomatedCronTrigger.id}: skipping - pattern not defined`,
+            );
             continue;
           }
 
-          if (!shouldRunNow(settings.pattern, now)) {
+          const shouldRun = shouldRunNow(settings.pattern, now);
+
+          this.logger.log(
+            `Trigger ${workflowAutomatedCronTrigger.id}: shouldRunNow(${settings.pattern}, ${now.toISOString()}) = ${shouldRun}`,
+          );
+
+          if (!shouldRun) {
             continue;
           }
+
+          this.logger.log(
+            `Trigger ${workflowAutomatedCronTrigger.id}: enqueuing WorkflowTriggerJob for workflow ${workflowAutomatedCronTrigger.workflowId}`,
+          );
 
           await this.messageQueueService.add<WorkflowTriggerJobData>(
             WorkflowTriggerJob.name,
@@ -80,6 +108,9 @@ export class WorkflowCronTriggerCronJob {
           );
         }
       } catch (error) {
+        this.logger.error(
+          `Error processing workspace ${activeWorkspace.id}: ${error}`,
+        );
         this.exceptionHandlerService.captureExceptions([error], {
           workspace: {
             id: activeWorkspace.id,
@@ -87,5 +118,7 @@ export class WorkflowCronTriggerCronJob {
         });
       }
     }
+
+    this.logger.log('WorkflowCronTriggerCronJob completed');
   }
 }

@@ -1,12 +1,13 @@
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
-import { generateAggregateQuery } from '../generateAggregateQuery';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
+import { generateAggregateQuery } from '@/object-record/utils/generateAggregateQuery';
 
 describe('generateAggregateQuery', () => {
   it('should generate correct aggregate query', () => {
-    const mockObjectMetadataItem: ObjectMetadataItem = {
+    const mockObjectMetadataItem: EnrichedObjectMetadataItem = {
       nameSingular: 'company',
       namePlural: 'companies',
       id: 'test-id',
+      universalIdentifier: 'test-id',
       labelSingular: 'Company',
       labelPlural: 'Companies',
       labelIdentifierFieldMetadataId: '20202020-72ba-4e11-a36d-e17b544541e1',
@@ -45,10 +46,11 @@ describe('generateAggregateQuery', () => {
   });
 
   it('should handle empty record fields', () => {
-    const mockObjectMetadataItem: ObjectMetadataItem = {
+    const mockObjectMetadataItem: EnrichedObjectMetadataItem = {
       nameSingular: 'person',
       namePlural: 'people',
       id: 'test-id',
+      universalIdentifier: 'test-id',
       labelSingular: 'Person',
       labelPlural: 'People',
       labelIdentifierFieldMetadataId: '20202020-72ba-4e11-a36d-e17b544541e1',

@@ -1,7 +1,7 @@
-import { type ActivityTargetableObject } from '../types/ActivityTargetableEntity';
-import { createState } from 'twenty-ui/utilities';
+import { type ActivityTargetableObject } from '@/activities/types/ActivityTargetableEntity';
+import { createAtomState } from '@/ui/utilities/state/jotai/utils/createAtomState';
 
-export const activityTargetableEntityArrayState = createState<
+export const activityTargetableEntityArrayState = createAtomState<
   ActivityTargetableObject[]
 >({
   key: 'activities/targetable-entity-array',

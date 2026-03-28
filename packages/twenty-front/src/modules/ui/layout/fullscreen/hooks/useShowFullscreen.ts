@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
-import { SettingsPath } from '@/types/SettingsPath';
 import { useLocation } from 'react-router-dom';
+import { SettingsPath } from 'twenty-shared/types';
 import { isMatchingLocation } from '~/utils/isMatchingLocation';
 
 export const useShowFullscreen = () => {
@@ -13,7 +13,11 @@ export const useShowFullscreen = () => {
         location,
         'settings/' + SettingsPath.RestPlayground + '/*',
       ) ||
-      isMatchingLocation(location, 'settings/' + SettingsPath.GraphQLPlayground)
+      isMatchingLocation(
+        location,
+        'settings/' + SettingsPath.GraphQLPlayground,
+      ) ||
+      isMatchingLocation(location, 'settings/' + SettingsPath.EventLogs)
     ) {
       return true;
     }

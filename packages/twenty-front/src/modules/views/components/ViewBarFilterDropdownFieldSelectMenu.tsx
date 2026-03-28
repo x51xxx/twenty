@@ -1,7 +1,5 @@
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import React from 'react';
-
-import { DropdownMenuItemsContainer } from '@/ui/layout/dropdown/components/DropdownMenuItemsContainer';
 
 import { objectFilterDropdownSearchInputComponentState } from '@/object-record/object-filter-dropdown/states/objectFilterDropdownSearchInputComponentState';
 
@@ -12,48 +10,51 @@ import { FILTER_FIELD_LIST_ID } from '@/object-record/object-filter-dropdown/con
 import { useFilterDropdownSelectableFieldMetadataItems } from '@/object-record/object-filter-dropdown/hooks/useFilterDropdownSelectableFieldMetadataItems';
 import { DropdownContent } from '@/ui/layout/dropdown/components/DropdownContent';
 import { DropdownMenuSectionLabel } from '@/ui/layout/dropdown/components/DropdownMenuSectionLabel';
-import { useRecoilComponentState } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentState';
+import { useAtomComponentState } from '@/ui/utilities/state/jotai/hooks/useAtomComponentState';
 import { ViewBarFilterDropdownBottomMenu } from '@/views/components/ViewBarFilterDropdownBottomMenu';
 import { ViewBarFilterDropdownFieldSelectMenuItem } from '@/views/components/ViewBarFilterDropdownFieldSelectMenuItem';
 
 import { DropdownMenuHeader } from '@/ui/layout/dropdown/components/DropdownMenuHeader/DropdownMenuHeader';
 import { DropdownMenuHeaderLeftComponent } from '@/ui/layout/dropdown/components/DropdownMenuHeader/internal/DropdownMenuHeaderLeftComponent';
+import { DropdownMenuItemsContainer } from '@/ui/layout/dropdown/components/DropdownMenuItemsContainer';
 import { GenericDropdownContentWidth } from '@/ui/layout/dropdown/constants/GenericDropdownContentWidth';
 import { useCloseDropdown } from '@/ui/layout/dropdown/hooks/useCloseDropdown';
+import { ScrollWrapper } from '@/ui/utilities/scroll/components/ScrollWrapper';
 import { VIEW_BAR_FILTER_BOTTOM_MENU_ITEM_IDS } from '@/views/constants/ViewBarFilterBottomMenuItemIds';
-import { VIEW_BAR_FILTER_DROPDOWN_ID } from '@/views/constants/ViewBarFilterDropdownId';
+import { ViewBarFilterDropdownIds } from '@/views/constants/ViewBarFilterDropdownIds';
 import { useLingui } from '@lingui/react/macro';
 import { IconX } from 'twenty-ui/display';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 export const StyledInput = styled.input`
   background: transparent;
   border: none;
-  border-top: none;
-  border-bottom: 1px solid ${({ theme }) => theme.border.color.light};
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
   border-radius: 0;
-  border-top-left-radius: ${({ theme }) => theme.border.radius.md};
-  border-top-right-radius: ${({ theme }) => theme.border.radius.md};
-  color: ${({ theme }) => theme.font.color.primary};
-  margin: 0;
-  outline: none;
-  padding: ${({ theme }) => theme.spacing(2)};
-  min-height: 19px;
+  border-top: none;
+  border-top-left-radius: ${themeCssVariables.border.radius.md};
+  border-top-right-radius: ${themeCssVariables.border.radius.md};
+  color: ${themeCssVariables.font.color.primary};
   font-family: inherit;
-  font-size: ${({ theme }) => theme.font.size.sm};
-
+  font-size: ${themeCssVariables.font.size.sm};
   font-weight: inherit;
+  margin: 0;
   max-width: 100%;
+  min-height: 19px;
+
+  outline: none;
   overflow: hidden;
+  padding: ${themeCssVariables.spacing[2]};
   text-decoration: none;
 
   &::placeholder {
-    color: ${({ theme }) => theme.font.color.light};
+    color: ${themeCssVariables.font.color.light};
   }
 `;
 
 export const ViewBarFilterDropdownFieldSelectMenu = () => {
   const [objectFilterDropdownSearchInput, setObjectFilterDropdownSearchInput] =
-    useRecoilComponentState(objectFilterDropdownSearchInputComponentState);
+    useAtomComponentState(objectFilterDropdownSearchInputComponentState);
 
   const {
     selectableHiddenFieldMetadataItems,
@@ -99,53 +100,55 @@ export const ViewBarFilterDropdownFieldSelectMenu = () => {
       >
         {t`Filter`}
       </DropdownMenuHeader>
-      <StyledInput
-        value={objectFilterDropdownSearchInput}
-        autoFocus
-        placeholder={t`Search fields`}
-        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-          setObjectFilterDropdownSearchInput(event.target.value)
-        }
-      />
-      <SelectableList
-        selectableItemIdArray={selectableFieldMetadataItemIds}
-        selectableListInstanceId={FILTER_FIELD_LIST_ID}
-        focusId={VIEW_BAR_FILTER_DROPDOWN_ID}
-      >
-        {shouldShowVisibleFields && (
-          <>
-            <DropdownMenuSectionLabel label={t`Visible fields`} />
-            <DropdownMenuItemsContainer>
-              {selectableVisibleFieldMetadataItems.map(
-                (visibleFieldMetadataItem) => (
-                  <ViewBarFilterDropdownFieldSelectMenuItem
-                    key={visibleFieldMetadataItem.id}
-                    fieldMetadataItemToSelect={visibleFieldMetadataItem}
-                  />
-                ),
-              )}
-            </DropdownMenuItemsContainer>
-          </>
-        )}
-        {shouldShowSeparator && <DropdownMenuSeparator />}
-        {shouldShowHiddenFields && (
-          <>
-            <DropdownMenuSectionLabel label={t`Hidden fields`} />
-            <DropdownMenuItemsContainer>
-              {selectableHiddenFieldMetadataItems.map(
-                (hiddenFieldMetadataItem) => (
-                  <ViewBarFilterDropdownFieldSelectMenuItem
-                    key={hiddenFieldMetadataItem.id}
-                    fieldMetadataItemToSelect={hiddenFieldMetadataItem}
-                  />
-                ),
-              )}
-            </DropdownMenuItemsContainer>
-          </>
-        )}
-        {hasSelectableItems && <DropdownMenuSeparator />}
-        <ViewBarFilterDropdownBottomMenu />
-      </SelectableList>
+      <ScrollWrapper componentInstanceId="view-bar-dropdown-filter-field-select-menu">
+        <StyledInput
+          value={objectFilterDropdownSearchInput}
+          autoFocus
+          placeholder={t`Search fields`}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+            setObjectFilterDropdownSearchInput(event.target.value)
+          }
+        />
+        <SelectableList
+          selectableItemIdArray={selectableFieldMetadataItemIds}
+          selectableListInstanceId={FILTER_FIELD_LIST_ID}
+          focusId={ViewBarFilterDropdownIds.MAIN}
+        >
+          {shouldShowVisibleFields && (
+            <>
+              <DropdownMenuSectionLabel label={t`Visible fields`} />
+              <DropdownMenuItemsContainer scrollable={false}>
+                {selectableVisibleFieldMetadataItems.map(
+                  (visibleFieldMetadataItem) => (
+                    <ViewBarFilterDropdownFieldSelectMenuItem
+                      key={visibleFieldMetadataItem.id}
+                      fieldMetadataItemToSelect={visibleFieldMetadataItem}
+                    />
+                  ),
+                )}
+              </DropdownMenuItemsContainer>
+            </>
+          )}
+          {shouldShowSeparator && <DropdownMenuSeparator />}
+          {shouldShowHiddenFields && (
+            <>
+              <DropdownMenuSectionLabel label={t`Hidden fields`} />
+              <DropdownMenuItemsContainer scrollable={false}>
+                {selectableHiddenFieldMetadataItems.map(
+                  (hiddenFieldMetadataItem) => (
+                    <ViewBarFilterDropdownFieldSelectMenuItem
+                      key={hiddenFieldMetadataItem.id}
+                      fieldMetadataItemToSelect={hiddenFieldMetadataItem}
+                    />
+                  ),
+                )}
+              </DropdownMenuItemsContainer>
+            </>
+          )}
+          {hasSelectableItems && <DropdownMenuSeparator />}
+          <ViewBarFilterDropdownBottomMenu />
+        </SelectableList>
+      </ScrollWrapper>
     </DropdownContent>
   );
 };

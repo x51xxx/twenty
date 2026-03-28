@@ -1,12 +1,16 @@
 import { SettingsCounter } from '@/settings/components/SettingsCounter';
 import {
-  StyledSettingsOptionCardContent,
-  StyledSettingsOptionCardDescription,
-  StyledSettingsOptionCardIcon,
-  StyledSettingsOptionCardTitle,
-} from '@/settings/components/SettingsOptions/SettingsOptionCardContentBase';
+  StyledSettingsCardContent,
+  StyledSettingsCardDescription,
+  StyledSettingsCardIcon,
+  StyledSettingsCardTextContainer,
+  StyledSettingsCardTitle,
+} from '@/settings/components/SettingsOptions/SettingsCardContentBase';
 import { SettingsOptionIconCustomizer } from '@/settings/components/SettingsOptions/SettingsOptionIconCustomizer';
-import { type IconComponent } from 'twenty-ui/display';
+import {
+  type IconComponent,
+  OverflowingTextWithTooltip,
+} from 'twenty-ui/display';
 
 type SettingsOptionCardContentCounterProps = {
   Icon?: IconComponent;
@@ -17,6 +21,7 @@ type SettingsOptionCardContentCounterProps = {
   onChange: (value: number) => void;
   minValue?: number;
   maxValue?: number;
+  showButtons?: boolean;
 };
 
 export const SettingsOptionCardContentCounter = ({
@@ -28,29 +33,31 @@ export const SettingsOptionCardContentCounter = ({
   onChange,
   minValue,
   maxValue,
+  showButtons = true,
 }: SettingsOptionCardContentCounterProps) => {
   return (
-    <StyledSettingsOptionCardContent disabled={disabled}>
+    <StyledSettingsCardContent disabled={disabled}>
       {Icon && (
-        <StyledSettingsOptionCardIcon>
+        <StyledSettingsCardIcon>
           <SettingsOptionIconCustomizer Icon={Icon} />
-        </StyledSettingsOptionCardIcon>
+        </StyledSettingsCardIcon>
       )}
-      <div>
-        <StyledSettingsOptionCardTitle>{title}</StyledSettingsOptionCardTitle>
+      <StyledSettingsCardTextContainer>
+        <StyledSettingsCardTitle>{title}</StyledSettingsCardTitle>
         {description && (
-          <StyledSettingsOptionCardDescription>
-            {description}
-          </StyledSettingsOptionCardDescription>
+          <StyledSettingsCardDescription>
+            <OverflowingTextWithTooltip text={description} />
+          </StyledSettingsCardDescription>
         )}
-      </div>
+      </StyledSettingsCardTextContainer>
       <SettingsCounter
         value={value}
         onChange={onChange}
         minValue={minValue}
         maxValue={maxValue}
         disabled={disabled}
+        showButtons={showButtons}
       />
-    </StyledSettingsOptionCardContent>
+    </StyledSettingsCardContent>
   );
 };

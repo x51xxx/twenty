@@ -1,60 +1,42 @@
 import { recordGroupIdsComponentState } from '@/object-record/record-group/states/recordGroupIdsComponentState';
 import { recordIndexRecordIdsByGroupComponentFamilyState } from '@/object-record/record-index/states/recordIndexRecordIdsByGroupComponentFamilyState';
 import { type ObjectRecord } from '@/object-record/types/ObjectRecord';
-import { createComponentSelector } from '@/ui/utilities/state/component-state/utils/createComponentSelector';
+import { createAtomComponentSelector } from '@/ui/utilities/state/jotai/utils/createAtomComponentSelector';
 import { ViewComponentInstanceContext } from '@/views/states/contexts/ViewComponentInstanceContext';
 
-/**
- * Do not use this key outside of this file.
- * This is a temporary key to store the record ids for the default record group.
- */
-const defaultFamilyKey = 'record-group-default-id';
+export const NO_RECORD_GROUP_FAMILY_KEY = 'record-group-default-id';
 
-export const recordIndexAllRecordIdsComponentSelector = createComponentSelector<
-  ObjectRecord['id'][]
->({
-  key: 'recordIndexAllRecordIdsComponentSelector',
-  componentInstanceContext: ViewComponentInstanceContext,
-  get:
-    ({ instanceId }) =>
-    ({ get }) => {
-      const recordGroupIds = get(
-        recordGroupIdsComponentState.atomFamily({
+export const recordIndexAllRecordIdsComponentSelector =
+  createAtomComponentSelector<string[]>({
+    key: 'recordIndexAllRecordIdsComponentSelector',
+    componentInstanceContext: ViewComponentInstanceContext,
+    get:
+      ({ instanceId }) =>
+      ({ get }) => {
+        const recordGroupIds = get(recordGroupIdsComponentState, {
           instanceId,
-        }),
-      );
+        });
 
-      if (recordGroupIds.length === 0) {
-        return get(
-          recordIndexRecordIdsByGroupComponentFamilyState.atomFamily({
+        if (recordGroupIds.length === 0) {
+          return get(recordIndexRecordIdsByGroupComponentFamilyState, {
             instanceId,
-            familyKey: defaultFamilyKey,
-          }),
+            familyKey: NO_RECORD_GROUP_FAMILY_KEY,
+          });
+        }
+
+        return recordGroupIds.reduce<ObjectRecord['id'][]>(
+          (acc, recordGroupId) => {
+            const rowIds = get(
+              recordIndexRecordIdsByGroupComponentFamilyState,
+              {
+                instanceId,
+                familyKey: recordGroupId,
+              },
+            );
+
+            return [...acc, ...rowIds];
+          },
+          [],
         );
-      }
-
-      return recordGroupIds.reduce<ObjectRecord['id'][]>(
-        (acc, recordGroupId) => {
-          const rowIds = get(
-            recordIndexRecordIdsByGroupComponentFamilyState.atomFamily({
-              instanceId,
-              familyKey: recordGroupId,
-            }),
-          );
-
-          return [...acc, ...rowIds];
-        },
-        [],
-      );
-    },
-  set:
-    ({ instanceId }) =>
-    ({ set }, recordIds) =>
-      set(
-        recordIndexRecordIdsByGroupComponentFamilyState.atomFamily({
-          instanceId,
-          familyKey: defaultFamilyKey,
-        }),
-        recordIds,
-      ),
-});
+      },
+  });

@@ -9,21 +9,19 @@ import { useCurrencySettingsFormInitialValues } from '@/settings/data-model/fiel
 import { useSelectSettingsFormInitialValues } from '@/settings/data-model/fields/forms/select/hooks/useSelectSettingsFormInitialValues';
 import { type FieldType } from '@/settings/data-model/types/FieldType';
 import { type SettingsFieldType } from '@/settings/data-model/types/SettingsFieldType';
-import { SettingsPath } from '@/types/SettingsPath';
 import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
-import { useIsFeatureEnabled } from '@/workspace/hooks/useIsFeatureEnabled';
-import { useTheme } from '@emotion/react';
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import { t } from '@lingui/core/macro';
 import { Section } from '@react-email/components';
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 import { Controller, useFormContext } from 'react-hook-form';
+import { SettingsPath } from 'twenty-shared/types';
+import { getSettingsPath } from 'twenty-shared/utils';
 import { H2Title, IconSearch } from 'twenty-ui/display';
 import { UndecoratedLink } from 'twenty-ui/navigation';
+import { ThemeContext, themeCssVariables } from 'twenty-ui/theme-constants';
 import { FieldMetadataType } from '~/generated-metadata/graphql';
-import { FeatureFlagKey } from '~/generated/graphql';
 import { type SettingsDataModelFieldTypeFormValues } from '~/pages/settings/data-model/new-field/SettingsObjectNewFieldSelect';
-import { getSettingsPath } from '~/utils/navigation/getSettingsPath';
 
 type SettingsObjectNewFieldSelectorProps = {
   className?: string;
@@ -45,9 +43,9 @@ const StyledTypeSelectContainer = styled.div`
 
 const StyledContainer = styled.div`
   display: flex;
-  gap: ${({ theme }) => theme.spacing(2)};
-  justify-content: flex-start;
   flex-wrap: wrap;
+  gap: ${themeCssVariables.spacing[2]};
+  justify-content: flex-start;
   width: 100%;
 `;
 
@@ -55,10 +53,10 @@ const StyledCardContainer = styled.div`
   display: flex;
 
   position: relative;
-  width: calc(50% - ${({ theme }) => theme.spacing(1)});
+  width: calc(50% - ${themeCssVariables.spacing[1]});
 `;
 
-const StyledSearchInput = styled(SettingsTextInput)`
+const StyledSearchInputContainer = styled.div`
   width: 100%;
 `;
 
@@ -66,7 +64,7 @@ export const SettingsObjectNewFieldSelector = ({
   excludedFieldTypes = [],
   objectNamePlural,
 }: SettingsObjectNewFieldSelectorProps) => {
-  const theme = useTheme();
+  const { theme } = useContext(ThemeContext);
   const { control, setValue } =
     useFormContext<SettingsDataModelFieldTypeFormValues>();
   const [searchQuery, setSearchQuery] = useState('');
@@ -105,20 +103,20 @@ export const SettingsObjectNewFieldSelector = ({
         break;
     }
   };
-  const isMorphRelationEnabled = useIsFeatureEnabled(
-    FeatureFlagKey.IS_MORPH_RELATION_ENABLED,
-  );
+
   return (
     <>
       {' '}
       <Section>
-        <StyledSearchInput
-          instanceId="new-field-type-search"
-          LeftIcon={IconSearch}
-          placeholder={t`Search a type`}
-          value={searchQuery}
-          onChange={setSearchQuery}
-        />
+        <StyledSearchInputContainer>
+          <SettingsTextInput
+            instanceId="new-field-type-search"
+            LeftIcon={IconSearch}
+            placeholder={t`Search a type`}
+            value={searchQuery}
+            onChange={setSearchQuery}
+          />
+        </StyledSearchInputContainer>
       </Section>
       <Controller
         name="type"
@@ -136,12 +134,16 @@ export const SettingsObjectNewFieldSelector = ({
                 <StyledContainer>
                   {fieldTypeConfigs
                     .filter(([, config]) => config.category === category)
-                    .filter(([key]) => {
-                      return (
-                        key !== FieldMetadataType.MORPH_RELATION ||
-                        isMorphRelationEnabled
-                      );
-                    })
+                    .filter(([key]) => key !== FieldMetadataType.RELATION)
+                    .map(
+                      ([key, config]) =>
+                        [
+                          key,
+                          key === FieldMetadataType.MORPH_RELATION
+                            ? { ...config, label: t`Relation` }
+                            : config,
+                        ] as [string, SettingsFieldTypeConfig<any>],
+                    )
                     .map(([key, config]) => (
                       <StyledCardContainer key={key}>
                         <UndecoratedLink

@@ -3,7 +3,7 @@ import { useRef } from 'react';
 
 import { useObjectPermissionsForObject } from '@/object-record/hooks/useObjectPermissionsForObject';
 import { hasRecordGroupsComponentSelector } from '@/object-record/record-group/states/selectors/hasRecordGroupsComponentSelector';
-import { recordIndexAllRecordIdsComponentSelector } from '@/object-record/record-index/states/selectors/recordIndexAllRecordIdsComponentSelector';
+import { recordIndexHasRecordsComponentSelector } from '@/object-record/record-index/states/selectors/recordIndexHasRecordsComponentSelector';
 import { RecordTableBodyEffectsWrapper } from '@/object-record/record-table/components/RecordTableBodyEffectsWrapper';
 import { RecordTableContent } from '@/object-record/record-table/components/RecordTableContent';
 import { RecordTableEmpty } from '@/object-record/record-table/components/RecordTableEmpty';
@@ -14,33 +14,39 @@ import { useRecordTableContextOrThrow } from '@/object-record/record-table/conte
 import { useResetTableRowSelection } from '@/object-record/record-table/hooks/internal/useResetTableRowSelection';
 import { isRecordTableInitialLoadingComponentState } from '@/object-record/record-table/states/isRecordTableInitialLoadingComponentState';
 import { useClickOutsideListener } from '@/ui/utilities/pointer-event/hooks/useClickOutsideListener';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentSelectorValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentSelectorValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+import isEmpty from 'lodash.isempty';
 
 export const RecordTable = () => {
-  const { recordTableId, objectNameSingular, objectMetadataItem } =
-    useRecordTableContextOrThrow();
+  const {
+    recordTableId,
+    objectNameSingular,
+    objectMetadataItem,
+    visibleRecordFields,
+  } = useRecordTableContextOrThrow();
 
   const objectPermissions = useObjectPermissionsForObject(
     objectMetadataItem.id,
   );
 
-  const tableBodyRef = useRef<HTMLTableElement>(null);
+  const tableBodyRef = useRef<HTMLDivElement>(null);
 
   const { toggleClickOutside } = useClickOutsideListener(
     RECORD_TABLE_CLICK_OUTSIDE_LISTENER_ID,
   );
 
-  const isRecordTableInitialLoading = useRecoilComponentValue(
+  const isRecordTableInitialLoading = useAtomComponentStateValue(
     isRecordTableInitialLoadingComponentState,
     recordTableId,
   );
 
-  const allRecordIds = useRecoilComponentValue(
-    recordIndexAllRecordIdsComponentSelector,
+  const recordTableHasRecords = useAtomComponentSelectorValue(
+    recordIndexHasRecordsComponentSelector,
     recordTableId,
   );
 
-  const hasRecordGroups = useRecoilComponentValue(
+  const hasRecordGroups = useAtomComponentSelectorValue(
     hasRecordGroupsComponentSelector,
     recordTableId,
   );
@@ -48,7 +54,7 @@ export const RecordTable = () => {
   const { resetTableRowSelection } = useResetTableRowSelection(recordTableId);
 
   const recordTableIsEmpty =
-    !isRecordTableInitialLoading && allRecordIds.length === 0;
+    !isRecordTableInitialLoading && !recordTableHasRecords;
 
   if (!isNonEmptyString(objectNameSingular)) {
     return <></>;
@@ -75,7 +81,9 @@ export const RecordTable = () => {
           <RecordTableScrollToFocusedRowEffect />
         </>
       )}
-      {recordTableIsEmpty && !hasRecordGroups ? (
+      {isRecordTableInitialLoading &&
+      isEmpty(visibleRecordFields) ? null : recordTableIsEmpty &&
+        !hasRecordGroups ? (
         <RecordTableEmpty tableBodyRef={tableBodyRef} />
       ) : (
         <RecordTableContent

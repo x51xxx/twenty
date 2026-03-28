@@ -1,15 +1,22 @@
-import { CAPTURE_ALL_VARIABLE_TAG_INNER_REGEX } from '@/workflow/workflow-variables/constants/CaptureAllVariableTagInnerRegex';
 import { type VariableSearchResult } from '@/workflow/workflow-variables/hooks/useSearchVariable';
-import type { BaseOutputSchemaV2 } from '@/workflow/workflow-variables/types/BaseOutputSchemaV2';
 import { isDefined } from 'twenty-shared/utils';
+import {
+  CAPTURE_ALL_VARIABLE_TAG_INNER_REGEX,
+  parseVariablePath,
+  type BaseOutputSchemaV2,
+} from 'twenty-shared/workflow';
 
+/**
+ * Parses a variable name to extract its components
+ * Example: "{{step1.field.value}}" -> { stepId: "step1", pathSegments: ["field"], targetFieldName: "value" }
+ */
 const parseVariableName = (rawVariableName: string) => {
   const variableWithoutBrackets = rawVariableName.replace(
     CAPTURE_ALL_VARIABLE_TAG_INNER_REGEX,
     (_, variableName) => variableName,
   );
 
-  const parts = variableWithoutBrackets.split('.');
+  const parts = parseVariablePath(variableWithoutBrackets);
   const stepId = parts.at(0);
 
   return {
@@ -29,7 +36,7 @@ const navigateToTargetField = (
   for (const pathSegment of pathSegments) {
     const field = currentSchema[pathSegment];
 
-    if (!isDefined(field) || field.isLeaf) {
+    if (!isDefined(field) || field.isLeaf === true) {
       return null;
     }
 
@@ -66,6 +73,35 @@ const buildVariableResult = (
   };
 };
 
+export const searchBaseOutputSchema = ({
+  stepName,
+  baseOutputSchema,
+  path,
+  selectedField,
+}: {
+  stepName: string;
+  baseOutputSchema: BaseOutputSchemaV2;
+  path: string[];
+  selectedField: string;
+}): VariableSearchResult => {
+  const navigationResult = navigateToTargetField(baseOutputSchema, path);
+
+  if (!navigationResult) {
+    return {
+      variableLabel: undefined,
+      variablePathLabel: undefined,
+      variableType: undefined,
+    };
+  }
+
+  return buildVariableResult(
+    stepName,
+    navigationResult.pathLabels,
+    navigationResult.schema,
+    selectedField,
+  );
+};
+
 /**
  * Searches for a variable within a base output schema and returns its metadata
  *
@@ -83,7 +119,6 @@ export const searchVariableThroughBaseOutputSchema = ({
   stepName: string;
   baseOutputSchema: BaseOutputSchemaV2;
   rawVariableName: string;
-  isFullRecord?: boolean;
 }): VariableSearchResult => {
   if (!isDefined(baseOutputSchema)) {
     return {
@@ -102,22 +137,10 @@ export const searchVariableThroughBaseOutputSchema = ({
     };
   }
 
-  const navigationResult = navigateToTargetField(
-    baseOutputSchema,
-    pathSegments,
-  );
-
-  if (!navigationResult) {
-    return {
-      variableLabel: undefined,
-      variablePathLabel: undefined,
-    };
-  }
-
-  return buildVariableResult(
+  return searchBaseOutputSchema({
     stepName,
-    navigationResult.pathLabels,
-    navigationResult.schema,
-    targetFieldName,
-  );
+    baseOutputSchema,
+    path: pathSegments,
+    selectedField: targetFieldName,
+  });
 };

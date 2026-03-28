@@ -1,12 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { msg } from '@lingui/core/macro';
+import { isNonEmptyString } from '@sniptt/guards';
+import { type ActorMetadata, FeatureFlagKey } from 'twenty-shared/types';
 
-import { t } from '@lingui/core/macro';
-
-import { type ActorMetadata } from 'src/engine/metadata-modules/field-metadata/composite-types/actor.composite-type';
+import { FeatureFlagService } from 'src/engine/core-modules/feature-flag/services/feature-flag.service';
+import { CommandMenuItemService } from 'src/engine/metadata-modules/command-menu-item/command-menu-item.service';
+import { CommandMenuItemAvailabilityType } from 'src/engine/metadata-modules/command-menu-item/enums/command-menu-item-availability-type.enum';
+import { EngineComponentKey } from 'src/engine/metadata-modules/command-menu-item/enums/engine-component-key.enum';
 import { type WorkspaceEntityManager } from 'src/engine/twenty-orm/entity-manager/workspace-entity-manager';
-import { ScopedWorkspaceContextFactory } from 'src/engine/twenty-orm/factories/scoped-workspace-context.factory';
+import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
 import { type WorkspaceRepository } from 'src/engine/twenty-orm/repository/workspace.repository';
-import { TwentyORMGlobalManager } from 'src/engine/twenty-orm/twenty-orm-global.manager';
+import { buildSystemAuthContext } from 'src/engine/twenty-orm/utils/build-system-auth-context.util';
 import { WorkspaceEventEmitter } from 'src/engine/workspace-event-emitter/workspace-event-emitter';
 import { AutomatedTriggerType } from 'src/modules/workflow/common/standard-objects/workflow-automated-trigger.workspace-entity';
 import {
@@ -16,6 +20,7 @@ import {
 import { type WorkflowWorkspaceEntity } from 'src/modules/workflow/common/standard-objects/workflow.workspace-entity';
 import { assertWorkflowVersionTriggerIsDefined } from 'src/modules/workflow/common/utils/assert-workflow-version-trigger-is-defined.util';
 import { WorkflowCommonWorkspaceService } from 'src/modules/workflow/common/workspace-services/workflow-common.workspace-service';
+import { CodeStepBuildService } from 'src/modules/workflow/workflow-builder/workflow-version-step/code-step/services/code-step-build.service';
 import { WorkflowRunnerWorkspaceService } from 'src/modules/workflow/workflow-runner/workspace-services/workflow-runner.workspace-service';
 import { WORKFLOW_VERSION_STATUS_UPDATED } from 'src/modules/workflow/workflow-status/constants/workflow-version-status-updated.constants';
 import { type WorkflowVersionStatusUpdate } from 'src/modules/workflow/workflow-status/jobs/workflow-statuses-update.job';
@@ -25,53 +30,49 @@ import {
   WorkflowTriggerException,
   WorkflowTriggerExceptionCode,
 } from 'src/modules/workflow/workflow-trigger/exceptions/workflow-trigger.exception';
-import { WorkflowTriggerType } from 'src/modules/workflow/workflow-trigger/types/workflow-trigger.type';
+import {
+  type WorkflowManualTrigger,
+  WorkflowTriggerType,
+} from 'src/modules/workflow/workflow-trigger/types/workflow-trigger.type';
 import { assertVersionCanBeActivated } from 'src/modules/workflow/workflow-trigger/utils/assert-version-can-be-activated.util';
 import { computeCronPatternFromSchedule } from 'src/modules/workflow/workflow-trigger/utils/compute-cron-pattern-from-schedule';
 import { assertNever } from 'src/utils/assert';
 
 @Injectable()
 export class WorkflowTriggerWorkspaceService {
+  private readonly logger = new Logger(WorkflowTriggerWorkspaceService.name);
+
   constructor(
-    private readonly twentyORMGlobalManager: TwentyORMGlobalManager,
+    private readonly globalWorkspaceOrmManager: GlobalWorkspaceOrmManager,
     private readonly workflowCommonWorkspaceService: WorkflowCommonWorkspaceService,
-    private readonly scopedWorkspaceContextFactory: ScopedWorkspaceContextFactory,
+    private readonly codeStepBuildService: CodeStepBuildService,
     private readonly workflowRunnerWorkspaceService: WorkflowRunnerWorkspaceService,
     private readonly automatedTriggerWorkspaceService: AutomatedTriggerWorkspaceService,
     private readonly workspaceEventEmitter: WorkspaceEventEmitter,
+    private readonly commandMenuItemService: CommandMenuItemService,
+    private readonly featureFlagService: FeatureFlagService,
   ) {}
-
-  private getWorkspaceId() {
-    const workspaceId = this.scopedWorkspaceContextFactory.create().workspaceId;
-
-    if (!workspaceId) {
-      throw new WorkflowTriggerException(
-        'No workspace id found',
-        WorkflowTriggerExceptionCode.INTERNAL_ERROR,
-      );
-    }
-
-    return workspaceId;
-  }
 
   async runWorkflowVersion({
     workflowVersionId,
     payload,
     createdBy,
     workflowRunId,
+    workspaceId,
   }: {
     workflowVersionId: string;
     payload: object;
     createdBy: ActorMetadata;
     workflowRunId?: string;
+    workspaceId: string;
   }) {
     await this.workflowCommonWorkspaceService.getWorkflowVersionOrFail({
       workflowVersionId,
-      workspaceId: this.getWorkspaceId(),
+      workspaceId,
     });
 
     return this.workflowRunnerWorkspaceService.run({
-      workspaceId: this.getWorkspaceId(),
+      workspaceId,
       workflowRunId,
       workflowVersionId,
       payload,
@@ -79,108 +80,103 @@ export class WorkflowTriggerWorkspaceService {
     });
   }
 
-  async activateWorkflowVersion(workflowVersionId: string) {
-    const workspaceId = this.getWorkspaceId();
-    const workflowVersionRepository =
-      await this.twentyORMGlobalManager.getRepositoryForWorkspace<WorkflowVersionWorkspaceEntity>(
-        this.getWorkspaceId(),
-        'workflowVersion',
-        { shouldBypassPermissionChecks: true }, // settings permissions are checked at resolver-level
-      );
+  async activateWorkflowVersion(
+    workflowVersionId: string,
+    workspaceId: string,
+  ) {
+    const authContext = buildSystemAuthContext(workspaceId);
 
-    const workflowVersionNullable = await workflowVersionRepository.findOne({
-      where: { id: workflowVersionId },
-    });
+    return this.globalWorkspaceOrmManager.executeInWorkspaceContext(
+      async () => {
+        const workflowVersionRepository =
+          await this.globalWorkspaceOrmManager.getRepository<WorkflowVersionWorkspaceEntity>(
+            workspaceId,
+            'workflowVersion',
+            { shouldBypassPermissionChecks: true },
+          );
 
-    const workflowVersion =
-      await this.workflowCommonWorkspaceService.getValidWorkflowVersionOrFail(
-        workflowVersionNullable,
-      );
-
-    const workflowRepository =
-      await this.twentyORMGlobalManager.getRepositoryForWorkspace<WorkflowWorkspaceEntity>(
-        workspaceId,
-        'workflow',
-        { shouldBypassPermissionChecks: true }, // settings permissions are checked at resolver-level
-      );
-
-    const workflow = await workflowRepository.findOne({
-      where: { id: workflowVersion.workflowId },
-    });
-
-    if (!workflow) {
-      throw new WorkflowTriggerException(
-        'No workflow found',
-        WorkflowTriggerExceptionCode.INVALID_WORKFLOW_VERSION,
-      );
-    }
-
-    assertVersionCanBeActivated(workflowVersion, workflow);
-
-    const workspaceDataSource =
-      await this.twentyORMGlobalManager.getDataSourceForWorkspace({
-        workspaceId: this.getWorkspaceId(),
-      });
-    const queryRunner = workspaceDataSource.createQueryRunner();
-
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    const manager = queryRunner.manager;
-
-    try {
-      await this.performActivationSteps(
-        workflow,
-        workflowVersion,
-        workflowRepository,
-        workflowVersionRepository,
-        manager,
-      );
-
-      await queryRunner.commitTransaction();
-
-      return true;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  async deactivateWorkflowVersion(workflowVersionId: string) {
-    const workspaceDataSource =
-      await this.twentyORMGlobalManager.getDataSourceForWorkspace({
-        workspaceId: this.getWorkspaceId(),
-      });
-    const queryRunner = workspaceDataSource.createQueryRunner();
-
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const workflowVersionRepository =
-        await this.twentyORMGlobalManager.getRepositoryForWorkspace<WorkflowVersionWorkspaceEntity>(
-          this.getWorkspaceId(),
-          'workflowVersion',
-          { shouldBypassPermissionChecks: true },
+        const workflowVersionNullable = await workflowVersionRepository.findOne(
+          {
+            where: { id: workflowVersionId },
+          },
         );
 
-      await this.performDeactivationSteps(
-        workflowVersionId,
-        workflowVersionRepository,
-        queryRunner.manager,
-      );
+        const workflowVersion =
+          await this.workflowCommonWorkspaceService.getValidWorkflowVersionOrFail(
+            workflowVersionNullable,
+          );
 
-      await queryRunner.commitTransaction();
+        const workflowRepository =
+          await this.globalWorkspaceOrmManager.getRepository<WorkflowWorkspaceEntity>(
+            workspaceId,
+            'workflow',
+            { shouldBypassPermissionChecks: true },
+          );
 
-      return true;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+        const workflow = await workflowRepository.findOne({
+          where: { id: workflowVersion.workflowId },
+        });
+
+        if (!workflow) {
+          throw new WorkflowTriggerException(
+            'No workflow found',
+            WorkflowTriggerExceptionCode.INVALID_WORKFLOW_VERSION,
+          );
+        }
+
+        assertVersionCanBeActivated(workflowVersion, workflow);
+
+        await this.codeStepBuildService.buildCodeStepsFromSourceForSteps({
+          workspaceId,
+          steps: workflowVersion.steps ?? [],
+        });
+
+        await this.performActivationSteps(
+          workflow,
+          workflowVersion,
+          workflowRepository,
+          workflowVersionRepository,
+          workspaceId,
+        );
+
+        return true;
+      },
+      authContext,
+    );
+  }
+
+  async deactivateWorkflowVersion(
+    workflowVersionId: string,
+    workspaceId: string,
+  ) {
+    const authContext = buildSystemAuthContext(workspaceId);
+
+    return this.globalWorkspaceOrmManager.executeInWorkspaceContext(
+      async () => {
+        const workflowVersionRepository =
+          await this.globalWorkspaceOrmManager.getRepository<WorkflowVersionWorkspaceEntity>(
+            workspaceId,
+            'workflowVersion',
+            { shouldBypassPermissionChecks: true },
+          );
+
+        await this.performDeactivationSteps(
+          workflowVersionId,
+          workflowVersionRepository,
+          workspaceId,
+        );
+
+        return true;
+      },
+      authContext,
+    );
+  }
+
+  async stopWorkflowRun(workflowRunId: string, workspaceId: string) {
+    return this.workflowRunnerWorkspaceService.stopWorkflowRun(
+      workspaceId,
+      workflowRunId,
+    );
   }
 
   private async performActivationSteps(
@@ -188,40 +184,104 @@ export class WorkflowTriggerWorkspaceService {
     workflowVersion: WorkflowVersionWorkspaceEntity,
     workflowRepository: WorkspaceRepository<WorkflowWorkspaceEntity>,
     workflowVersionRepository: WorkspaceRepository<WorkflowVersionWorkspaceEntity>,
-    manager: WorkspaceEntityManager,
+    workspaceId: string,
   ) {
+    const previousPublishedVersionId = workflow.lastPublishedVersionId;
+
     if (
-      workflow.lastPublishedVersionId &&
-      workflowVersion.id !== workflow.lastPublishedVersionId
+      previousPublishedVersionId &&
+      workflowVersion.id !== previousPublishedVersionId
     ) {
       await this.performDeactivationSteps(
-        workflow.lastPublishedVersionId,
+        previousPublishedVersionId,
         workflowVersionRepository,
-        manager,
+        workspaceId,
       );
     }
 
-    await this.upgradeWorkflowVersion(
+    await this.createOrUpdateCommandMenuItem(
       workflow,
-      workflowVersion.id,
-      workflowRepository,
-      workflowVersionRepository,
-      manager,
-    );
-
-    await this.setActiveVersionStatus(
       workflowVersion,
-      workflowVersionRepository,
-      manager,
+      workspaceId,
     );
 
-    await this.enableTrigger(workflowVersion, manager);
+    const workspaceDataSource =
+      await this.globalWorkspaceOrmManager.getGlobalWorkspaceDataSource();
+
+    const queryRunner = workspaceDataSource.createQueryRunner();
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      if (workflow.lastPublishedVersionId !== workflowVersion.id) {
+        if (workflow.lastPublishedVersionId) {
+          await workflowVersionRepository.update(
+            { id: workflow.lastPublishedVersionId },
+            { status: WorkflowVersionStatus.ARCHIVED },
+            queryRunner.manager,
+          );
+        }
+
+        await workflowRepository.update(
+          { id: workflow.id },
+          { lastPublishedVersionId: workflowVersion.id },
+          queryRunner.manager,
+        );
+      }
+
+      const activeWorkflowVersions = await workflowVersionRepository.find(
+        {
+          where: {
+            workflowId: workflowVersion.workflowId,
+            status: WorkflowVersionStatus.ACTIVE,
+          },
+        },
+        queryRunner.manager,
+      );
+
+      if (activeWorkflowVersions.length > 0) {
+        throw new WorkflowTriggerException(
+          'Cannot have more than one active workflow version',
+          WorkflowTriggerExceptionCode.FORBIDDEN,
+          {
+            userFriendlyMessage: msg`Cannot have more than one active workflow version`,
+          },
+        );
+      }
+
+      await workflowVersionRepository.update(
+        { id: workflowVersion.id },
+        { status: WorkflowVersionStatus.ACTIVE },
+        queryRunner.manager,
+      );
+
+      await this.enableAutomatedTrigger(workflowVersion, workspaceId, {
+        entityManager: queryRunner.manager,
+      });
+
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+
+    await this.emitStatusUpdateEvents(
+      workflowVersion,
+      WorkflowVersionStatus.ACTIVE,
+      workspaceId,
+    );
   }
 
   private async performDeactivationSteps(
     workflowVersionId: string,
     workflowVersionRepository: WorkspaceRepository<WorkflowVersionWorkspaceEntity>,
-    manager: WorkspaceEntityManager,
+    workspaceId: string,
   ) {
     const workflowVersionNullable = await workflowVersionRepository.findOne({
       where: { id: workflowVersionId },
@@ -236,110 +296,196 @@ export class WorkflowTriggerWorkspaceService {
       return;
     }
 
-    await this.setDeactivatedVersionStatus(
-      workflowVersion,
-      workflowVersionRepository,
-      manager,
-    );
+    await this.deleteCommandMenuItem(workflowVersion, workspaceId);
 
-    await this.disableTrigger(workflowVersion, manager);
-  }
+    const workspaceDataSource =
+      await this.globalWorkspaceOrmManager.getGlobalWorkspaceDataSource();
 
-  private async setActiveVersionStatus(
-    workflowVersion: WorkflowVersionWorkspaceEntity,
-    workflowVersionRepository: WorkspaceRepository<WorkflowVersionWorkspaceEntity>,
-    manager: WorkspaceEntityManager,
-  ) {
-    const activeWorkflowVersions = await workflowVersionRepository.find(
-      {
-        where: {
-          workflowId: workflowVersion.workflowId,
-          status: WorkflowVersionStatus.ACTIVE,
-        },
-      },
-      manager,
-    );
+    const queryRunner = workspaceDataSource.createQueryRunner();
 
-    if (activeWorkflowVersions.length > 0) {
-      throw new WorkflowTriggerException(
-        'Cannot have more than one active workflow version',
-        WorkflowTriggerExceptionCode.FORBIDDEN,
-        {
-          userFriendlyMessage: t`Cannot have more than one active workflow version`,
-        },
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      await workflowVersionRepository.update(
+        { id: workflowVersion.id },
+        { status: WorkflowVersionStatus.DEACTIVATED },
+        queryRunner.manager,
       );
+
+      await this.disableAutomatedTrigger(workflowVersion, workspaceId, {
+        entityManager: queryRunner.manager,
+      });
+
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
-
-    await workflowVersionRepository.update(
-      { id: workflowVersion.id },
-      { status: WorkflowVersionStatus.ACTIVE },
-      manager,
-    );
-
-    await this.emitStatusUpdateEvents(
-      workflowVersion,
-      WorkflowVersionStatus.ACTIVE,
-      this.getWorkspaceId(),
-    );
-  }
-
-  private async setDeactivatedVersionStatus(
-    workflowVersion: WorkflowVersionWorkspaceEntity,
-    workflowVersionRepository: WorkspaceRepository<WorkflowVersionWorkspaceEntity>,
-    manager: WorkspaceEntityManager,
-  ) {
-    if (workflowVersion.status !== WorkflowVersionStatus.ACTIVE) {
-      throw new WorkflowTriggerException(
-        'Cannot disable non-active workflow version',
-        WorkflowTriggerExceptionCode.FORBIDDEN,
-        {
-          userFriendlyMessage: t`Cannot disable non-active workflow version`,
-        },
-      );
-    }
-
-    await workflowVersionRepository.update(
-      { id: workflowVersion.id },
-      { status: WorkflowVersionStatus.DEACTIVATED },
-      manager,
-    );
 
     await this.emitStatusUpdateEvents(
       workflowVersion,
       WorkflowVersionStatus.DEACTIVATED,
-      this.getWorkspaceId(),
+      workspaceId,
     );
   }
 
-  private async upgradeWorkflowVersion(
+  private async resolveManualTriggerAvailability(
+    trigger: WorkflowManualTrigger,
+    workspaceId: string,
+  ): Promise<{
+    availabilityType: CommandMenuItemAvailabilityType;
+    availabilityObjectMetadataId: string | undefined;
+  }> {
+    const availability = trigger.settings.availability;
+
+    let availabilityType = CommandMenuItemAvailabilityType.GLOBAL;
+    let availabilityObjectMetadataId: string | undefined;
+
+    if (availability) {
+      switch (availability.type) {
+        case 'GLOBAL':
+          availabilityType = CommandMenuItemAvailabilityType.GLOBAL;
+          break;
+        case 'SINGLE_RECORD':
+        case 'BULK_RECORDS': {
+          availabilityType = CommandMenuItemAvailabilityType.RECORD_SELECTION;
+
+          const { objectIdByNameSingular } =
+            await this.workflowCommonWorkspaceService.getFlatEntityMaps(
+              workspaceId,
+            );
+
+          const objectId =
+            objectIdByNameSingular[availability.objectNameSingular];
+
+          if (!objectId) {
+            throw new WorkflowTriggerException(
+              `Object metadata not found for object: ${availability.objectNameSingular}`,
+              WorkflowTriggerExceptionCode.INVALID_WORKFLOW_VERSION,
+            );
+          }
+
+          availabilityObjectMetadataId = objectId;
+          break;
+        }
+      }
+    }
+
+    return { availabilityType, availabilityObjectMetadataId };
+  }
+
+  private async createOrUpdateCommandMenuItem(
     workflow: WorkflowWorkspaceEntity,
-    newPublishedVersionId: string,
-    workflowRepository: WorkspaceRepository<WorkflowWorkspaceEntity>,
-    workflowVersionRepository: WorkspaceRepository<WorkflowVersionWorkspaceEntity>,
-    manager: WorkspaceEntityManager,
+    workflowVersion: WorkflowVersionWorkspaceEntity,
+    workspaceId: string,
   ) {
-    if (workflow.lastPublishedVersionId === newPublishedVersionId) {
+    assertWorkflowVersionTriggerIsDefined(workflowVersion);
+
+    if (workflowVersion.trigger.type !== WorkflowTriggerType.MANUAL) {
       return;
     }
 
-    if (workflow.lastPublishedVersionId) {
-      await workflowVersionRepository.update(
-        { id: workflow.lastPublishedVersionId },
-        { status: WorkflowVersionStatus.ARCHIVED },
-        manager,
+    const isCommandMenuItemEnabled =
+      await this.featureFlagService.isFeatureEnabled(
+        FeatureFlagKey.IS_COMMAND_MENU_ITEM_ENABLED,
+        workspaceId,
       );
+
+    if (!isCommandMenuItemEnabled) {
+      return;
     }
 
-    await workflowRepository.update(
-      { id: workflow.id },
-      { lastPublishedVersionId: newPublishedVersionId },
-      manager,
-    );
+    const trigger = workflowVersion.trigger as WorkflowManualTrigger;
+
+    const { availabilityType, availabilityObjectMetadataId } =
+      await this.resolveManualTriggerAvailability(trigger, workspaceId);
+
+    const label = isNonEmptyString(workflow.name)
+      ? workflow.name
+      : 'Manual Trigger';
+
+    const existingCommandMenuItem =
+      await this.commandMenuItemService.findByWorkflowVersionId(
+        workflowVersion.id,
+        workspaceId,
+      );
+
+    if (existingCommandMenuItem) {
+      await this.commandMenuItemService.update(
+        {
+          id: existingCommandMenuItem.id,
+          label,
+          shortLabel: label,
+          icon: trigger.settings.icon,
+          isPinned: trigger.settings.isPinned,
+          availabilityType,
+          availabilityObjectMetadataId,
+        },
+        workspaceId,
+      );
+    } else {
+      await this.commandMenuItemService.create(
+        {
+          workflowVersionId: workflowVersion.id,
+          engineComponentKey: EngineComponentKey.TRIGGER_WORKFLOW_VERSION,
+          label,
+          shortLabel: label,
+          icon: trigger.settings.icon,
+          isPinned: trigger.settings.isPinned,
+          availabilityType,
+          availabilityObjectMetadataId,
+        },
+        workspaceId,
+      );
+    }
   }
 
-  private async enableTrigger(
+  private async deleteCommandMenuItem(
     workflowVersion: WorkflowVersionWorkspaceEntity,
-    manager: WorkspaceEntityManager,
+    workspaceId: string,
+  ) {
+    assertWorkflowVersionTriggerIsDefined(workflowVersion);
+
+    if (workflowVersion.trigger.type !== WorkflowTriggerType.MANUAL) {
+      return;
+    }
+
+    const isCommandMenuItemEnabled =
+      await this.featureFlagService.isFeatureEnabled(
+        FeatureFlagKey.IS_COMMAND_MENU_ITEM_ENABLED,
+        workspaceId,
+      );
+
+    if (!isCommandMenuItemEnabled) {
+      return;
+    }
+
+    const existingCommandMenuItem =
+      await this.commandMenuItemService.findByWorkflowVersionId(
+        workflowVersion.id,
+        workspaceId,
+      );
+
+    if (existingCommandMenuItem) {
+      await this.commandMenuItemService.delete(
+        existingCommandMenuItem.id,
+        workspaceId,
+      );
+    }
+  }
+
+  private async enableAutomatedTrigger(
+    workflowVersion: WorkflowVersionWorkspaceEntity,
+    workspaceId: string,
+    transactionContext?: {
+      entityManager: WorkspaceEntityManager;
+    },
   ) {
     assertWorkflowVersionTriggerIsDefined(workflowVersion);
 
@@ -355,7 +501,8 @@ export class WorkflowTriggerWorkspaceService {
           workflowId: workflowVersion.workflowId,
           type: AutomatedTriggerType.DATABASE_EVENT,
           settings,
-          manager,
+          workspaceId,
+          entityManager: transactionContext?.entityManager,
         });
 
         return;
@@ -367,20 +514,23 @@ export class WorkflowTriggerWorkspaceService {
           workflowId: workflowVersion.workflowId,
           type: AutomatedTriggerType.CRON,
           settings: { pattern },
-          manager,
+          workspaceId,
+          entityManager: transactionContext?.entityManager,
         });
 
         return;
       }
-      default: {
+      default:
         assertNever(workflowVersion.trigger);
-      }
     }
   }
 
-  private async disableTrigger(
+  private async disableAutomatedTrigger(
     workflowVersion: WorkflowVersionWorkspaceEntity,
-    manager: WorkspaceEntityManager,
+    workspaceId: string,
+    transactionContext?: {
+      entityManager: WorkspaceEntityManager;
+    },
   ) {
     assertWorkflowVersionTriggerIsDefined(workflowVersion);
 
@@ -389,7 +539,8 @@ export class WorkflowTriggerWorkspaceService {
       case WorkflowTriggerType.CRON:
         await this.automatedTriggerWorkspaceService.deleteAutomatedTrigger({
           workflowId: workflowVersion.workflowId,
-          manager,
+          workspaceId,
+          entityManager: transactionContext?.entityManager,
         });
 
         return;

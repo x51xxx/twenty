@@ -1,6 +1,6 @@
-import { Bundle, ZObject } from 'zapier-platform-core';
+import type { Bundle, ZObject } from 'zapier-platform-core';
 
-import { requestSchema } from '../utils/requestDb';
+import { requestSchema } from 'src/utils/requestDb';
 
 const objectListRequest = async (z: ZObject, bundle: Bundle) => {
   const schema = await requestSchema(z, bundle);

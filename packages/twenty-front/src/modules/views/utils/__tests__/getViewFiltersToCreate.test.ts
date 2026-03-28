@@ -1,13 +1,12 @@
 import { type ViewFilter } from '@/views/types/ViewFilter';
 import { ViewFilterOperand } from 'twenty-shared/types';
-import { getViewFiltersToCreate } from '../getViewFiltersToCreate';
+import { getViewFiltersToCreate } from '@/views/utils/getViewFiltersToCreate';
 
 describe('getViewFiltersToCreate', () => {
   const baseFilter: ViewFilter = {
-    __typename: 'ViewFilter',
     id: 'filter-1',
     fieldMetadataId: 'field-1',
-    operand: ViewFilterOperand.Contains,
+    operand: ViewFilterOperand.CONTAINS,
     value: 'test',
     displayValue: 'test',
     viewFilterGroupId: 'group-1',

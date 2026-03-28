@@ -1,30 +1,22 @@
-import { useTheme } from '@emotion/react';
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 
 import { TableCell } from '@/ui/layout/table/components/TableCell';
 import { TableRow } from '@/ui/layout/table/components/TableRow';
 import { getUrlHostnameOrThrow, isValidUrl } from 'twenty-shared/utils';
-import { IconChevronRight } from 'twenty-ui/display';
+import {
+  IconChevronRight,
+  OverflowingTextWithTooltip,
+} from 'twenty-ui/display';
+import { useContext } from 'react';
+import { ThemeContext, themeCssVariables } from 'twenty-ui/theme-constants';
 import { type Webhook } from '~/generated-metadata/graphql';
 
-export const StyledApisFieldTableRow = styled(TableRow)`
-  grid-template-columns: 1fr 28px;
-`;
+const WEBHOOK_TABLE_ROW_GRID_TEMPLATE_COLUMNS = '1fr 28px';
 
-const StyledIconTableCell = styled(TableCell)`
-  justify-content: center;
-  padding-right: ${({ theme }) => theme.spacing(1)};
-  padding-left: 0;
-`;
-
-const StyledUrlTableCell = styled(TableCell)`
-  color: ${({ theme }) => theme.font.color.primary};
-  overflow-x: scroll;
-  white-space: nowrap;
-`;
-
-const StyledIconChevronRight = styled(IconChevronRight)`
-  color: ${({ theme }) => theme.font.color.tertiary};
+const StyledIconChevronRightContainer = styled.span`
+  align-items: center;
+  color: ${themeCssVariables.font.color.tertiary};
+  display: flex;
 `;
 
 export const SettingsDevelopersWebhookTableRow = ({
@@ -37,21 +29,32 @@ export const SettingsDevelopersWebhookTableRow = ({
   >;
   to: string;
 }) => {
-  const theme = useTheme();
-
+  const { theme } = useContext(ThemeContext);
   return (
-    <StyledApisFieldTableRow to={to}>
-      <StyledUrlTableCell>
-        {isValidUrl(webhook.targetUrl)
-          ? getUrlHostnameOrThrow(webhook.targetUrl)
-          : webhook.targetUrl}
-      </StyledUrlTableCell>
-      <StyledIconTableCell>
-        <StyledIconChevronRight
-          size={theme.icon.size.md}
-          stroke={theme.icon.stroke.sm}
+    <TableRow
+      gridTemplateColumns={WEBHOOK_TABLE_ROW_GRID_TEMPLATE_COLUMNS}
+      to={to}
+    >
+      <TableCell color={themeCssVariables.font.color.primary} overflow="hidden">
+        <OverflowingTextWithTooltip
+          text={
+            isValidUrl(webhook.targetUrl)
+              ? getUrlHostnameOrThrow(webhook.targetUrl)
+              : webhook.targetUrl
+          }
         />
-      </StyledIconTableCell>
-    </StyledApisFieldTableRow>
+      </TableCell>
+      <TableCell
+        align="center"
+        padding={`0 ${themeCssVariables.spacing[1]} 0 0`}
+      >
+        <StyledIconChevronRightContainer>
+          <IconChevronRight
+            size={theme.icon.size.md}
+            stroke={theme.icon.stroke.sm}
+          />
+        </StyledIconChevronRightContainer>
+      </TableCell>
+    </TableRow>
   );
 };

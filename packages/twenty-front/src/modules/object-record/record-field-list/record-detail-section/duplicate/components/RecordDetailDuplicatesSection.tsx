@@ -1,4 +1,4 @@
-import { useOpenMergeRecordsPageInCommandMenu } from '@/command-menu/hooks/useOpenMergeRecordsPageInCommandMenu';
+import { useOpenMergeRecordsPageInSidePanel } from '@/side-panel/hooks/useOpenMergeRecordsPageInSidePanel';
 import { useObjectMetadataItem } from '@/object-metadata/hooks/useObjectMetadataItem';
 import { RecordChip } from '@/object-record/components/RecordChip';
 import { useFindDuplicateRecords } from '@/object-record/hooks/useFindDuplicateRecords';
@@ -6,6 +6,7 @@ import { RecordDetailRecordsListContainer } from '@/object-record/record-field-l
 import { RecordDetailRecordsListItemContainer } from '@/object-record/record-field-list/record-detail-section/components/RecordDetailRecordsListItemContainer';
 import { RecordDetailSectionContainer } from '@/object-record/record-field-list/record-detail-section/components/RecordDetailSectionContainer';
 
+import { t } from '@lingui/core/macro';
 import { isDefined } from 'twenty-shared/utils';
 import { IconArrowMerge } from 'twenty-ui/display';
 import { LightIconButton } from 'twenty-ui/input';
@@ -33,24 +34,28 @@ export const RecordDetailDuplicatesSection = ({
     objectRecordId,
   ];
 
-  const { openMergeRecordsPageInCommandMenu } =
-    useOpenMergeRecordsPageInCommandMenu({
+  const { openMergeRecordsPageInSidePanel } =
+    useOpenMergeRecordsPageInSidePanel({
       objectNameSingular,
       objectRecordIds: duplicateRecordIds,
     });
 
-  if (!queryResults || !queryResults[0] || queryResults[0].length === 0)
+  if (
+    !isDefined(queryResults) ||
+    !isDefined(queryResults[0]) ||
+    queryResults[0].length === 0
+  )
     return null;
 
   return (
     <RecordDetailSectionContainer
-      title="Duplicates"
+      title={t`Duplicates`}
       rightAdornment={
         <LightIconButton
           className="displayOnHover"
           Icon={IconArrowMerge}
           accent="tertiary"
-          onClick={openMergeRecordsPageInCommandMenu}
+          onClick={openMergeRecordsPageInSidePanel}
         />
       }
     >

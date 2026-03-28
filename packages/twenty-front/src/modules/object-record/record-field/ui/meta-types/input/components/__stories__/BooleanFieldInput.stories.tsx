@@ -1,17 +1,17 @@
-import { type Meta, type StoryObj } from '@storybook/react';
-import { expect, userEvent, within } from '@storybook/test';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useEffect } from 'react';
-import { useSetRecoilState } from 'recoil';
+import { expect, userEvent, within } from 'storybook/test';
 
 import { recordStoreFamilyState } from '@/object-record/record-store/states/recordStoreFamilyState';
+import { useSetAtomFamilyState } from '@/ui/utilities/state/jotai/hooks/useSetAtomFamilyState';
 import { FieldMetadataType } from '~/generated-metadata/graphql';
 
 import { FieldContext } from '@/object-record/record-field/ui/contexts/FieldContext';
 import { getFieldInputEventContextProviderWithJestMocks } from '@/object-record/record-field/ui/meta-types/input/components/__stories__/utils/getFieldInputEventContextProviderWithJestMocks';
+import { BooleanFieldInput } from '@/object-record/record-field/ui/meta-types/input/components/BooleanFieldInput';
 import { RecordFieldComponentInstanceContext } from '@/object-record/record-field/ui/states/contexts/RecordFieldComponentInstanceContext';
 import { RECORD_TABLE_CELL_INPUT_ID_PREFIX } from '@/object-record/record-table/constants/RecordTableCellInputIdPrefix';
 import { getRecordFieldInputInstanceId } from '@/object-record/utils/getRecordFieldInputId';
-import { BooleanFieldInput } from '../BooleanFieldInput';
 
 const { FieldInputEventContextProviderWithJestMocks, handleSubmitMocked } =
   getFieldInputEventContextProviderWithJestMocks();
@@ -23,11 +23,14 @@ const BooleanFieldValueSetterEffect = ({
   value: boolean;
   recordId: string;
 }) => {
-  const setField = useSetRecoilState(recordStoreFamilyState(recordId));
+  const setRecordStore = useSetAtomFamilyState(
+    recordStoreFamilyState,
+    recordId,
+  );
 
   useEffect(() => {
-    setField({ id: recordId, Boolean: value, __typename: 'Person' });
-  }, [recordId, setField, value]);
+    setRecordStore({ id: recordId, Boolean: value, __typename: 'Person' });
+  }, [recordId, setRecordStore, value]);
 
   return <></>;
 };
@@ -84,6 +87,7 @@ const BooleanFieldInputWithContext = ({
 const meta: Meta = {
   title: 'UI/Data/Field/Input/BooleanFieldInput',
   component: BooleanFieldInputWithContext,
+  decorators: [],
   args: {
     value: true,
     recordId: 'id-1',

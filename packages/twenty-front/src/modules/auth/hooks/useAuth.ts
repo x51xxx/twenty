@@ -1,36 +1,45 @@
-import { AppPath } from '@/types/AppPath';
-import { ApolloError, useApolloClient } from '@apollo/client';
-import { useCallback } from 'react';
 import {
-  snapshot_UNSTABLE,
-  useGotoRecoilSnapshot,
-  useRecoilCallback,
-  useRecoilValue,
-  useSetRecoilState,
-} from 'recoil';
+  useApolloClient,
+  useLazyQuery,
+  useMutation,
+} from '@apollo/client/react';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { useCallback } from 'react';
+import { AppPath } from 'twenty-shared/types';
 
-import { billingState } from '@/client-config/states/billingState';
-import { clientConfigApiStatusState } from '@/client-config/states/clientConfigApiStatusState';
-import { supportChatState } from '@/client-config/states/supportChatState';
 import { REACT_APP_SERVER_BASE_URL } from '~/config';
 import {
-  useCheckUserExistsLazyQuery,
-  useGetAuthTokensFromLoginTokenMutation,
-  useGetAuthTokensFromOtpMutation,
-  useGetLoginTokenFromCredentialsMutation,
-  useGetLoginTokenFromEmailVerificationTokenMutation,
-  useGetWorkspaceAgnosticTokenFromEmailVerificationTokenMutation,
-  useSignInMutation,
-  useSignUpInWorkspaceMutation,
-  useSignUpMutation,
+  type AuthToken,
   type AuthTokenPair,
+  CheckUserExistsDocument,
+  GetAuthTokensFromLoginTokenDocument,
+  GetAuthTokensFromOtpDocument,
+  GetLoginTokenFromCredentialsDocument,
+  SignInDocument,
+  SignUpInWorkspaceDocument,
+  SignUpDocument,
+  VerifyEmailAndGetLoginTokenDocument,
+  VerifyEmailAndGetWorkspaceAgnosticTokenDocument,
 } from '~/generated-metadata/graphql';
 
-import { isDeveloperDefaultSignInPrefilledState } from '@/client-config/states/isDeveloperDefaultSignInPrefilledState';
-import { tokenPairState } from '../states/tokenPairState';
+import { tokenPairState } from '@/auth/states/tokenPairState';
+import { clearSessionLocalStorageKeys } from '@/auth/utils/clearSessionLocalStorageKeys';
+import { broadcastSignOutToOtherTabs } from '@/auth/utils/crossTabSignOut';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
+import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
 
+import { isAppEffectRedirectEnabledState } from '@/app/states/isAppEffectRedirectEnabledState';
+import { availableWorkspacesState } from '@/auth/states/availableWorkspacesState';
+import { currentUserState } from '@/auth/states/currentUserState';
+import { currentUserWorkspaceState } from '@/auth/states/currentUserWorkspaceState';
+import { currentWorkspaceMemberState } from '@/auth/states/currentWorkspaceMemberState';
+import { currentWorkspaceMembersState } from '@/auth/states/currentWorkspaceMembersState';
+import { currentWorkspaceState } from '@/auth/states/currentWorkspaceState';
 import { useSignUpInNewWorkspace } from '@/auth/sign-in-up/hooks/useSignUpInNewWorkspace';
-import { isCurrentUserLoadedState } from '@/auth/states/isCurrentUserLoadedState';
+import { useLoadMockedMetadata } from '@/metadata-store/hooks/useLoadMockedMetadata';
+import { preloadMockedMetadata } from '@/metadata-store/utils/preloadMockedMetadata';
+import { lastAuthenticatedMethodState } from '@/auth/states/lastAuthenticatedMethodState';
+import { loginTokenState } from '@/auth/states/loginTokenState';
 import {
   SignInUpStep,
   signInUpStepState,
@@ -42,144 +51,138 @@ import {
   getFirstAvailableWorkspaces,
 } from '@/auth/utils/availableWorkspacesUtils';
 import { useRequestFreshCaptchaToken } from '@/captcha/hooks/useRequestFreshCaptchaToken';
-import { apiConfigState } from '@/client-config/states/apiConfigState';
-import { captchaState } from '@/client-config/states/captchaState';
+import { isCaptchaScriptLoadedState } from '@/captcha/states/isCaptchaScriptLoadedState';
 import { isEmailVerificationRequiredState } from '@/client-config/states/isEmailVerificationRequiredState';
 import { isMultiWorkspaceEnabledState } from '@/client-config/states/isMultiWorkspaceEnabledState';
-import { sentryConfigState } from '@/client-config/states/sentryConfigState';
 import { useLastAuthenticatedWorkspaceDomain } from '@/domain-manager/hooks/useLastAuthenticatedWorkspaceDomain';
 import { useOrigin } from '@/domain-manager/hooks/useOrigin';
 import { useRedirect } from '@/domain-manager/hooks/useRedirect';
 import { useRedirectToWorkspaceDomain } from '@/domain-manager/hooks/useRedirectToWorkspaceDomain';
 import { domainConfigurationState } from '@/domain-manager/states/domainConfigurationState';
-import { useRefreshObjectMetadataItems } from '@/object-metadata/hooks/useRefreshObjectMetadataItems';
+import { useClearSseClient } from '@/sse-db-event/hooks/useClearSseClient';
 import { useLoadCurrentUser } from '@/users/hooks/useLoadCurrentUser';
 import { workspaceAuthProvidersState } from '@/workspace/states/workspaceAuthProvidersState';
 import { i18n } from '@lingui/core';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SOURCE_LOCALE } from 'twenty-shared/translations';
 import { isDefined } from 'twenty-shared/utils';
-import { iconsState } from 'twenty-ui/display';
-import { type AuthToken } from '~/generated/graphql';
-import { cookieStorage } from '~/utils/cookie-storage';
 import { getWorkspaceUrl } from '~/utils/getWorkspaceUrl';
-import { loginTokenState } from '../states/loginTokenState';
+import { useStore } from 'jotai';
 
 export const useAuth = () => {
-  const setTokenPair = useSetRecoilState(tokenPairState);
-  const setLoginToken = useSetRecoilState(loginTokenState);
+  const store = useStore();
+  const setTokenPair = useSetAtomState(tokenPairState);
+  const setLoginToken = useSetAtomState(loginTokenState);
+  const setIsAppEffectRedirectEnabled = useSetAtomState(
+    isAppEffectRedirectEnabledState,
+  );
+
   const { origin } = useOrigin();
   const { requestFreshCaptchaToken } = useRequestFreshCaptchaToken();
-  const isMultiWorkspaceEnabled = useRecoilValue(isMultiWorkspaceEnabledState);
-  const isEmailVerificationRequired = useRecoilValue(
+  const isCaptchaScriptLoaded = useAtomStateValue(isCaptchaScriptLoadedState);
+  const isMultiWorkspaceEnabled = useAtomStateValue(
+    isMultiWorkspaceEnabledState,
+  );
+  const isEmailVerificationRequired = useAtomStateValue(
     isEmailVerificationRequiredState,
   );
   const { loadCurrentUser } = useLoadCurrentUser();
+  const { clearSseClient } = useClearSseClient();
 
-  const { refreshObjectMetadataItems } = useRefreshObjectMetadataItems();
+  const { applyMockedMetadata } = useLoadMockedMetadata();
   const { createWorkspace } = useSignUpInNewWorkspace();
 
-  const setSignInUpStep = useSetRecoilState(signInUpStepState);
+  const setSignInUpStep = useSetAtomState(signInUpStepState);
   const { redirect } = useRedirect();
   const { redirectToWorkspaceDomain } = useRedirectToWorkspaceDomain();
 
-  const [getLoginTokenFromCredentials] =
-    useGetLoginTokenFromCredentialsMutation();
-  const [signIn] = useSignInMutation();
-  const [signUp] = useSignUpMutation();
-  const [signUpInWorkspace] = useSignUpInWorkspaceMutation();
-  const [getAuthTokensFromLoginToken] =
-    useGetAuthTokensFromLoginTokenMutation();
-  const [getLoginTokenFromEmailVerificationToken] =
-    useGetLoginTokenFromEmailVerificationTokenMutation();
-  const [getWorkspaceAgnosticTokenFromEmailVerificationToken] =
-    useGetWorkspaceAgnosticTokenFromEmailVerificationTokenMutation();
-  const [getAuthTokensFromOtp] = useGetAuthTokensFromOtpMutation();
+  const [getLoginTokenFromCredentials] = useMutation(
+    GetLoginTokenFromCredentialsDocument,
+  );
+  const [signIn] = useMutation(SignInDocument);
+  const [signUp] = useMutation(SignUpDocument);
+  const [signUpInWorkspace] = useMutation(SignUpInWorkspaceDocument);
+  const [getAuthTokensFromLoginToken] = useMutation(
+    GetAuthTokensFromLoginTokenDocument,
+  );
+  const [verifyEmailAndGetLoginToken] = useMutation(
+    VerifyEmailAndGetLoginTokenDocument,
+  );
+  const [verifyEmailAndGetWorkspaceAgnosticToken] = useMutation(
+    VerifyEmailAndGetWorkspaceAgnosticTokenDocument,
+  );
+  const [getAuthTokensFromOtp] = useMutation(GetAuthTokensFromOtpDocument);
 
-  const workspacePublicData = useRecoilValue(workspacePublicDataState);
+  const workspacePublicData = useAtomStateValue(workspacePublicDataState);
 
   const { setLastAuthenticateWorkspaceDomain } =
     useLastAuthenticatedWorkspaceDomain();
-  const [checkUserExistsQuery, { data: checkUserExistsData }] =
-    useCheckUserExistsLazyQuery();
+  const [checkUserExistsQuery, { data: checkUserExistsData }] = useLazyQuery(
+    CheckUserExistsDocument,
+  );
 
   const client = useApolloClient();
-
-  const goToRecoilSnapshot = useGotoRecoilSnapshot();
 
   const [, setSearchParams] = useSearchParams();
 
   const navigate = useNavigate();
 
-  const clearSession = useRecoilCallback(
-    ({ snapshot }) =>
-      async () => {
-        const emptySnapshot = snapshot_UNSTABLE();
+  const clearSession = useCallback(async () => {
+    clearSseClient();
+    store.set(isAppEffectRedirectEnabledState.atom, false);
 
-        const iconsValue = snapshot.getLoadable(iconsState).getValue();
-        const authProvidersValue = snapshot
-          .getLoadable(workspaceAuthProvidersState)
-          .getValue();
-        const billing = snapshot.getLoadable(billingState).getValue();
-        const isDeveloperDefaultSignInPrefilled = snapshot
-          .getLoadable(isDeveloperDefaultSignInPrefilledState)
-          .getValue();
-        const supportChat = snapshot.getLoadable(supportChatState).getValue();
-        const captcha = snapshot.getLoadable(captchaState).getValue();
-        const clientConfigApiStatus = snapshot
-          .getLoadable(clientConfigApiStatusState)
-          .getValue();
-        const isCurrentUserLoaded = snapshot
-          .getLoadable(isCurrentUserLoadedState)
-          .getValue();
-        const isMultiWorkspaceEnabled = snapshot
-          .getLoadable(isMultiWorkspaceEnabledState)
-          .getValue();
-        const domainConfiguration = snapshot
-          .getLoadable(domainConfigurationState)
-          .getValue();
-        const apiConfig = snapshot.getLoadable(apiConfigState).getValue();
-        const sentryConfig = snapshot.getLoadable(sentryConfigState).getValue();
-        const workspacePublicData = snapshot
-          .getLoadable(workspacePublicDataState)
-          .getValue();
+    const mockedData = await preloadMockedMetadata();
 
-        const initialSnapshot = emptySnapshot.map(({ set }) => {
-          set(iconsState, iconsValue);
-          set(workspaceAuthProvidersState, authProvidersValue);
-          set(billingState, billing);
-          set(
-            isDeveloperDefaultSignInPrefilledState,
-            isDeveloperDefaultSignInPrefilled,
-          );
-          set(supportChatState, supportChat);
-          set(captchaState, captcha);
-          set(apiConfigState, apiConfig);
-          set(sentryConfigState, sentryConfig);
-          set(workspacePublicDataState, workspacePublicData);
-          set(clientConfigApiStatusState, clientConfigApiStatus);
-          set(isCurrentUserLoadedState, isCurrentUserLoaded);
-          set(isMultiWorkspaceEnabledState, isMultiWorkspaceEnabled);
-          set(domainConfigurationState, domainConfiguration);
-          return undefined;
-        });
+    const authProvidersValue = store.get(workspaceAuthProvidersState.atom);
+    const domainConfigurationValue = store.get(domainConfigurationState.atom);
+    const workspacePublicDataValue = store.get(workspacePublicDataState.atom);
+    const lastAuthenticatedMethod = store.get(
+      lastAuthenticatedMethodState.atom,
+    );
+    const isCaptchaScriptLoadedValue = store.get(
+      isCaptchaScriptLoadedState.atom,
+    );
 
-        goToRecoilSnapshot(initialSnapshot);
+    sessionStorage.clear();
+    clearSessionLocalStorageKeys();
 
-        sessionStorage.clear();
-        localStorage.clear();
-        await client.clearStore();
-        // We need to explicitly clear the state to trigger the cookie deletion which include the parent domain
-        setLastAuthenticateWorkspaceDomain(null);
-        navigate(AppPath.SignInUp);
-      },
-    [navigate, client, goToRecoilSnapshot, setLastAuthenticateWorkspaceDomain],
-  );
+    store.set(workspaceAuthProvidersState.atom, authProvidersValue);
+    store.set(workspacePublicDataState.atom, workspacePublicDataValue);
+    store.set(domainConfigurationState.atom, domainConfigurationValue);
+    store.set(isCaptchaScriptLoadedState.atom, isCaptchaScriptLoadedValue);
+    store.set(lastAuthenticatedMethodState.atom, lastAuthenticatedMethod);
+
+    store.set(tokenPairState.atom, null);
+    store.set(currentUserState.atom, null);
+    store.set(currentWorkspaceState.atom, null);
+    store.set(currentUserWorkspaceState.atom, null);
+    store.set(currentWorkspaceMemberState.atom, null);
+    store.set(currentWorkspaceMembersState.atom, []);
+    store.set(availableWorkspacesState.atom, {
+      availableWorkspacesForSignIn: [],
+      availableWorkspacesForSignUp: [],
+    });
+    store.set(loginTokenState.atom, null);
+    store.set(signInUpStepState.atom, SignInUpStep.Init);
+
+    applyMockedMetadata(mockedData);
+
+    await client.clearStore();
+    setLastAuthenticateWorkspaceDomain(null);
+    navigate(AppPath.SignInUp);
+    store.set(isAppEffectRedirectEnabledState.atom, true);
+  }, [
+    clearSseClient,
+    client,
+    setLastAuthenticateWorkspaceDomain,
+    applyMockedMetadata,
+    navigate,
+    store,
+  ]);
 
   const handleSetAuthTokens = useCallback(
     (tokens: AuthTokenPair) => {
       setTokenPair(tokens);
-      cookieStorage.setItem('tokenPair', JSON.stringify(tokens));
     },
     [setTokenPair],
   );
@@ -195,8 +198,8 @@ export const useAuth = () => {
             origin,
           },
         });
-        if (isDefined(getLoginTokenResult.errors)) {
-          throw getLoginTokenResult.errors;
+        if (isDefined(getLoginTokenResult.error)) {
+          throw getLoginTokenResult.error;
         }
 
         if (!getLoginTokenResult.data?.getLoginTokenFromCredentials) {
@@ -207,8 +210,8 @@ export const useAuth = () => {
       } catch (error) {
         // TODO: Get intellisense for graphql error extensions code (codegen?)
         if (
-          error instanceof ApolloError &&
-          error.graphQLErrors[0]?.extensions?.subCode === 'EMAIL_NOT_VERIFIED'
+          CombinedGraphQLErrors.is(error) &&
+          error.errors[0]?.extensions?.subCode === 'EMAIL_NOT_VERIFIED'
         ) {
           setSearchParams({ email });
           setSignInUpStep(SignInUpStep.EmailVerification);
@@ -220,13 +223,13 @@ export const useAuth = () => {
     [getLoginTokenFromCredentials, setSearchParams, setSignInUpStep, origin],
   );
 
-  const handleGetLoginTokenFromEmailVerificationToken = useCallback(
+  const handleverifyEmailAndGetLoginToken = useCallback(
     async (
       emailVerificationToken: string,
       email: string,
       captchaToken?: string,
     ) => {
-      const loginTokenResult = await getLoginTokenFromEmailVerificationToken({
+      const loginTokenResult = await verifyEmailAndGetLoginToken({
         variables: {
           email,
           emailVerificationToken,
@@ -235,45 +238,42 @@ export const useAuth = () => {
         },
       });
 
-      if (isDefined(loginTokenResult.errors)) {
-        throw loginTokenResult.errors;
+      if (isDefined(loginTokenResult.error)) {
+        throw loginTokenResult.error;
       }
 
-      if (!loginTokenResult.data?.getLoginTokenFromEmailVerificationToken) {
+      if (!loginTokenResult.data?.verifyEmailAndGetLoginToken) {
         throw new Error('No login token');
       }
 
-      return loginTokenResult.data.getLoginTokenFromEmailVerificationToken;
+      return loginTokenResult.data.verifyEmailAndGetLoginToken;
     },
-    [getLoginTokenFromEmailVerificationToken, origin],
+    [verifyEmailAndGetLoginToken, origin],
   );
 
-  const handleGetWorkspaceAgnosticTokenFromEmailVerificationToken = useCallback(
+  const handleverifyEmailAndGetWorkspaceAgnosticToken = useCallback(
     async (
       emailVerificationToken: string,
       email: string,
       captchaToken?: string,
     ) => {
-      const { data, errors } =
-        await getWorkspaceAgnosticTokenFromEmailVerificationToken({
-          variables: {
-            email,
-            emailVerificationToken,
-            captchaToken,
-          },
-        });
+      const { data, error } = await verifyEmailAndGetWorkspaceAgnosticToken({
+        variables: {
+          email,
+          emailVerificationToken,
+          captchaToken,
+        },
+      });
 
-      if (isDefined(errors)) {
-        throw errors;
+      if (isDefined(error)) {
+        throw error;
       }
 
-      if (!data?.getWorkspaceAgnosticTokenFromEmailVerificationToken) {
+      if (!data?.verifyEmailAndGetWorkspaceAgnosticToken) {
         throw new Error('No workspace agnostic token in result');
       }
 
-      handleSetAuthTokens(
-        data.getWorkspaceAgnosticTokenFromEmailVerificationToken.tokens,
-      );
+      handleSetAuthTokens(data.verifyEmailAndGetWorkspaceAgnosticToken.tokens);
 
       const { user } = await loadCurrentUser();
 
@@ -285,7 +285,7 @@ export const useAuth = () => {
     },
     [
       createWorkspace,
-      getWorkspaceAgnosticTokenFromEmailVerificationToken,
+      verifyEmailAndGetWorkspaceAgnosticToken,
       handleSetAuthTokens,
       loadCurrentUser,
       setSignInUpStep,
@@ -302,14 +302,13 @@ export const useAuth = () => {
   const handleLoadWorkspaceAfterAuthentication = useCallback(
     async (authTokens: AuthTokenPair) => {
       handleSetAuthTokens(authTokens);
+      setIsAppEffectRedirectEnabled(false);
 
-      // TODO: We can't parallelize this yet because when loadCurrentUSer is loaded
-      // then UserProvider updates its children and PrefetchDataProvider is triggered
-      // which requires the correct metadata to be loaded (not the mocks)
       await loadCurrentUser();
-      await refreshObjectMetadataItems();
+
+      setIsAppEffectRedirectEnabled(true);
     },
-    [loadCurrentUser, handleSetAuthTokens, refreshObjectMetadataItems],
+    [loadCurrentUser, handleSetAuthTokens, setIsAppEffectRedirectEnabled],
   );
 
   const handleGetAuthTokensFromLoginToken = useCallback(
@@ -322,8 +321,8 @@ export const useAuth = () => {
           },
         });
 
-        if (isDefined(getAuthTokensResult.errors)) {
-          throw getAuthTokensResult.errors;
+        if (isDefined(getAuthTokensResult.error)) {
+          throw getAuthTokensResult.error;
         }
 
         if (!getAuthTokensResult.data?.getAuthTokensFromLoginToken) {
@@ -335,8 +334,8 @@ export const useAuth = () => {
         );
       } catch (error) {
         if (
-          error instanceof ApolloError &&
-          error.graphQLErrors[0]?.extensions?.subCode ===
+          CombinedGraphQLErrors.is(error) &&
+          error.errors[0]?.extensions?.subCode ===
             'TWO_FACTOR_AUTHENTICATION_PROVISION_REQUIRED'
         ) {
           handleSetLoginToken(loginToken);
@@ -345,8 +344,8 @@ export const useAuth = () => {
         }
 
         if (
-          error instanceof ApolloError &&
-          error.graphQLErrors[0]?.extensions?.subCode ===
+          CombinedGraphQLErrors.is(error) &&
+          error.errors[0]?.extensions?.subCode ===
             'TWO_FACTOR_AUTHENTICATION_VERIFICATION_REQUIRED'
         ) {
           handleSetLoginToken(loginToken);
@@ -367,7 +366,7 @@ export const useAuth = () => {
 
   const handleCredentialsSignIn = useCallback(
     async (email: string, password: string, captchaToken?: string) => {
-      signIn({
+      await signIn({
         variables: { email, password, captchaToken },
         onCompleted: async (data) => {
           handleSetAuthTokens(data.signIn.tokens);
@@ -401,8 +400,8 @@ export const useAuth = () => {
         },
         onError: (error) => {
           if (
-            error instanceof ApolloError &&
-            error.graphQLErrors[0]?.extensions?.subCode === 'EMAIL_NOT_VERIFIED'
+            CombinedGraphQLErrors.is(error) &&
+            error.errors[0]?.extensions?.subCode === 'EMAIL_NOT_VERIFIED'
           ) {
             setSearchParams({ email });
             setSignInUpStep(SignInUpStep.EmailVerification);
@@ -434,8 +433,8 @@ export const useAuth = () => {
         },
       });
 
-      if (isDefined(signUpResult.errors)) {
-        throw signUpResult.errors;
+      if (isDefined(signUpResult.error)) {
+        throw signUpResult.error;
       }
 
       if (isEmailVerificationRequired) {
@@ -482,9 +481,10 @@ export const useAuth = () => {
   );
 
   const handleSignOut = useCallback(async () => {
+    broadcastSignOutToOtherTabs();
     await clearSession();
-    await requestFreshCaptchaToken();
-  }, [clearSession, requestFreshCaptchaToken]);
+    if (isCaptchaScriptLoaded) await requestFreshCaptchaToken();
+  }, [clearSession, isCaptchaScriptLoaded, requestFreshCaptchaToken]);
 
   const handleCredentialsSignUpInWorkspace = useCallback(
     async ({
@@ -517,8 +517,8 @@ export const useAuth = () => {
         },
       });
 
-      if (isDefined(signUpInWorkspaceResult.errors)) {
-        throw signUpInWorkspaceResult.errors;
+      if (isDefined(signUpInWorkspaceResult.error)) {
+        throw signUpInWorkspaceResult.error;
       }
 
       if (!signUpInWorkspaceResult.data?.signUpInWorkspace) {
@@ -628,6 +628,18 @@ export const useAuth = () => {
     [buildRedirectUrl, redirect],
   );
 
+  const handleCasdoorLogin = useCallback(
+    (params: {
+      workspacePersonalInviteToken?: string;
+      workspaceInviteHash?: string;
+      billingCheckoutSession?: BillingCheckoutSession;
+      action: string;
+    }) => {
+      redirect(buildRedirectUrl('/auth/casdoor', params));
+    },
+    [buildRedirectUrl, redirect],
+  );
+
   const handleGetAuthTokensFromOTP = useCallback(
     async (otp: string, loginToken: string, captchaToken?: string) => {
       const getAuthTokensFromOtpResult = await getAuthTokensFromOtp({
@@ -639,8 +651,8 @@ export const useAuth = () => {
         },
       });
 
-      if (isDefined(getAuthTokensFromOtpResult.errors)) {
-        throw getAuthTokensFromOtpResult.errors;
+      if (isDefined(getAuthTokensFromOtpResult.error)) {
+        throw getAuthTokensFromOtpResult.error;
       }
 
       if (!getAuthTokensFromOtpResult.data?.getAuthTokensFromOTP) {
@@ -656,10 +668,9 @@ export const useAuth = () => {
 
   return {
     getLoginTokenFromCredentials: handleGetLoginTokenFromCredentials,
-    getWorkspaceAgnosticTokenFromEmailVerificationToken:
-      handleGetWorkspaceAgnosticTokenFromEmailVerificationToken,
-    getLoginTokenFromEmailVerificationToken:
-      handleGetLoginTokenFromEmailVerificationToken,
+    verifyEmailAndGetWorkspaceAgnosticToken:
+      handleverifyEmailAndGetWorkspaceAgnosticToken,
+    verifyEmailAndGetLoginToken: handleverifyEmailAndGetLoginToken,
     getAuthTokensFromLoginToken: handleGetAuthTokensFromLoginToken,
     checkUserExists: { checkUserExistsData, checkUserExistsQuery },
     clearSession,
@@ -670,6 +681,7 @@ export const useAuth = () => {
     signInWithCredentials: handleCredentialsSignIn,
     signInWithGoogle: handleGoogleLogin,
     signInWithMicrosoft: handleMicrosoftLogin,
+    signInWithCasdoor: handleCasdoorLogin,
     setAuthTokens: handleSetAuthTokens,
     getAuthTokensFromOTP: handleGetAuthTokensFromOTP,
   };

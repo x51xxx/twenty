@@ -1,4 +1,4 @@
-import { type Meta, type StoryObj } from '@storybook/react';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
 
 import { ComponentDecorator } from '@ui/testing';
 
@@ -9,10 +9,6 @@ const meta: Meta<typeof ColorSample> = {
   component: ColorSample,
   decorators: [ComponentDecorator],
   args: { colorName: 'green' },
-  argTypes: {
-    as: { control: false },
-    theme: { control: false },
-  },
 };
 
 export default meta;

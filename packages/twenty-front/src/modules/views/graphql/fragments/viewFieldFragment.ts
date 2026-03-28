@@ -1,7 +1,7 @@
 import { gql } from '@apollo/client';
 
 export const VIEW_FIELD_FRAGMENT = gql`
-  fragment ViewFieldFragment on CoreViewField {
+  fragment ViewFieldFragment on ViewField {
     id
     fieldMetadataId
     viewId
@@ -9,5 +9,10 @@ export const VIEW_FIELD_FRAGMENT = gql`
     position
     size
     aggregateOperation
+    viewFieldGroupId
+    isOverridden
+    createdAt
+    updatedAt
+    deletedAt
   }
 `;

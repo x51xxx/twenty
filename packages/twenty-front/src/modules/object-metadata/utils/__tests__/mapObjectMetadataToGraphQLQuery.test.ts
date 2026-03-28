@@ -1,19 +1,19 @@
 import { mapObjectMetadataToGraphQLQuery } from '@/object-metadata/utils/mapObjectMetadataToGraphQLQuery';
-import { generatedMockObjectMetadataItems } from '~/testing/utils/generatedMockObjectMetadataItems';
+import { getTestEnrichedObjectMetadataItemsMock } from '~/testing/utils/getTestEnrichedObjectMetadataItemsMock';
 import { normalizeGQLQuery } from '~/utils/normalizeGQLQuery';
 
-const personObjectMetadataItem = generatedMockObjectMetadataItems.find(
+const personObjectMetadataItem = getTestEnrichedObjectMetadataItemsMock().find(
   (item) => item.nameSingular === 'person',
 );
 
 if (!personObjectMetadataItem) {
-  throw new Error('ObjectMetadataItem not found');
+  throw new Error('Object metadata not found');
 }
 
 describe('mapObjectMetadataToGraphQLQuery', () => {
   it('should query only specified recordGqlFields', async () => {
     const res = mapObjectMetadataToGraphQLQuery({
-      objectMetadataItems: generatedMockObjectMetadataItems,
+      objectMetadataItems: getTestEnrichedObjectMetadataItemsMock(),
       objectMetadataItem: personObjectMetadataItem,
       recordGqlFields: {
         company: true,
@@ -38,6 +38,8 @@ describe('mapObjectMetadataToGraphQLQuery', () => {
           canDestroyObjectRecords: true,
           objectMetadataId: personObjectMetadataItem.id,
           restrictedFields: {},
+          rowLevelPermissionPredicates: [],
+          rowLevelPermissionPredicateGroups: [],
         },
       },
     });
@@ -54,7 +56,7 @@ describe('mapObjectMetadataToGraphQLQuery', () => {
         primaryEmail
         additionalEmails
     }
-    phone 
+    phone
     {
       primaryPhoneNumber
       primaryPhoneCountryCode
@@ -131,7 +133,7 @@ describe('mapObjectMetadataToGraphQLQuery', () => {
 
   it('should load only specified operation fields nested', async () => {
     const res = mapObjectMetadataToGraphQLQuery({
-      objectMetadataItems: generatedMockObjectMetadataItems,
+      objectMetadataItems: getTestEnrichedObjectMetadataItemsMock(),
       objectMetadataItem: personObjectMetadataItem,
       recordGqlFields: { company: { id: true }, id: true, name: true },
       objectPermissionsByObjectMetadataId: {
@@ -142,6 +144,8 @@ describe('mapObjectMetadataToGraphQLQuery', () => {
           canDestroyObjectRecords: true,
           objectMetadataId: personObjectMetadataItem.id,
           restrictedFields: {},
+          rowLevelPermissionPredicates: [],
+          rowLevelPermissionPredicateGroups: [],
         },
       },
     });

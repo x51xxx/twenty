@@ -1,6 +1,6 @@
 import { FieldMetadataType } from 'twenty-shared/types';
 import { v4 } from 'uuid';
-import { getDefaultFormFieldSettings } from '../getDefaultFormFieldSettings';
+import { getDefaultFormFieldSettings } from '@/workflow/workflow-steps/workflow-actions/form-action/utils/getDefaultFormFieldSettings';
 
 jest.mock('uuid', () => ({
   v4: jest.fn(() => 'test-uuid-123'),
@@ -50,6 +50,20 @@ describe('getDefaultFormFieldSettings', () => {
       placeholder: 'Select a Company',
       settings: {
         objectName: 'company',
+      },
+    });
+  });
+
+  it('should return correct default settings for MULTI_SELECT field type', () => {
+    const result = getDefaultFormFieldSettings(FieldMetadataType.MULTI_SELECT);
+    expect(result).toEqual({
+      id: 'test-uuid-123',
+      name: 'multiSelect',
+      label: 'Multi-Select',
+      placeholder: 'Choose values',
+      settings: {
+        selectType: 'EXISTING_FIELD',
+        selectedFieldId: undefined,
       },
     });
   });

@@ -1,4 +1,6 @@
-import styled from '@emotion/styled';
+import { t } from '@lingui/core/macro';
+import { styled } from '@linaria/react';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 // @ts-expect-error // Todo: remove usage of react-data-grid
 import { type Column, useRowSelection } from 'react-data-grid';
 import { createPortal } from 'react-dom';
@@ -13,12 +15,12 @@ import camelCase from 'lodash.camelcase';
 import { isDefined } from 'twenty-shared/utils';
 import { AppTooltip, TooltipDelay } from 'twenty-ui/display';
 import { Checkbox, CheckboxVariant, Toggle } from 'twenty-ui/input';
-import { type ImportedStructuredRowMetadata } from '../types';
+import { type ImportedStructuredRowMetadata } from '@/spreadsheet-import/steps/components/ValidationStep/types';
 
 const StyledHeaderContainer = styled.div`
   align-items: center;
   display: flex;
-  gap: ${({ theme }) => theme.spacing(1)};
+  gap: ${themeCssVariables.spacing[1]};
   position: relative;
 `;
 
@@ -51,7 +53,7 @@ const StyledInputContainer = styled.div`
   display: flex;
   min-height: 100%;
   min-width: 100%;
-  padding-right: ${({ theme }) => theme.spacing(2)};
+  padding-right: ${themeCssVariables.spacing[2]};
 `;
 
 const StyledDefaultContainer = styled.div`
@@ -62,7 +64,7 @@ const StyledDefaultContainer = styled.div`
 `;
 
 const StyledSelectReadonlyValueContianer = styled.div`
-  padding-left: ${({ theme }) => theme.spacing(2)};
+  padding-left: ${themeCssVariables.spacing[2]};
 `;
 
 const SELECT_COLUMN_KEY = 'select-row';
@@ -84,13 +86,13 @@ export const generateColumns = (
     sortable: false,
     frozen: true,
     formatter: (props: any) => {
-      // eslint-disable-next-line  react-hooks/rules-of-hooks
+      // oxlint-disable-next-line  react-hooks/rules-of-hooks
       const [isRowSelected, onRowSelectionChange] = useRowSelection();
 
       return (
         <StyledCheckboxContainer>
           <Checkbox
-            aria-label="Select"
+            aria-label={t`Select`}
             checked={isRowSelected}
             variant={CheckboxVariant.Tertiary}
             onChange={(event) => {

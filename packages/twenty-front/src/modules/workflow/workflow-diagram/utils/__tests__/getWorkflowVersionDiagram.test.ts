@@ -1,5 +1,5 @@
 import { getUuidV4Mock } from '~/testing/utils/getUuidV4Mock';
-import { getWorkflowVersionDiagram } from '../getWorkflowVersionDiagram';
+import { getWorkflowVersionDiagram } from '@/workflow/workflow-diagram/utils/getWorkflowVersionDiagram';
 
 jest.mock('uuid', () => ({
   v4: getUuidV4Mock(),
@@ -9,7 +9,7 @@ describe('getWorkflowVersionDiagram', () => {
   it('returns an empty diagram if the provided workflow version', () => {
     const result = getWorkflowVersionDiagram({
       workflowVersion: undefined,
-      isEditable: true,
+      workflowContext: 'workflow',
     });
 
     expect(result).toMatchInlineSnapshot(`
@@ -33,7 +33,7 @@ describe('getWorkflowVersionDiagram', () => {
         updatedAt: '',
         workflowId: '',
       },
-      isEditable: true,
+      workflowContext: 'workflow',
     });
 
     expect(result).toMatchInlineSnapshot(`
@@ -77,7 +77,7 @@ describe('getWorkflowVersionDiagram', () => {
         updatedAt: '',
         workflowId: '',
       },
-      isEditable: true,
+      workflowContext: 'workflow',
     });
 
     expect(result).toMatchInlineSnapshot(`
@@ -126,9 +126,8 @@ describe('getWorkflowVersionDiagram', () => {
                 continueOnFailure: { value: false },
               },
               input: {
-                serverlessFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
-                serverlessFunctionVersion: '1',
-                serverlessFunctionInput: {},
+                logicFunctionId: 'a5434be2-c10b-465c-acec-46492782a997',
+                logicFunctionInput: {},
               },
               outputSchema: {},
             },
@@ -145,7 +144,7 @@ describe('getWorkflowVersionDiagram', () => {
         updatedAt: '',
         workflowId: '',
       },
-      isEditable: true,
+      workflowContext: 'workflow',
     });
 
     expect(result).toMatchInlineSnapshot(`
@@ -159,10 +158,13 @@ describe('getWorkflowVersionDiagram', () => {
       "id": "8f3b2121-f194-4ba4-9fbf-0",
       "markerEnd": "edge-branch-arrow-default",
       "markerStart": undefined,
+      "reconnectable": "target",
       "selectable": true,
       "source": "trigger",
+      "sourceHandle": "default",
       "target": "step-1",
-      "type": "empty-filter--editable",
+      "targetHandle": "default",
+      "type": "editable",
       "zIndex": -2,
     },
   ],

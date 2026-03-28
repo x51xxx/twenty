@@ -1,35 +1,59 @@
-import { useMutation } from '@apollo/client';
+import { useMutation } from '@apollo/client/react';
+import { DeleteOneObjectMetadataItemDocument } from '~/generated-metadata/graphql';
 
-import {
-  type DeleteOneObjectMetadataItemMutation,
-  type DeleteOneObjectMetadataItemMutationVariables,
-} from '~/generated-metadata/graphql';
-
-import { DELETE_ONE_OBJECT_METADATA_ITEM } from '../graphql/mutations';
-
-import { useRefreshObjectMetadataItems } from '@/object-metadata/hooks/useRefreshObjectMetadataItems';
+import { useMetadataErrorHandler } from '@/metadata-error-handler/hooks/useMetadataErrorHandler';
+import { useUpdateMetadataStoreDraft } from '@/metadata-store/hooks/useUpdateMetadataStoreDraft';
+import { type MetadataRequestResult } from '@/object-metadata/types/MetadataRequestResult.type';
+import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { t } from '@lingui/core/macro';
+import { CrudOperationType } from 'twenty-shared/types';
 
 export const useDeleteOneObjectMetadataItem = () => {
-  const [mutate] = useMutation<
-    DeleteOneObjectMetadataItemMutation,
-    DeleteOneObjectMetadataItemMutationVariables
-  >(DELETE_ONE_OBJECT_METADATA_ITEM);
+  const [deleteOneObjectMetadataItemMutation] = useMutation(
+    DeleteOneObjectMetadataItemDocument,
+  );
 
-  const { refreshObjectMetadataItems } =
-    useRefreshObjectMetadataItems('network-only');
+  const { handleMetadataError } = useMetadataErrorHandler();
+  const { enqueueErrorSnackBar } = useSnackBar();
+  const { removeFromDraft, applyChanges } = useUpdateMetadataStoreDraft();
 
   const deleteOneObjectMetadataItem = async (
-    idToDelete: DeleteOneObjectMetadataItemMutationVariables['idToDelete'],
-  ) => {
-    const result = await mutate({
-      variables: {
-        idToDelete,
-      },
-    });
+    idToDelete: string,
+  ): Promise<
+    MetadataRequestResult<
+      Awaited<ReturnType<typeof deleteOneObjectMetadataItemMutation>>
+    >
+  > => {
+    try {
+      const response = await deleteOneObjectMetadataItemMutation({
+        variables: {
+          idToDelete,
+        },
+      });
 
-    await refreshObjectMetadataItems();
+      removeFromDraft({ key: 'objectMetadataItems', itemIds: [idToDelete] });
+      applyChanges();
 
-    return result;
+      return {
+        status: 'successful',
+        response,
+      };
+    } catch (error) {
+      if (CombinedGraphQLErrors.is(error)) {
+        handleMetadataError(error, {
+          primaryMetadataName: 'objectMetadata',
+          operationType: CrudOperationType.DELETE,
+        });
+      } else {
+        enqueueErrorSnackBar({ message: t`An error occurred.` });
+      }
+
+      return {
+        status: 'failed',
+        error,
+      };
+    }
   };
 
   return {

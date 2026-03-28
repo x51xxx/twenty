@@ -1,9 +1,13 @@
-import { createFamilyState } from '@/ui/utilities/state/utils/createFamilyState';
-import { type Role } from '~/generated/graphql';
+import { createAtomFamilyState } from '@/ui/utilities/state/jotai/utils/createAtomFamilyState';
+import { type RoleWithPartialMembers } from '@/settings/roles/types/RoleWithPartialMembers';
 
-export const settingsDraftRoleFamilyState = createFamilyState<Role, string>({
+export const settingsDraftRoleFamilyState = createAtomFamilyState<
+  RoleWithPartialMembers,
+  string
+>({
   key: 'settingsDraftRoleFamilyState',
   defaultValue: {
+    __typename: 'Role',
     id: '',
     label: '',
     description: '',
@@ -19,5 +23,12 @@ export const settingsDraftRoleFamilyState = createFamilyState<Role, string>({
     permissionFlags: [],
     objectPermissions: [],
     fieldPermissions: [],
+    rowLevelPermissionPredicates: [],
+    rowLevelPermissionPredicateGroups: [],
+    canBeAssignedToAgents: false,
+    canBeAssignedToApiKeys: false,
+    canBeAssignedToUsers: false,
+    agents: [],
+    apiKeys: [],
   },
 });

@@ -1,78 +1,91 @@
 import { Test, type TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 
-import { type Repository } from 'typeorm';
-
-import { ObjectMetadataEntity } from 'src/engine/metadata-modules/object-metadata/object-metadata.entity';
+import { ApplicationService } from 'src/engine/core-modules/application/application.service';
+import { WorkspaceManyOrAllFlatEntityMapsCacheService } from 'src/engine/metadata-modules/flat-entity/services/workspace-many-or-all-flat-entity-maps-cache.service';
 import { type UpsertObjectPermissionsInput } from 'src/engine/metadata-modules/object-permission/dtos/upsert-object-permissions.input';
-import { ObjectPermissionEntity } from 'src/engine/metadata-modules/object-permission/object-permission.entity';
 import { ObjectPermissionService } from 'src/engine/metadata-modules/object-permission/object-permission.service';
 import {
   PermissionsException,
   PermissionsExceptionCode,
   PermissionsExceptionMessage,
 } from 'src/engine/metadata-modules/permissions/permissions.exception';
-import { RoleEntity } from 'src/engine/metadata-modules/role/role.entity';
-import { type ObjectMetadataItemWithFieldMaps } from 'src/engine/metadata-modules/types/object-metadata-item-with-field-maps';
-import { WorkspacePermissionsCacheService } from 'src/engine/metadata-modules/workspace-permissions-cache/workspace-permissions-cache.service';
-import { WorkspaceCacheStorageService } from 'src/engine/workspace-cache-storage/workspace-cache-storage.service';
+import { WorkspaceMigrationValidateBuildAndRunService } from 'src/engine/workspace-manager/workspace-migration/services/workspace-migration-validate-build-and-run-service';
+
+const createMockFlatRoleMaps = (roleId: string, isEditable: boolean) => ({
+  byUniversalIdentifier: {
+    [roleId]: {
+      id: roleId,
+      universalIdentifier: roleId,
+      isEditable,
+      canReadAllObjectRecords: true,
+      canUpdateAllObjectRecords: true,
+      canSoftDeleteAllObjectRecords: false,
+      canDestroyAllObjectRecords: false,
+    },
+  },
+  universalIdentifierById: { [roleId]: roleId },
+  byId: { [roleId]: { id: roleId, universalIdentifier: roleId, isEditable } },
+});
+
+const createMockFlatObjectMetadataMaps = (
+  objectMetadataId: string,
+  isSystem: boolean,
+) => ({
+  byUniversalIdentifier: {
+    [objectMetadataId]: {
+      id: objectMetadataId,
+      universalIdentifier: objectMetadataId,
+      isSystem,
+    },
+  },
+  universalIdentifierById: { [objectMetadataId]: objectMetadataId },
+  byId: { [objectMetadataId]: { id: objectMetadataId, isSystem } },
+});
 
 describe('ObjectPermissionService', () => {
   let service: ObjectPermissionService;
-  let objectPermissionRepository: jest.Mocked<
-    Repository<ObjectPermissionEntity>
-  >;
-  let roleRepository: jest.Mocked<Repository<RoleEntity>>;
-  let workspacePermissionsCacheService: jest.Mocked<WorkspacePermissionsCacheService>;
-  let workspaceCacheStorageService: jest.Mocked<WorkspaceCacheStorageService>;
+  let workspaceManyOrAllFlatEntityMapsCacheService: jest.Mocked<WorkspaceManyOrAllFlatEntityMapsCacheService>;
+  let workspaceMigrationValidateBuildAndRunService: jest.Mocked<WorkspaceMigrationValidateBuildAndRunService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ObjectPermissionService,
         {
-          provide: getRepositoryToken(ObjectPermissionEntity),
+          provide: ApplicationService,
           useValue: {
-            upsert: jest.fn(),
-            find: jest.fn(),
+            findWorkspaceTwentyStandardAndCustomApplicationOrThrow: jest
+              .fn()
+              .mockResolvedValue({
+                workspaceCustomFlatApplication: {
+                  id: 'app-id',
+                  universalIdentifier: 'app-universal-id',
+                },
+              }),
           },
         },
         {
-          provide: getRepositoryToken(RoleEntity),
+          provide: WorkspaceManyOrAllFlatEntityMapsCacheService,
           useValue: {
-            findOne: jest.fn(),
+            getOrRecomputeManyOrAllFlatEntityMaps: jest.fn(),
           },
         },
         {
-          provide: getRepositoryToken(ObjectMetadataEntity),
+          provide: WorkspaceMigrationValidateBuildAndRunService,
           useValue: {
-            find: jest.fn(),
-          },
-        },
-        {
-          provide: WorkspacePermissionsCacheService,
-          useValue: {
-            recomputeRolesPermissionsCache: jest.fn(),
-          },
-        },
-        {
-          provide: WorkspaceCacheStorageService,
-          useValue: {
-            getObjectMetadataMapsOrThrow: jest.fn(),
+            validateBuildAndRunWorkspaceMigration: jest.fn(),
           },
         },
       ],
     }).compile();
 
     service = module.get<ObjectPermissionService>(ObjectPermissionService);
-    objectPermissionRepository = module.get(
-      getRepositoryToken(ObjectPermissionEntity),
+    workspaceManyOrAllFlatEntityMapsCacheService = module.get(
+      WorkspaceManyOrAllFlatEntityMapsCacheService,
     );
-    roleRepository = module.get(getRepositoryToken(RoleEntity));
-    workspacePermissionsCacheService = module.get(
-      WorkspacePermissionsCacheService,
+    workspaceMigrationValidateBuildAndRunService = module.get(
+      WorkspaceMigrationValidateBuildAndRunService,
     );
-    workspaceCacheStorageService = module.get(WorkspaceCacheStorageService);
   });
 
   describe('upsertObjectPermissions', () => {
@@ -81,18 +94,7 @@ describe('ObjectPermissionService', () => {
     const systemObjectMetadataId = 'system-object-id';
     const customObjectMetadataId = 'custom-object-id';
 
-    beforeEach(() => {
-      // Mock role validation
-      roleRepository.findOne.mockResolvedValue({
-        id: roleId,
-        workspaceId,
-        isEditable: true,
-        objectPermissions: [],
-      } as unknown as RoleEntity);
-    });
-
     it('should throw PermissionsException when trying to add object permission on system object', async () => {
-      // Arrange
       const input: UpsertObjectPermissionsInput = {
         roleId,
         objectPermissions: [
@@ -106,21 +108,21 @@ describe('ObjectPermissionService', () => {
         ],
       };
 
-      // Mock object metadata maps with a system object
-      workspaceCacheStorageService.getObjectMetadataMapsOrThrow.mockResolvedValue(
+      workspaceManyOrAllFlatEntityMapsCacheService.getOrRecomputeManyOrAllFlatEntityMaps.mockResolvedValue(
         {
-          byId: {
-            [systemObjectMetadataId]: {
-              id: systemObjectMetadataId,
-              isSystem: true,
-              workspaceId,
-            } as ObjectMetadataItemWithFieldMaps,
+          flatObjectPermissionMaps: {
+            byUniversalIdentifier: {},
+            universalIdentifierById: {},
+            byId: {},
           },
-          idByNameSingular: {},
-        },
+          flatRoleMaps: createMockFlatRoleMaps(roleId, true),
+          flatObjectMetadataMaps: createMockFlatObjectMetadataMaps(
+            systemObjectMetadataId,
+            true,
+          ),
+        } as any,
       );
 
-      // Act & Assert
       await expect(
         service.upsertObjectPermissions({
           workspaceId,
@@ -133,15 +135,12 @@ describe('ObjectPermissionService', () => {
         ),
       );
 
-      // Verify that upsert was never called
-      expect(objectPermissionRepository.upsert).not.toHaveBeenCalled();
       expect(
-        workspacePermissionsCacheService.recomputeRolesPermissionsCache,
+        workspaceMigrationValidateBuildAndRunService.validateBuildAndRunWorkspaceMigration,
       ).not.toHaveBeenCalled();
     });
 
     it('should successfully create object permission for custom (non-system) object', async () => {
-      // Arrange
       const input: UpsertObjectPermissionsInput = {
         roleId,
         objectPermissions: [
@@ -155,74 +154,70 @@ describe('ObjectPermissionService', () => {
         ],
       };
 
-      // Mock object metadata maps with a custom object
-      workspaceCacheStorageService.getObjectMetadataMapsOrThrow.mockResolvedValue(
-        {
-          byId: {
-            [customObjectMetadataId]: {
-              id: customObjectMetadataId,
-              isSystem: false,
-              workspaceId,
-            } as ObjectMetadataItemWithFieldMaps,
-          },
-          idByNameSingular: {},
-        },
-      );
-
-      // Mock successful upsert
-      const mockObjectPermission = {
+      const permissionUniversalId = 'permission-universal-id';
+      const freshFlatObjectPermission = {
         id: 'permission-id',
+        universalIdentifier: permissionUniversalId,
         roleId,
+        roleUniversalIdentifier: roleId,
         objectMetadataId: customObjectMetadataId,
-        workspaceId,
+        objectMetadataUniversalIdentifier: customObjectMetadataId,
         canReadObjectRecords: true,
         canUpdateObjectRecords: true,
         canSoftDeleteObjectRecords: false,
         canDestroyObjectRecords: false,
-      } as ObjectPermissionEntity;
+      };
 
-      objectPermissionRepository.upsert.mockResolvedValue({
-        generatedMaps: [{ id: 'permission-id' }],
-        identifiers: [],
-        raw: [],
-      });
+      workspaceManyOrAllFlatEntityMapsCacheService.getOrRecomputeManyOrAllFlatEntityMaps
+        .mockResolvedValueOnce({
+          flatObjectPermissionMaps: {
+            byUniversalIdentifier: {},
+            universalIdentifierById: {},
+            byId: {},
+          },
+          flatRoleMaps: createMockFlatRoleMaps(roleId, true),
+          flatObjectMetadataMaps: createMockFlatObjectMetadataMaps(
+            customObjectMetadataId,
+            false,
+          ),
+        } as any)
+        .mockResolvedValueOnce({
+          flatObjectPermissionMaps: {
+            byUniversalIdentifier: {
+              [permissionUniversalId]: freshFlatObjectPermission,
+            },
+            universalIdentifierById: {
+              [freshFlatObjectPermission.id]: permissionUniversalId,
+            },
+            byId: {
+              [freshFlatObjectPermission.id]: freshFlatObjectPermission,
+            },
+          },
+        } as any);
 
-      objectPermissionRepository.find.mockResolvedValue([mockObjectPermission]);
+      workspaceMigrationValidateBuildAndRunService.validateBuildAndRunWorkspaceMigration.mockResolvedValue(
+        { status: 'success' } as any,
+      );
 
-      // Act
       const result = await service.upsertObjectPermissions({
         workspaceId,
         input,
       });
 
-      // Assert
-      expect(result).toEqual([mockObjectPermission]);
-      expect(objectPermissionRepository.upsert).toHaveBeenCalledWith(
-        [
-          {
-            objectMetadataId: customObjectMetadataId,
-            canReadObjectRecords: true,
-            canUpdateObjectRecords: true,
-            canSoftDeleteObjectRecords: false,
-            canDestroyObjectRecords: false,
-            roleId,
-            workspaceId,
-          },
-        ],
-        {
-          conflictPaths: ['objectMetadataId', 'roleId'],
-        },
-      );
-      expect(
-        workspacePermissionsCacheService.recomputeRolesPermissionsCache,
-      ).toHaveBeenCalledWith({
-        workspaceId,
-        roleIds: [roleId],
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        objectMetadataId: customObjectMetadataId,
+        canReadObjectRecords: true,
+        canUpdateObjectRecords: true,
+        canSoftDeleteObjectRecords: false,
+        canDestroyObjectRecords: false,
       });
+      expect(
+        workspaceMigrationValidateBuildAndRunService.validateBuildAndRunWorkspaceMigration,
+      ).toHaveBeenCalled();
     });
 
     it('should throw PermissionsException when object metadata is not found', async () => {
-      // Arrange
       const input: UpsertObjectPermissionsInput = {
         roleId,
         objectPermissions: [
@@ -236,15 +231,22 @@ describe('ObjectPermissionService', () => {
         ],
       };
 
-      // Mock empty object metadata maps
-      workspaceCacheStorageService.getObjectMetadataMapsOrThrow.mockResolvedValue(
+      workspaceManyOrAllFlatEntityMapsCacheService.getOrRecomputeManyOrAllFlatEntityMaps.mockResolvedValue(
         {
-          byId: {},
-          idByNameSingular: {},
-        },
+          flatObjectPermissionMaps: {
+            byUniversalIdentifier: {},
+            universalIdentifierById: {},
+            byId: {},
+          },
+          flatRoleMaps: createMockFlatRoleMaps(roleId, true),
+          flatObjectMetadataMaps: {
+            byUniversalIdentifier: {},
+            universalIdentifierById: {},
+            byId: {},
+          },
+        } as any,
       );
 
-      // Act & Assert
       await expect(
         service.upsertObjectPermissions({
           workspaceId,

@@ -7,14 +7,14 @@ import { isDefined } from 'twenty-shared/utils';
 import { AuthException } from 'src/engine/core-modules/auth/auth.exception';
 import { AuthGraphqlApiExceptionFilter } from 'src/engine/core-modules/auth/filters/auth-graphql-api-exception.filter';
 import { AccessTokenService } from 'src/engine/core-modules/auth/token/services/access-token.service';
-import { type AuthContext } from 'src/engine/core-modules/auth/types/auth-context.type';
 import { getAuthExceptionRestStatus } from 'src/engine/core-modules/auth/utils/get-auth-exception-rest-status.util';
 import { ExceptionHandlerService } from 'src/engine/core-modules/exception-handler/exception-handler.service';
 import { ErrorCode } from 'src/engine/core-modules/graphql/utils/graphql-errors.util';
 import { JwtWrapperService } from 'src/engine/core-modules/jwt/services/jwt-wrapper.service';
 import { DataSourceService } from 'src/engine/metadata-modules/data-source/data-source.service';
-import { WorkspaceMetadataCacheService } from 'src/engine/metadata-modules/workspace-metadata-cache/services/workspace-metadata-cache.service';
+import { WorkspaceManyOrAllFlatEntityMapsCacheService } from 'src/engine/metadata-modules/flat-entity/services/workspace-many-or-all-flat-entity-maps-cache.service';
 import { INTERNAL_SERVER_ERROR } from 'src/engine/middlewares/constants/default-error-message.constant';
+import { bindDataToRequestObject } from 'src/engine/utils/bind-data-to-request-object.util';
 import {
   handleException,
   handleExceptionAndConvertToGraphQLError,
@@ -27,7 +27,7 @@ export class MiddlewareService {
   constructor(
     private readonly accessTokenService: AccessTokenService,
     private readonly workspaceStorageCacheService: WorkspaceCacheStorageService,
-    private readonly workspaceMetadataCacheService: WorkspaceMetadataCacheService,
+    private readonly flatEntityMapsCacheService: WorkspaceManyOrAllFlatEntityMapsCacheService,
     private readonly dataSourceService: DataSourceService,
     private readonly exceptionHandlerService: ExceptionHandlerService,
     private readonly jwtWrapperService: JwtWrapperService,
@@ -39,7 +39,7 @@ export class MiddlewareService {
     return !!token;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   public writeRestResponseOnExceptionCaught(res: Response, error: any) {
     const statusCode = this.getStatus(error);
 
@@ -62,7 +62,7 @@ export class MiddlewareService {
     res.end();
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   public writeGraphqlResponseOnExceptionCaught(res: Response, error: any) {
     let errors;
 
@@ -106,13 +106,6 @@ export class MiddlewareService {
         )
       : undefined;
 
-    if (metadataVersion === undefined && isDefined(data.workspace)) {
-      await this.workspaceMetadataCacheService.recomputeMetadataCache({
-        workspaceId: data.workspace.id,
-      });
-      throw new Error('Metadata cache version not found');
-    }
-
     const dataSourcesMetadata = data.workspace
       ? await this.dataSourceService.getDataSourcesMetadataFromWorkspaceId(
           data.workspace.id,
@@ -123,7 +116,7 @@ export class MiddlewareService {
       throw new Error('No data sources found');
     }
 
-    this.bindDataToRequestObject(data, request, metadataVersion);
+    bindDataToRequestObject(data, request, metadataVersion);
   }
 
   public async hydrateGraphqlRequest(request: Request) {
@@ -142,35 +135,14 @@ export class MiddlewareService {
         )
       : undefined;
 
-    this.bindDataToRequestObject(data, request, metadataVersion);
+    bindDataToRequestObject(data, request, metadataVersion);
   }
 
   private hasErrorStatus(error: unknown): error is { status: number } {
     return isDefined((error as { status: number })?.status);
   }
 
-  private bindDataToRequestObject(
-    data: AuthContext,
-    request: Request,
-    metadataVersion: number | undefined,
-  ) {
-    request.user = data.user;
-    request.apiKey = data.apiKey;
-    request.userWorkspace = data.userWorkspace;
-    request.workspace = data.workspace;
-    request.workspaceId = data.workspace?.id;
-    request.workspaceMetadataVersion = metadataVersion;
-    request.workspaceMemberId = data.workspaceMemberId;
-    request.userWorkspaceId = data.userWorkspaceId;
-    request.authProvider = data.authProvider;
-
-    request.locale =
-      data.userWorkspace?.locale ??
-      (request.headers['x-locale'] as keyof typeof APP_LOCALES) ??
-      SOURCE_LOCALE;
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   private getStatus(error: any): number {
     if (this.hasErrorStatus(error)) {
       return error.status;

@@ -1,4 +1,4 @@
-import { type Meta, type StoryObj } from '@storybook/react';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { ComponentDecorator } from '@ui/testing';
 
 import { Card } from '../Card';
@@ -11,7 +11,7 @@ const meta: Meta<typeof Card> = {
   component: Card,
   decorators: [ComponentDecorator],
   render: (args) => (
-    // eslint-disable-next-line react/jsx-props-no-spreading
+    // oxlint-disable-next-line react/jsx-props-no-spreading
     <Card {...args}>
       <CardHeader>Lorem ipsum</CardHeader>
       <CardContent>
@@ -22,10 +22,7 @@ const meta: Meta<typeof Card> = {
       <CardFooter>Lorem ipsum</CardFooter>
     </Card>
   ),
-  argTypes: {
-    as: { control: false },
-    theme: { control: false },
-  },
+  argTypes: {},
 };
 
 export default meta;

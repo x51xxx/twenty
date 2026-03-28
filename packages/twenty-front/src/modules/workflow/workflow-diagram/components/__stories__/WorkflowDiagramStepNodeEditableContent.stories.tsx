@@ -1,14 +1,39 @@
-import { type Meta, type StoryObj } from '@storybook/react';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
 
 import { WorkflowVisualizerComponentInstanceContext } from '@/workflow/workflow-diagram/states/contexts/WorkflowVisualizerComponentInstanceContext';
+import { workflowSelectedNodeComponentState } from '@/workflow/workflow-diagram/states/workflowSelectedNodeComponentState';
 import { type WorkflowDiagramStepNodeData } from '@/workflow/workflow-diagram/types/WorkflowDiagram';
-import { fn } from '@storybook/test';
+import { WorkflowDiagramStepNodeEditableContent } from '@/workflow/workflow-diagram/workflow-nodes/components/WorkflowDiagramStepNodeEditableContent';
 import '@xyflow/react/dist/style.css';
-import { RecoilRoot } from 'recoil';
+import { useStore } from 'jotai';
+import { useEffect } from 'react';
+import { isDefined } from 'twenty-shared/utils';
 import { CatalogDecorator, type CatalogStory } from 'twenty-ui/testing';
 import { ReactflowDecorator } from '~/testing/decorators/ReactflowDecorator';
 import { graphqlMocks } from '~/testing/graphqlMocks';
-import { WorkflowDiagramStepNodeEditableContent } from '../../workflow-nodes/components/WorkflowDiagramStepNodeEditableContent';
+
+const JotaiInitializer = ({
+  children,
+  selectedNodeId,
+}: {
+  children: React.ReactNode;
+  selectedNodeId?: string;
+}) => {
+  const store = useStore();
+
+  useEffect(() => {
+    if (isDefined(selectedNodeId)) {
+      store.set(
+        workflowSelectedNodeComponentState.atomFamily({
+          instanceId: 'workflow-visualizer-instance-id',
+        }),
+        selectedNodeId,
+      );
+    }
+  }, [store, selectedNodeId]);
+
+  return <>{children}</>;
+};
 
 const meta: Meta<typeof WorkflowDiagramStepNodeEditableContent> = {
   title: 'Modules/Workflow/WorkflowDiagramStepNodeEditableContent',
@@ -16,6 +41,7 @@ const meta: Meta<typeof WorkflowDiagramStepNodeEditableContent> = {
   parameters: {
     msw: graphqlMocks,
   },
+  decorators: [],
 };
 
 export default meta;
@@ -121,7 +147,6 @@ export const Catalog: CatalogStory<
     id: 'story-node',
     data: ALL_STEPS[0],
     selected: false,
-    onDelete: fn(),
   },
   parameters: {
     pseudo: { hover: ['.hover'] },
@@ -149,14 +174,16 @@ export const Catalog: CatalogStory<
   decorators: [
     (Story, { args }) => {
       return (
-        <div className={`selectable ${args.selected ? 'selected' : ''}`}>
-          <RecoilRoot>
-            <WorkflowVisualizerComponentInstanceContext.Provider
-              value={{ instanceId: 'workflow-visualizer-instance-id' }}
+        <div>
+          <WorkflowVisualizerComponentInstanceContext.Provider
+            value={{ instanceId: 'workflow-visualizer-instance-id' }}
+          >
+            <JotaiInitializer
+              selectedNodeId={args.selected ? args.id : undefined}
             >
               <Story />
-            </WorkflowVisualizerComponentInstanceContext.Provider>
-          </RecoilRoot>
+            </JotaiInitializer>
+          </WorkflowVisualizerComponentInstanceContext.Provider>
         </div>
       );
     },

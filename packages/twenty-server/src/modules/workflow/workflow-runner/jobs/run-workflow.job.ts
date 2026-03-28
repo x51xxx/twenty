@@ -2,77 +2,71 @@ import { Scope } from '@nestjs/common';
 
 import { isDefined } from 'twenty-shared/utils';
 
-import { FeatureFlagKey } from 'src/engine/core-modules/feature-flag/enums/feature-flag-key.enum';
-import { FeatureFlagService } from 'src/engine/core-modules/feature-flag/services/feature-flag.service';
 import { Process } from 'src/engine/core-modules/message-queue/decorators/process.decorator';
 import { Processor } from 'src/engine/core-modules/message-queue/decorators/processor.decorator';
 import { MessageQueue } from 'src/engine/core-modules/message-queue/message-queue.constants';
 import { MetricsService } from 'src/engine/core-modules/metrics/metrics.service';
 import { MetricsKeys } from 'src/engine/core-modules/metrics/types/metrics-keys.type';
-import { ThrottlerService } from 'src/engine/core-modules/throttler/throttler.service';
-import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
+import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
+import { buildSystemAuthContext } from 'src/engine/twenty-orm/utils/build-system-auth-context.util';
 import { WorkflowRunStatus } from 'src/modules/workflow/common/standard-objects/workflow-run.workspace-entity';
 import { WorkflowCommonWorkspaceService } from 'src/modules/workflow/common/workspace-services/workflow-common.workspace-service';
+import { CodeStepBuildService } from 'src/modules/workflow/workflow-builder/workflow-version-step/code-step/services/code-step-build.service';
 import { WorkflowExecutorWorkspaceService } from 'src/modules/workflow/workflow-executor/workspace-services/workflow-executor.workspace-service';
+import { RUN_WORKFLOW_JOB_NAME } from 'src/modules/workflow/workflow-runner/constants/run-workflow-job-name';
 import {
   WorkflowRunException,
   WorkflowRunExceptionCode,
 } from 'src/modules/workflow/workflow-runner/exceptions/workflow-run.exception';
-import { getRootSteps } from 'src/modules/workflow/workflow-runner/utils/get-root-steps.utils';
-import { WorkflowRunQueueWorkspaceService } from 'src/modules/workflow/workflow-runner/workflow-run-queue/workspace-services/workflow-run-queue.workspace-service';
+import { type RunWorkflowJobData } from 'src/modules/workflow/workflow-runner/types/run-workflow-job-data.type';
 import { WorkflowRunWorkspaceService } from 'src/modules/workflow/workflow-runner/workflow-run/workflow-run.workspace-service';
 import { WorkflowTriggerType } from 'src/modules/workflow/workflow-trigger/types/workflow-trigger.type';
-
-export type RunWorkflowJobData = {
-  workspaceId: string;
-  workflowRunId: string;
-  lastExecutedStepId?: string;
-};
 
 @Processor({ queueName: MessageQueue.workflowQueue, scope: Scope.REQUEST })
 export class RunWorkflowJob {
   constructor(
     private readonly workflowCommonWorkspaceService: WorkflowCommonWorkspaceService,
+    private readonly codeStepBuildService: CodeStepBuildService,
     private readonly workflowExecutorWorkspaceService: WorkflowExecutorWorkspaceService,
     private readonly workflowRunWorkspaceService: WorkflowRunWorkspaceService,
-    private readonly throttlerService: ThrottlerService,
-    private readonly twentyConfigService: TwentyConfigService,
     private readonly metricsService: MetricsService,
-    private readonly workflowRunQueueWorkspaceService: WorkflowRunQueueWorkspaceService,
-    private readonly featureFlagService: FeatureFlagService,
+    private readonly globalWorkspaceOrmManager: GlobalWorkspaceOrmManager,
   ) {}
 
-  @Process(RunWorkflowJob.name)
+  @Process(RUN_WORKFLOW_JOB_NAME)
   async handle({
     workflowRunId,
     lastExecutedStepId,
     workspaceId,
   }: RunWorkflowJobData): Promise<void> {
-    try {
-      if (lastExecutedStepId) {
-        await this.resumeWorkflowExecution({
+    const authContext = buildSystemAuthContext(workspaceId);
+
+    await this.globalWorkspaceOrmManager.executeInWorkspaceContext(async () => {
+      try {
+        if (lastExecutedStepId) {
+          await this.resumeWorkflowExecution({
+            workspaceId,
+            workflowRunId,
+            lastExecutedStepId,
+          });
+        } else {
+          await this.startWorkflowExecution({
+            workflowRunId,
+            workspaceId,
+          });
+        }
+      } catch (error) {
+        await this.workflowRunWorkspaceService.endWorkflowRun({
           workspaceId,
           workflowRunId,
-          lastExecutedStepId,
+          status: WorkflowRunStatus.FAILED,
+          error: error.message,
+          isSystemError: true,
         });
-      } else {
-        await this.startWorkflowExecution({
-          workflowRunId,
-          workspaceId,
-        });
+
+        throw error;
       }
-    } catch (error) {
-      await this.workflowRunWorkspaceService.endWorkflowRun({
-        workspaceId,
-        workflowRunId,
-        status: WorkflowRunStatus.FAILED,
-        error: error.message,
-      });
-    } finally {
-      await this.workflowRunQueueWorkspaceService.decreaseWorkflowRunQueuedCount(
-        workspaceId,
-      );
-    }
+    }, authContext);
   }
 
   private async startWorkflowExecution({
@@ -88,6 +82,13 @@ export class RunWorkflowJob {
         workspaceId,
       });
 
+    if (
+      workflowRun.status !== WorkflowRunStatus.ENQUEUED &&
+      workflowRun.status !== WorkflowRunStatus.NOT_STARTED
+    ) {
+      return;
+    }
+
     const workflowVersion =
       await this.workflowCommonWorkspaceService.getWorkflowVersionOrFail({
         workspaceId,
@@ -101,11 +102,9 @@ export class RunWorkflowJob {
       );
     }
 
-    await this.throttleExecution(workflowVersion.workflowId);
-
-    await this.incrementTriggerMetrics({
-      workflowRunId,
-      triggerType: workflowVersion.trigger.type,
+    await this.codeStepBuildService.buildCodeStepsFromSourceForSteps({
+      workspaceId,
+      steps: workflowVersion.steps,
     });
 
     await this.workflowRunWorkspaceService.startWorkflowRun({
@@ -113,17 +112,12 @@ export class RunWorkflowJob {
       workspaceId,
     });
 
-    const rootSteps = getRootSteps(workflowVersion.steps);
+    await this.incrementTriggerMetrics({
+      workflowRunId,
+      triggerType: workflowVersion.trigger.type,
+    });
 
-    const isWorkflowBranchEnabled =
-      await this.featureFlagService.isFeatureEnabled(
-        FeatureFlagKey.IS_WORKFLOW_BRANCH_ENABLED,
-        workspaceId,
-      );
-
-    const stepIds = isWorkflowBranchEnabled
-      ? (workflowVersion.trigger.nextStepIds ?? [])
-      : (rootSteps.map((step) => step.id) ?? []);
+    const stepIds = workflowVersion.trigger.nextStepIds ?? [];
 
     await this.workflowExecutorWorkspaceService.executeFromSteps({
       stepIds,
@@ -162,10 +156,22 @@ export class RunWorkflowJob {
       );
     }
 
-    if (
-      !isDefined(lastExecutedStep.nextStepIds) ||
-      lastExecutedStep.nextStepIds.length === 0
-    ) {
+    const lastExecutedStepOutput =
+      workflowRun.state?.stepInfos[lastExecutedStepId];
+
+    const { nextStepIdsToExecute, nextStepIdsToSkip, nextStepIdsToFailSafely } =
+      await this.workflowExecutorWorkspaceService.getNextStepIdsToExecute({
+        executedStep: lastExecutedStep,
+        executedStepOutput: lastExecutedStepOutput,
+      });
+
+    const hasStepsToSkipOrFailSafely =
+      isDefined(nextStepIdsToSkip) || isDefined(nextStepIdsToFailSafely);
+
+    const hasStepsToExecute =
+      isDefined(nextStepIdsToExecute) && nextStepIdsToExecute.length > 0;
+
+    if (!hasStepsToSkipOrFailSafely && !hasStepsToExecute) {
       await this.workflowRunWorkspaceService.endWorkflowRun({
         workflowRunId,
         workspaceId,
@@ -175,30 +181,27 @@ export class RunWorkflowJob {
       return;
     }
 
-    await this.workflowExecutorWorkspaceService.executeFromSteps({
-      stepIds: lastExecutedStep.nextStepIds,
-      workflowRunId,
-      workspaceId,
-    });
-  }
+    const steps = workflowRun.state?.flow?.steps ?? [];
 
-  private async throttleExecution(workflowId: string) {
-    try {
-      await this.throttlerService.throttle(
-        `${workflowId}-workflow-execution`,
-        this.twentyConfigService.get('WORKFLOW_EXEC_THROTTLE_LIMIT'),
-        this.twentyConfigService.get('WORKFLOW_EXEC_THROTTLE_TTL'),
+    if (hasStepsToSkipOrFailSafely) {
+      await this.workflowExecutorWorkspaceService.skipAndFailSafelyStepsThenContinue(
+        {
+          stepIdsToSkip: nextStepIdsToSkip ?? [],
+          stepIdsToFailSafely: nextStepIdsToFailSafely ?? [],
+          steps,
+          workflowRunId,
+          workspaceId,
+          executedStepsCount: 0,
+        },
       );
-    } catch {
-      await this.metricsService.incrementCounter({
-        key: MetricsKeys.WorkflowRunFailedThrottled,
-        eventId: workflowId,
+    }
+
+    if (hasStepsToExecute) {
+      await this.workflowExecutorWorkspaceService.executeFromSteps({
+        stepIds: nextStepIdsToExecute,
+        workflowRunId,
+        workspaceId,
       });
-
-      throw new WorkflowRunException(
-        'Workflow execution rate limit exceeded',
-        WorkflowRunExceptionCode.WORKFLOW_RUN_LIMIT_REACHED,
-      );
     }
   }
 

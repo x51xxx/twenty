@@ -1,10 +1,10 @@
-import { makeGraphqlAPIRequest } from 'test/integration/graphql/utils/make-graphql-api-request.util';
+import { makeMetadataAPIRequest } from 'test/integration/metadata/suites/utils/make-metadata-api-request.util';
 import { updateFeatureFlagFactory } from 'test/integration/graphql/utils/update-feature-flag-factory.util';
 import { warnIfErrorButNotExpectedToFail } from 'test/integration/metadata/utils/warn-if-error-but-not-expected-to-fail.util';
 import { warnIfNoErrorButExpectedToFail } from 'test/integration/metadata/utils/warn-if-no-error-but-expected-to-fail.util';
+import { type FeatureFlagKey } from 'twenty-shared/types';
 
-import { type FeatureFlagKey } from 'src/engine/core-modules/feature-flag/enums/feature-flag-key.enum';
-import { SEED_APPLE_WORKSPACE_ID } from 'src/engine/workspace-manager/dev-seeder/core/utils/seed-workspaces.util';
+import { SEED_APPLE_WORKSPACE_ID } from 'src/engine/workspace-manager/dev-seeder/core/constants/seeder-workspaces.constant';
 
 export const updateFeatureFlag = async ({
   featureFlag,
@@ -23,7 +23,7 @@ export const updateFeatureFlag = async ({
     value,
   );
 
-  const response = await makeGraphqlAPIRequest(enablePermissionsQuery);
+  const response = await makeMetadataAPIRequest(enablePermissionsQuery);
 
   if (expectToFail === false) {
     warnIfErrorButNotExpectedToFail({

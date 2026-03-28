@@ -11,6 +11,7 @@ export type Message = Omit<
   | 'messageParticipants'
   | 'messageThread'
   | 'messageThreadId'
+  | 'messageFolders'
   | 'id'
 > & {
   attachments: {
@@ -19,6 +20,15 @@ export type Message = Omit<
   externalId: string;
   messageThreadExternalId: string;
   direction: MessageDirection;
+  messageFolderIds?: string[];
+  messageFolderExternalIds?: string[];
+  labelIds?: string[];
+};
+
+export type MessageAttachment = {
+  filename: string;
+  content: Buffer;
+  contentType: string;
 };
 
 export type MessageParticipant = Omit<

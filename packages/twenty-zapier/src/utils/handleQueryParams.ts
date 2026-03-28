@@ -1,4 +1,4 @@
-import { InputData } from '../utils/data.types';
+import { type InputData } from 'src/utils/data.types';
 
 const OBJECT_SUBFIELD_NAMES = ['secondaryLinks', 'additionalPhones'];
 

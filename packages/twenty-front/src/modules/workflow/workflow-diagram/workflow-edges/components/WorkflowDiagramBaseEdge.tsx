@@ -1,11 +1,17 @@
-import { useTheme } from '@emotion/react';
-import { BaseEdge, type EdgeProps } from '@xyflow/react';
-import { type WorkflowDiagramEdge } from '@/workflow/workflow-diagram/types/WorkflowDiagram';
 import { useEdgeState } from '@/workflow/workflow-diagram/workflow-edges/hooks/useEdgeState';
+import { type WorkflowDiagramEdgeComponentProps } from '@/workflow/workflow-diagram/workflow-edges/types/WorkflowDiagramEdgeComponentProps';
+import { BaseEdge } from '@xyflow/react';
+import { ThemeContext } from 'twenty-ui/theme-constants';
+import { useContext } from 'react';
 
 type WorkflowDiagramBaseEdgeProps = Pick<
-  EdgeProps<WorkflowDiagramEdge>,
-  'source' | 'target' | 'markerStart' | 'markerEnd'
+  WorkflowDiagramEdgeComponentProps,
+  | 'source'
+  | 'sourceHandleId'
+  | 'target'
+  | 'targetHandleId'
+  | 'markerStart'
+  | 'markerEnd'
 > & {
   path: string;
 };
@@ -13,17 +19,28 @@ type WorkflowDiagramBaseEdgeProps = Pick<
 export const WorkflowDiagramBaseEdge = ({
   source,
   target,
+  sourceHandleId,
+  targetHandleId,
   markerStart,
   markerEnd,
   path,
 }: WorkflowDiagramBaseEdgeProps) => {
-  const theme = useTheme();
-
+  const { theme } = useContext(ThemeContext);
   const { isEdgeSelected, isEdgeHovered } = useEdgeState();
 
-  const selected = isEdgeSelected({ source, target });
+  const selected = isEdgeSelected({
+    source,
+    target,
+    sourceHandle: sourceHandleId,
+    targetHandle: targetHandleId,
+  });
 
-  const isHovered = isEdgeHovered({ source, target });
+  const isHovered = isEdgeHovered({
+    source,
+    target,
+    sourceHandle: sourceHandleId,
+    targetHandle: targetHandleId,
+  });
 
   const stroke = selected
     ? theme.color.blue

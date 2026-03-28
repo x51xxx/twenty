@@ -5,19 +5,17 @@ import { SETTINGS_FIELD_TYPE_CONFIGS } from '@/settings/data-model/constants/Set
 import { SettingsObjectNewFieldSelector } from '@/settings/data-model/fields/forms/components/SettingsObjectNewFieldSelector';
 import { type FieldType } from '@/settings/data-model/types/FieldType';
 import { type SettingsFieldType } from '@/settings/data-model/types/SettingsFieldType';
-import { AppPath } from '@/types/AppPath';
-import { SettingsPath } from '@/types/SettingsPath';
 import { SubMenuTopBarContainer } from '@/ui/layout/page/components/SubMenuTopBarContainer';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { t } from '@lingui/core/macro';
 import { useEffect } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 import { useParams } from 'react-router-dom';
-import { isDefined } from 'twenty-shared/utils';
+import { AppPath, SettingsPath } from 'twenty-shared/types';
+import { getSettingsPath, isDefined } from 'twenty-shared/utils';
 import { z } from 'zod';
 import { FieldMetadataType } from '~/generated-metadata/graphql';
 import { useNavigateApp } from '~/hooks/useNavigateApp';
-import { getSettingsPath } from '~/utils/navigation/getSettingsPath';
 
 export const settingsDataModelFieldTypeFormSchema = z.object({
   type: z.enum(
@@ -35,21 +33,20 @@ export type SettingsDataModelFieldTypeFormValues = z.infer<
 export const SettingsObjectNewFieldSelect = () => {
   const navigate = useNavigateApp();
   const { objectNamePlural = '' } = useParams();
-  const { findActiveObjectMetadataItemByNamePlural } =
+  const { findObjectMetadataItemByNamePlural } =
     useFilteredObjectMetadataItems();
   const activeObjectMetadataItem =
-    findActiveObjectMetadataItemByNamePlural(objectNamePlural);
+    findObjectMetadataItemByNamePlural(objectNamePlural);
   const formMethods = useForm({
     resolver: zodResolver(settingsDataModelFieldTypeFormSchema),
     defaultValues: {
       type: FieldMetadataType.TEXT,
     },
   });
+
   const excludedFieldTypes: FieldType[] = (
     [
       FieldMetadataType.NUMERIC,
-      FieldMetadataType.RICH_TEXT,
-      FieldMetadataType.RICH_TEXT_V2,
       FieldMetadataType.ACTOR,
       FieldMetadataType.UUID,
     ] as const
@@ -64,14 +61,17 @@ export const SettingsObjectNewFieldSelect = () => {
   if (!activeObjectMetadataItem) return null;
 
   return (
-    <FormProvider // eslint-disable-next-line react/jsx-props-no-spreading
+    <FormProvider // oxlint-disable-next-line react/jsx-props-no-spreading
       {...formMethods}
     >
       <SubMenuTopBarContainer
         title={t`1. Select a field type`}
         links={[
-          { children: t`Workspace`, href: '/settings/general' },
-          { children: t`Objects`, href: '/settings/objects' },
+          {
+            children: t`Workspace`,
+            href: getSettingsPath(SettingsPath.Workspace),
+          },
+          { children: t`Objects`, href: getSettingsPath(SettingsPath.Objects) },
           {
             children: activeObjectMetadataItem.labelPlural,
             href: getSettingsPath(SettingsPath.ObjectDetail, {

@@ -2,9 +2,8 @@ import { Controller, useFormContext } from 'react-hook-form';
 
 import { useFieldMetadataItemById } from '@/object-metadata/hooks/useFieldMetadataItemById';
 import { useObjectMetadataItem } from '@/object-metadata/hooks/useObjectMetadataItem';
-import { Separator } from '@/settings/components/Separator';
 import { SettingsOptionCardContentSelect } from '@/settings/components/SettingsOptions/SettingsOptionCardContentSelect';
-import { canBeUnique } from '@/settings/data-model/fields/forms/utils/canBeUnique.util';
+import { canBeUnique } from '@/settings/data-model/fields/forms/utils/canBeUnique';
 import { t } from '@lingui/core/macro';
 import { type FieldMetadataType } from 'twenty-shared/types';
 import { IconKey } from 'twenty-ui/display';
@@ -18,12 +17,14 @@ type SettingsDataModelFieldIsUniqueFormProps = {
   objectNameSingular: string;
   fieldType: FieldMetadataType;
   existingFieldMetadataId: string;
+  disabled?: boolean;
 };
 
 export const SettingsDataModelFieldIsUniqueForm = ({
   fieldType,
   existingFieldMetadataId,
   objectNameSingular,
+  disabled = false,
 }: SettingsDataModelFieldIsUniqueFormProps) => {
   const { control } =
     useFormContext<SettingsDataModelFieldIsUniqueFormValues>();
@@ -64,7 +65,6 @@ export const SettingsDataModelFieldIsUniqueForm = ({
 
         return (
           <>
-            <Separator />
             <SettingsOptionCardContentSelect
               Icon={IconKey}
               title={t`Unique`}
@@ -74,7 +74,7 @@ export const SettingsDataModelFieldIsUniqueForm = ({
                 toggleSize="small"
                 value={isUnique}
                 onChange={(value) => onChange(value)}
-                disabled={hasStandardUniqueIndex}
+                disabled={disabled || hasStandardUniqueIndex}
               />
             </SettingsOptionCardContentSelect>
           </>

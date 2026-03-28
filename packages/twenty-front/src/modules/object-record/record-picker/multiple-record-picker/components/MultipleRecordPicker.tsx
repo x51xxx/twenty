@@ -1,3 +1,7 @@
+import { useCallback, useRef } from 'react';
+import { useStore } from 'jotai';
+
+import { useObjectPermissionsForObject } from '@/object-record/hooks/useObjectPermissionsForObject';
 import { MultipleRecordPickerItemsDisplay } from '@/object-record/record-picker/multiple-record-picker/components/MultipleRecordPickerItemsDisplay';
 import { MultipleRecordPickerOnClickOutsideEffect } from '@/object-record/record-picker/multiple-record-picker/components/MultipleRecordPickerOnClickOutsideEffect';
 import { MultipleRecordPickerSearchInput } from '@/object-record/record-picker/multiple-record-picker/components/MultipleRecordPickerSearchInput';
@@ -7,17 +11,15 @@ import { multipleRecordPickerSearchFilterComponentState } from '@/object-record/
 import { getMultipleRecordPickerSelectableListId } from '@/object-record/record-picker/multiple-record-picker/utils/getMultipleRecordPickerSelectableListId';
 import { type RecordPickerLayoutDirection } from '@/object-record/record-picker/types/RecordPickerLayoutDirection';
 import { type RecordPickerPickableMorphItem } from '@/object-record/record-picker/types/RecordPickerPickableMorphItem';
-import { useHasObjectReadOnlyPermission } from '@/settings/roles/hooks/useHasObjectReadOnlyPermission';
 import { CreateNewButton } from '@/ui/input/relation-picker/components/CreateNewButton';
 import { DropdownContent } from '@/ui/layout/dropdown/components/DropdownContent';
 import { DropdownMenuItemsContainer } from '@/ui/layout/dropdown/components/DropdownMenuItemsContainer';
 import { useSelectableList } from '@/ui/layout/selectable-list/hooks/useSelectableList';
 import { useHotkeysOnFocusedElement } from '@/ui/utilities/hotkey/hooks/useHotkeysOnFocusedElement';
-import { useRecoilComponentCallbackState } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentCallbackState';
-import { useRef } from 'react';
-import { useRecoilCallback } from 'recoil';
+import { useAtomComponentStateCallbackState } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateCallbackState';
 import { Key } from 'ts-key-enum';
 import { isDefined } from 'twenty-shared/utils';
+import { t } from '@lingui/core/macro';
 import { IconPlus } from 'twenty-ui/display';
 
 type MultipleRecordPickerProps = {
@@ -28,6 +30,8 @@ type MultipleRecordPickerProps = {
   componentInstanceId: string;
   onClickOutside: () => void;
   focusId: string;
+  objectMetadataItemIdForCreate?: string;
+  dropdownWidth?: number;
 };
 
 export const MultipleRecordPicker = ({
@@ -38,6 +42,8 @@ export const MultipleRecordPicker = ({
   layoutDirection = 'search-bar-on-bottom',
   componentInstanceId,
   focusId,
+  objectMetadataItemIdForCreate,
+  dropdownWidth,
 }: MultipleRecordPickerProps) => {
   const selectableListComponentInstanceId =
     getMultipleRecordPickerSelectableListId(componentInstanceId);
@@ -46,31 +52,28 @@ export const MultipleRecordPicker = ({
     selectableListComponentInstanceId,
   );
 
-  const multipleRecordPickerSearchFilterState = useRecoilComponentCallbackState(
-    multipleRecordPickerSearchFilterComponentState,
-    componentInstanceId,
-  );
+  const multipleRecordPickerSearchFilterState =
+    useAtomComponentStateCallbackState(
+      multipleRecordPickerSearchFilterComponentState,
+      componentInstanceId,
+    );
 
   const multipleRecordPickerPickableMorphItemsState =
-    useRecoilComponentCallbackState(
+    useAtomComponentStateCallbackState(
       multipleRecordPickerPickableMorphItemsComponentState,
       componentInstanceId,
     );
 
-  const hasObjectReadOnlyPermission = useHasObjectReadOnlyPermission();
+  const store = useStore();
 
-  const resetState = useRecoilCallback(
-    ({ set }) => {
-      return () => {
-        set(multipleRecordPickerPickableMorphItemsState, []);
-        set(multipleRecordPickerSearchFilterState, '');
-      };
-    },
-    [
-      multipleRecordPickerPickableMorphItemsState,
-      multipleRecordPickerSearchFilterState,
-    ],
-  );
+  const resetState = useCallback(() => {
+    store.set(multipleRecordPickerPickableMorphItemsState, []);
+    store.set(multipleRecordPickerSearchFilterState, '');
+  }, [
+    multipleRecordPickerPickableMorphItemsState,
+    multipleRecordPickerSearchFilterState,
+    store,
+  ]);
 
   const handleSubmit = () => {
     onSubmit?.();
@@ -94,25 +97,24 @@ export const MultipleRecordPicker = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const handleCreateNewButtonClick = useRecoilCallback(
-    ({ snapshot }) => {
-      return () => {
-        const recordPickerSearchFilter = snapshot
-          .getLoadable(multipleRecordPickerSearchFilterState)
-          .getValue();
-        onCreate?.(recordPickerSearchFilter);
-      };
-    },
-    [multipleRecordPickerSearchFilterState, onCreate],
-  );
+  const handleCreateNewButtonClick = useCallback(() => {
+    const recordPickerSearchFilter = store.get(
+      multipleRecordPickerSearchFilterState,
+    );
+    onCreate?.(recordPickerSearchFilter);
+  }, [multipleRecordPickerSearchFilterState, onCreate, store]);
+
+  const hasCreatePermissionOnObjectForCreate = useObjectPermissionsForObject(
+    objectMetadataItemIdForCreate ?? '',
+  ).canUpdateObjectRecords;
 
   const createNewButtonSection =
-    isDefined(onCreate) && !hasObjectReadOnlyPermission ? (
+    isDefined(onCreate) && hasCreatePermissionOnObjectForCreate ? (
       <DropdownMenuItemsContainer scrollable={false}>
         <CreateNewButton
           onClick={handleCreateNewButtonClick}
           LeftIcon={IconPlus}
-          text="Add New"
+          text={t`Add New`}
         />
       </DropdownMenuItemsContainer>
     ) : null;
@@ -125,7 +127,7 @@ export const MultipleRecordPicker = ({
         containerRef={containerRef}
         onClickOutside={handleClickOutside}
       />
-      <DropdownContent ref={containerRef}>
+      <DropdownContent ref={containerRef} widthInPixels={dropdownWidth}>
         {layoutDirection === 'search-bar-on-bottom' && (
           <>
             {createNewButtonSection}

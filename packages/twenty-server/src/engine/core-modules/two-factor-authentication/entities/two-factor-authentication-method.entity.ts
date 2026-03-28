@@ -1,5 +1,3 @@
-import { Field, ObjectType } from '@nestjs/graphql';
-
 import { TwoFactorAuthenticationStrategy } from 'twenty-shared/types';
 import {
   Column,
@@ -14,30 +12,26 @@ import {
 } from 'typeorm';
 
 import { OTPStatus } from 'src/engine/core-modules/two-factor-authentication/strategies/otp/otp.constants';
-import { UserWorkspace } from 'src/engine/core-modules/user-workspace/user-workspace.entity';
+import { UserWorkspaceEntity } from 'src/engine/core-modules/user-workspace/user-workspace.entity';
 
 @Index(['userWorkspaceId', 'strategy'], { unique: true })
 @Entity({ name: 'twoFactorAuthenticationMethod', schema: 'core' })
-@ObjectType()
-export class TwoFactorAuthenticationMethod {
-  @Field()
+export class TwoFactorAuthenticationMethodEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Field({ nullable: false })
   @Column({ nullable: false, type: 'uuid' })
   userWorkspaceId: string;
 
-  @Field(() => UserWorkspace)
   @ManyToOne(
-    () => UserWorkspace,
+    () => UserWorkspaceEntity,
     (userWorkspace) => userWorkspace.twoFactorAuthenticationMethods,
     {
       onDelete: 'CASCADE',
     },
   )
   @JoinColumn({ name: 'userWorkspaceId' })
-  userWorkspace: Relation<UserWorkspace>;
+  userWorkspace: Relation<UserWorkspaceEntity>;
 
   @Column({ nullable: false, type: 'text' })
   secret: string;
@@ -49,22 +43,18 @@ export class TwoFactorAuthenticationMethod {
   })
   status: OTPStatus;
 
-  @Field(() => TwoFactorAuthenticationStrategy)
   @Column({
     type: 'enum',
     enum: TwoFactorAuthenticationStrategy,
   })
   strategy: TwoFactorAuthenticationStrategy;
 
-  @Field()
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @Field()
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 
-  @Field({ nullable: true })
   @Column({ nullable: true, type: 'timestamptz' })
   deletedAt: Date;
 }

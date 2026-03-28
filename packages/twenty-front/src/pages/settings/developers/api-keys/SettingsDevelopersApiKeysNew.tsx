@@ -1,59 +1,36 @@
-import { DateTime } from 'luxon';
-import { useState } from 'react';
+import { addDays } from 'date-fns';
+import { useCallback, useEffect, useState } from 'react';
 
-import { currentWorkspaceState } from '@/auth/states/currentWorkspaceState';
 import { SaveAndCancelButtons } from '@/settings/components/SaveAndCancelButtons/SaveAndCancelButtons';
 import { SettingsPageContainer } from '@/settings/components/SettingsPageContainer';
 import { SettingsSkeletonLoader } from '@/settings/components/SettingsSkeletonLoader';
 import { SettingsDevelopersRoleSelector } from '@/settings/developers/components/SettingsDevelopersRoleSelector';
 import { EXPIRATION_DATES } from '@/settings/developers/constants/ExpirationDates';
 import { apiKeyTokenFamilyState } from '@/settings/developers/states/apiKeyTokenFamilyState';
-import { SettingsPath } from '@/types/SettingsPath';
 import { Select } from '@/ui/input/components/Select';
 import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
 import { SubMenuTopBarContainer } from '@/ui/layout/page/components/SubMenuTopBarContainer';
-import { useIsFeatureEnabled } from '@/workspace/hooks/useIsFeatureEnabled';
+import { useMutation, useQuery } from '@apollo/client/react';
 import { useLingui } from '@lingui/react/macro';
-import { useRecoilCallback, useRecoilValue } from 'recoil';
+import { useStore } from 'jotai';
 import { Key } from 'ts-key-enum';
-import { isDefined } from 'twenty-shared/utils';
+import { SettingsPath } from 'twenty-shared/types';
+import { getSettingsPath, isDefined } from 'twenty-shared/utils';
 import { H2Title } from 'twenty-ui/display';
 import { Section } from 'twenty-ui/layout';
 import {
-  FeatureFlagKey,
-  useCreateApiKeyMutation,
-  useGenerateApiKeyTokenMutation,
-  useGetRolesQuery,
+  CreateApiKeyDocument,
+  GenerateApiKeyTokenDocument,
+  GetRolesDocument,
 } from '~/generated-metadata/graphql';
 import { useNavigateSettings } from '~/hooks/useNavigateSettings';
-import { getSettingsPath } from '~/utils/navigation/getSettingsPath';
 
 export const SettingsDevelopersApiKeysNew = () => {
   const { t } = useLingui();
-  const [generateOneApiKeyToken] = useGenerateApiKeyTokenMutation();
+  const [generateOneApiKeyToken] = useMutation(GenerateApiKeyTokenDocument);
   const navigateSettings = useNavigateSettings();
-  const currentWorkspace = useRecoilValue(currentWorkspaceState);
-  const { data: rolesData, loading: rolesLoading } = useGetRolesQuery({
-    onCompleted: (data) => {
-      if (isApiKeyRolesEnabled && isDefined(data?.getRoles)) {
-        const defaultRole = data.getRoles.find(
-          (role) => role.id === currentWorkspace?.defaultRole?.id,
-        );
-        if (isDefined(defaultRole) && !formValues.roleId) {
-          setFormValues((prev) => ({
-            ...prev,
-            roleId: defaultRole.id,
-          }));
-        }
-      }
-    },
-  });
+  const { data: rolesData, loading: rolesLoading } = useQuery(GetRolesDocument);
   const roles = rolesData?.getRoles ?? [];
-  const isApiKeyRolesEnabled = useIsFeatureEnabled(
-    FeatureFlagKey.IS_API_KEY_ROLES_ENABLED,
-  );
-
-  const adminRole = roles.find((role) => role.label === 'Admin');
 
   const [formValues, setFormValues] = useState<{
     name: string;
@@ -65,24 +42,42 @@ export const SettingsDevelopersApiKeysNew = () => {
     roleId: '',
   });
 
-  const [createApiKey] = useCreateApiKeyMutation();
+  useEffect(() => {
+    if (isDefined(rolesData?.getRoles)) {
+      const apiKeyAssignableRoles = rolesData.getRoles.filter(
+        (role) => role.canBeAssignedToApiKeys,
+      );
+      if (apiKeyAssignableRoles.length > 0) {
+        setFormValues((prev) => {
+          if (!prev.roleId) {
+            return { ...prev, roleId: apiKeyAssignableRoles[0].id };
+          }
+          return prev;
+        });
+      }
+    }
+  }, [rolesData]);
 
-  const setApiKeyTokenCallback = useRecoilCallback(
-    ({ set }) =>
-      (apiKeyId: string, token: string) => {
-        set(apiKeyTokenFamilyState(apiKeyId), token);
-      },
-    [],
+  const [createApiKey] = useMutation(CreateApiKeyDocument);
+
+  const jotaiStore = useStore();
+
+  const setApiKeyTokenCallback = useCallback(
+    (apiKeyId: string, token: string) => {
+      jotaiStore.set(apiKeyTokenFamilyState.atomFamily(apiKeyId), token);
+    },
+    [jotaiStore],
   );
 
   const handleSave = async () => {
-    const expiresAt = DateTime.now()
-      .plus({ days: formValues.expirationDate ?? 30 })
-      .toString();
+    if (!formValues.name) return;
 
-    const roleIdToUse = isApiKeyRolesEnabled
-      ? formValues.roleId
-      : adminRole?.id;
+    const expiresAt = addDays(
+      new Date(),
+      formValues.expirationDate ?? 30,
+    ).toISOString();
+
+    const roleIdToUse = formValues.roleId;
 
     if (!roleIdToUse) {
       return;
@@ -91,7 +86,7 @@ export const SettingsDevelopersApiKeysNew = () => {
     const { data: newApiKeyData } = await createApiKey({
       variables: {
         input: {
-          name: formValues.name,
+          name: formValues.name.trim(),
           expiresAt,
           roleId: roleIdToUse,
         },
@@ -122,9 +117,7 @@ export const SettingsDevelopersApiKeysNew = () => {
     }
   };
 
-  const canSave = isApiKeyRolesEnabled
-    ? !!formValues.name && !!formValues.roleId && createApiKey
-    : !!formValues.name && !!adminRole?.id && createApiKey;
+  const canSave = !!formValues.name && !!formValues.roleId;
 
   if (rolesLoading) {
     return <SettingsSkeletonLoader />;
@@ -175,24 +168,22 @@ export const SettingsDevelopersApiKeysNew = () => {
             fullWidth
           />
         </Section>
-        {isApiKeyRolesEnabled && (
-          <Section>
-            <H2Title
-              title={t`Role`}
-              description={t`What this API can do: Select a user role to define its permissions.`}
-            />
-            <SettingsDevelopersRoleSelector
-              value={formValues.roleId}
-              onChange={(roleId) => {
-                setFormValues((prevState) => ({
-                  ...prevState,
-                  roleId,
-                }));
-              }}
-              roles={roles}
-            />
-          </Section>
-        )}
+        <Section>
+          <H2Title
+            title={t`Role`}
+            description={t`What this API can do: Select a user role to define its permissions.`}
+          />
+          <SettingsDevelopersRoleSelector
+            value={formValues.roleId}
+            onChange={(roleId) => {
+              setFormValues((prevState) => ({
+                ...prevState,
+                roleId,
+              }));
+            }}
+            roles={roles}
+          />
+        </Section>
         <Section>
           <H2Title
             title={t`Expiration Date`}

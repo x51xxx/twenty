@@ -10,7 +10,7 @@ import {
   IconSquareNumber8,
   IconSquareNumber9,
 } from 'twenty-ui/display';
-import { type FixedLengthArray } from '../types/FixedLengthArray';
+import { type FixedLengthArray } from '@/object-record/record-merge/types/FixedLengthArray';
 
 export const getPositionNumberIcon = (index: number) => {
   const iconMapping: FixedLengthArray<
@@ -28,5 +28,5 @@ export const getPositionNumberIcon = (index: number) => {
     IconSquareNumber9,
   ];
 
-  return iconMapping[index] || IconSquareNumber1;
+  return iconMapping[index] ?? IconSquareNumber1;
 };

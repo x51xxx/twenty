@@ -1,11 +1,14 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 
 import { encodeCursorData } from 'src/engine/api/graphql/graphql-query-runner/utils/cursors.util';
-import { mockObjectMetadataItemsWithFieldMaps } from 'src/engine/core-modules/__mocks__/mockObjectMetadataItemsWithFieldMaps';
+import {
+  mockFlatFieldMetadataMaps,
+  mockFlatObjectMetadatas,
+} from 'src/engine/core-modules/__mocks__/mockFlatObjectMetadatas';
 import { FileService } from 'src/engine/core-modules/file/services/file.service';
 import { SearchService } from 'src/engine/core-modules/search/services/search.service';
-import { TwentyORMManager } from 'src/engine/twenty-orm/twenty-orm.manager';
-import { WorkspaceCacheStorageService } from 'src/engine/workspace-cache-storage/workspace-cache-storage.service';
+import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
+import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
 
 describe('SearchService', () => {
   let service: SearchService;
@@ -14,9 +17,9 @@ describe('SearchService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SearchService,
-        { provide: TwentyORMManager, useValue: {} },
-        { provide: WorkspaceCacheStorageService, useValue: {} },
+        { provide: GlobalWorkspaceOrmManager, useValue: {} },
         { provide: FileService, useValue: {} },
+        { provide: TwentyConfigService, useValue: { get: () => false } },
       ],
     }).compile();
 
@@ -30,53 +33,71 @@ describe('SearchService', () => {
   describe('filterObjectMetadataItems', () => {
     it('should return searchable object metadata items', () => {
       const objectMetadataItems = service.filterObjectMetadataItems({
-        objectMetadataItemWithFieldMaps: mockObjectMetadataItemsWithFieldMaps,
+        flatObjectMetadatas: mockFlatObjectMetadatas,
         includedObjectNameSingulars: [],
         excludedObjectNameSingulars: [],
       });
 
       expect(objectMetadataItems).toEqual([
-        mockObjectMetadataItemsWithFieldMaps[0],
-        mockObjectMetadataItemsWithFieldMaps[1],
-        mockObjectMetadataItemsWithFieldMaps[2],
+        mockFlatObjectMetadatas[0],
+        mockFlatObjectMetadatas[1],
+        mockFlatObjectMetadatas[2],
       ]);
     });
     it('should return searchable object metadata items without excluded ones', () => {
       const objectMetadataItems = service.filterObjectMetadataItems({
-        objectMetadataItemWithFieldMaps: mockObjectMetadataItemsWithFieldMaps,
+        flatObjectMetadatas: mockFlatObjectMetadatas,
         includedObjectNameSingulars: [],
         excludedObjectNameSingulars: ['company'],
       });
 
       expect(objectMetadataItems).toEqual([
-        mockObjectMetadataItemsWithFieldMaps[0],
-        mockObjectMetadataItemsWithFieldMaps[2],
+        mockFlatObjectMetadatas[0],
+        mockFlatObjectMetadatas[2],
       ]);
     });
     it('should return searchable object metadata items with included ones only', () => {
       const objectMetadataItems = service.filterObjectMetadataItems({
-        objectMetadataItemWithFieldMaps: mockObjectMetadataItemsWithFieldMaps,
+        flatObjectMetadatas: mockFlatObjectMetadatas,
         includedObjectNameSingulars: ['company'],
         excludedObjectNameSingulars: [],
       });
 
-      expect(objectMetadataItems).toEqual([
-        mockObjectMetadataItemsWithFieldMaps[1],
-      ]);
+      expect(objectMetadataItems).toEqual([mockFlatObjectMetadatas[1]]);
+    });
+    it('should allow non-searchable objects when explicitly included', () => {
+      const objectMetadataItems = service.filterObjectMetadataItems({
+        flatObjectMetadatas: mockFlatObjectMetadatas,
+        includedObjectNameSingulars: ['non-searchable-object'],
+        excludedObjectNameSingulars: [],
+      });
+
+      expect(objectMetadataItems).toEqual([mockFlatObjectMetadatas[3]]);
+    });
+    it('should block objects with channel visibility constraints even when explicitly included', () => {
+      const objectMetadataItems = service.filterObjectMetadataItems({
+        flatObjectMetadatas: mockFlatObjectMetadatas,
+        includedObjectNameSingulars: ['message'],
+        excludedObjectNameSingulars: [],
+      });
+
+      expect(objectMetadataItems).toEqual([]);
     });
   });
 
   describe('getLabelIdentifierColumns', () => {
     it('should return the two label identifier columns for a person object metadata item', () => {
       const labelIdentifierColumns = service.getLabelIdentifierColumns(
-        mockObjectMetadataItemsWithFieldMaps[0],
+        mockFlatObjectMetadatas[0],
+        mockFlatFieldMetadataMaps,
       );
 
       expect(labelIdentifierColumns).toEqual(['nameFirstName', 'nameLastName']);
     });
     it('should return the label identifier column for a regular object metadata item', () => {
       const labelIdentifierColumns = service.getLabelIdentifierColumns(
-        mockObjectMetadataItemsWithFieldMaps[1],
+        mockFlatObjectMetadatas[1],
+        mockFlatFieldMetadataMaps,
       );
 
       expect(labelIdentifierColumns).toEqual(['name']);
@@ -86,14 +107,16 @@ describe('SearchService', () => {
   describe('getImageIdentifierColumn', () => {
     it('should return null if the object metadata item does not have an image identifier', () => {
       const imageIdentifierColumn = service.getImageIdentifierColumn(
-        mockObjectMetadataItemsWithFieldMaps[0],
+        mockFlatObjectMetadatas[0],
+        mockFlatFieldMetadataMaps,
       );
 
       expect(imageIdentifierColumn).toBeNull();
     });
     it('should return `domainNamePrimaryLinkUrl` column for a company object metadata item', () => {
       const imageIdentifierColumn = service.getImageIdentifierColumn(
-        mockObjectMetadataItemsWithFieldMaps[1],
+        mockFlatObjectMetadatas[1],
+        mockFlatFieldMetadataMaps,
       );
 
       expect(imageIdentifierColumn).toEqual('domainNamePrimaryLinkUrl');
@@ -101,7 +124,8 @@ describe('SearchService', () => {
 
     it('should return the image identifier column', () => {
       const imageIdentifierColumn = service.getImageIdentifierColumn(
-        mockObjectMetadataItemsWithFieldMaps[2],
+        mockFlatObjectMetadatas[2],
+        mockFlatFieldMetadataMaps,
       );
 
       expect(imageIdentifierColumn).toEqual('imageIdentifierFieldName');
@@ -113,6 +137,7 @@ describe('SearchService', () => {
       const objectResults = [
         {
           objectNameSingular: 'person',
+          objectLabelSingular: 'Person',
           tsRankCD: 2,
           tsRank: 1,
           recordId: '',
@@ -121,6 +146,7 @@ describe('SearchService', () => {
         },
         {
           objectNameSingular: 'company',
+          objectLabelSingular: 'Company',
           tsRankCD: 1,
           tsRank: 1,
           recordId: '',
@@ -129,6 +155,7 @@ describe('SearchService', () => {
         },
         {
           objectNameSingular: 'regular-custom-object',
+          objectLabelSingular: 'Regular Custom Object',
           tsRankCD: 3,
           tsRank: 1,
           recordId: '',
@@ -148,6 +175,7 @@ describe('SearchService', () => {
       const objectResults = [
         {
           objectNameSingular: 'person',
+          objectLabelSingular: 'Person',
           tsRankCD: 1,
           tsRank: 1,
           recordId: '',
@@ -156,6 +184,7 @@ describe('SearchService', () => {
         },
         {
           objectNameSingular: 'company',
+          objectLabelSingular: 'Company',
           tsRankCD: 1,
           tsRank: 2,
           recordId: '',
@@ -164,6 +193,7 @@ describe('SearchService', () => {
         },
         {
           objectNameSingular: 'regular-custom-object',
+          objectLabelSingular: 'Regular Custom Object',
           tsRankCD: 1,
           tsRank: 3,
           recordId: '',
@@ -183,6 +213,7 @@ describe('SearchService', () => {
       const objectResults = [
         {
           objectNameSingular: 'company',
+          objectLabelSingular: 'Company',
           tsRankCD: 1,
           tsRank: 1,
           recordId: '',
@@ -191,6 +222,7 @@ describe('SearchService', () => {
         },
         {
           objectNameSingular: 'person',
+          objectLabelSingular: 'Person',
           tsRankCD: 1,
           tsRank: 1,
           recordId: '',
@@ -199,6 +231,7 @@ describe('SearchService', () => {
         },
         {
           objectNameSingular: 'regular-custom-object',
+          objectLabelSingular: 'Regular Custom Object',
           tsRankCD: 1,
           tsRank: 1,
           recordId: '',
@@ -221,6 +254,7 @@ describe('SearchService', () => {
         {
           record: {
             objectNameSingular: 'company',
+            objectLabelSingular: 'Company',
             tsRankCD: 0.9,
             tsRank: 0.9,
             recordId: 'companyId1',
@@ -237,6 +271,7 @@ describe('SearchService', () => {
         {
           record: {
             objectNameSingular: 'company',
+            objectLabelSingular: 'Company',
             tsRankCD: 0.89,
             tsRank: 0.89,
             recordId: 'companyId2',
@@ -253,6 +288,7 @@ describe('SearchService', () => {
         {
           record: {
             objectNameSingular: 'person',
+            objectLabelSingular: 'Person',
             tsRankCD: 0.87,
             tsRank: 0.87,
             recordId: 'personId1',
@@ -270,6 +306,7 @@ describe('SearchService', () => {
         {
           record: {
             objectNameSingular: 'person',
+            objectLabelSingular: 'Person',
             tsRankCD: 0.87,
             tsRank: 0.87,
             recordId: 'personId2',
@@ -287,6 +324,7 @@ describe('SearchService', () => {
         {
           record: {
             objectNameSingular: 'opportunity',
+            objectLabelSingular: 'Opportunity',
             tsRankCD: 0.87,
             tsRank: 0.87,
             recordId: 'opportunityId1',
@@ -305,6 +343,7 @@ describe('SearchService', () => {
         {
           record: {
             objectNameSingular: 'note',
+            objectLabelSingular: 'Note',
             tsRankCD: 0.2,
             tsRank: 0.2,
             recordId: 'noteId1',
@@ -324,6 +363,7 @@ describe('SearchService', () => {
         {
           record: {
             objectNameSingular: 'company',
+            objectLabelSingular: 'Company',
             tsRankCD: 0.1,
             tsRank: 0.1,
             recordId: 'companyId3',
@@ -356,6 +396,7 @@ describe('SearchService', () => {
         {
           record: {
             objectNameSingular: 'person',
+            objectLabelSingular: 'Person',
             tsRankCD: 0.87,
             tsRank: 0.87,
             recordId: 'personId2',
@@ -373,6 +414,7 @@ describe('SearchService', () => {
         {
           record: {
             objectNameSingular: 'opportunity',
+            objectLabelSingular: 'Opportunity',
             tsRankCD: 0.87,
             tsRank: 0.87,
             recordId: 'opportunityId1',
@@ -391,6 +433,7 @@ describe('SearchService', () => {
         {
           record: {
             objectNameSingular: 'note',
+            objectLabelSingular: 'Note',
             tsRankCD: 0.2,
             tsRank: 0.2,
             recordId: 'noteId1',
@@ -410,6 +453,7 @@ describe('SearchService', () => {
         {
           record: {
             objectNameSingular: 'company',
+            objectLabelSingular: 'Company',
             tsRankCD: 0.1,
             tsRank: 0.1,
             recordId: 'companyId3',

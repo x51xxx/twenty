@@ -6,20 +6,17 @@ import {
   CreateDateColumn,
   Entity,
   Index,
-  JoinColumn,
-  ManyToOne,
   PrimaryGeneratedColumn,
-  Relation,
   UpdateDateColumn,
 } from 'typeorm';
 
 import { UUIDScalarType } from 'src/engine/api/graphql/workspace-schema-builder/graphql-types/scalars';
-import { Workspace } from 'src/engine/core-modules/workspace/workspace.entity';
+import { WorkspaceRelatedEntity } from 'src/engine/workspace-manager/types/workspace-related-entity';
 
 @Index('IDX_API_KEY_WORKSPACE_ID', ['workspaceId'])
 @Entity({ name: 'apiKey', schema: 'core' })
 @ObjectType('ApiKey')
-export class ApiKey {
+export class ApiKeyEntity extends WorkspaceRelatedEntity {
   @IDField(() => UUIDScalarType)
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -36,10 +33,6 @@ export class ApiKey {
   @Column({ type: 'timestamptz', nullable: true })
   revokedAt?: Date | null;
 
-  @Field(() => UUIDScalarType)
-  @Column('uuid')
-  workspaceId: string;
-
   @Field(() => Date)
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
@@ -47,11 +40,4 @@ export class ApiKey {
   @Field(() => Date)
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
-
-  @Field(() => Workspace)
-  @ManyToOne(() => Workspace, (workspace) => workspace.apiKeys, {
-    onDelete: 'CASCADE',
-  })
-  @JoinColumn({ name: 'workspaceId' })
-  workspace: Relation<Workspace>;
 }

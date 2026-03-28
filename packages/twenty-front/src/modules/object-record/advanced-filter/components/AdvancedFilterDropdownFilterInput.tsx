@@ -1,3 +1,4 @@
+import { ObjectFilterDropdownActorSelect } from '@/object-record/object-filter-dropdown/components/ObjectFilterDropdownActorSelect';
 import { ObjectFilterDropdownOptionSelect } from '@/object-record/object-filter-dropdown/components/ObjectFilterDropdownOptionSelect';
 import { ObjectFilterDropdownRatingInput } from '@/object-record/object-filter-dropdown/components/ObjectFilterDropdownRatingInput';
 import { ObjectFilterDropdownRecordSelect } from '@/object-record/object-filter-dropdown/components/ObjectFilterDropdownRecordSelect';
@@ -10,16 +11,17 @@ import { ObjectFilterDropdownBooleanSelect } from '@/object-record/object-filter
 import { ObjectFilterDropdownCountrySelect } from '@/object-record/object-filter-dropdown/components/ObjectFilterDropdownCountrySelect';
 import { ObjectFilterDropdownCurrencySelect } from '@/object-record/object-filter-dropdown/components/ObjectFilterDropdownCurrencySelect';
 import { ObjectFilterDropdownDateInput } from '@/object-record/object-filter-dropdown/components/ObjectFilterDropdownDateInput';
+import { ObjectFilterDropdownDateTimeInput } from '@/object-record/object-filter-dropdown/components/ObjectFilterDropdownDateTimeInput';
 import { ObjectFilterDropdownTextInput } from '@/object-record/object-filter-dropdown/components/ObjectFilterDropdownTextInput';
-import { DATE_FILTER_TYPES } from '@/object-record/object-filter-dropdown/constants/DateFilterTypes';
 import { subFieldNameUsedInDropdownComponentState } from '@/object-record/object-filter-dropdown/states/subFieldNameUsedInDropdownComponentState';
-import { isExpectedSubFieldName } from '@/object-record/object-filter-dropdown/utils/isExpectedSubFieldName';
 import { isFilterOnActorSourceSubField } from '@/object-record/object-filter-dropdown/utils/isFilterOnActorSourceSubField';
+import { isFilterOnActorWorkspaceMemberSubField } from '@/object-record/object-filter-dropdown/utils/isFilterOnActorWorkspaceMemberSubField';
 import { type RecordFilter } from '@/object-record/record-filter/types/RecordFilter';
 import { DropdownContent } from '@/ui/layout/dropdown/components/DropdownContent';
 import { GenericDropdownContentWidth } from '@/ui/layout/dropdown/constants/GenericDropdownContentWidth';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 import { FieldMetadataType } from 'twenty-shared/types';
+import { isExpectedSubFieldName } from 'twenty-shared/utils';
 
 type AdvancedFilterDropdownFilterInputProps = {
   filterDropdownId: string;
@@ -30,7 +32,7 @@ export const AdvancedFilterDropdownFilterInput = ({
   filterDropdownId,
   recordFilter,
 }: AdvancedFilterDropdownFilterInputProps) => {
-  const subFieldNameUsedInDropdown = useRecoilComponentValue(
+  const subFieldNameUsedInDropdown = useAtomComponentStateValue(
     subFieldNameUsedInDropdownComponentState,
   );
 
@@ -39,6 +41,9 @@ export const AdvancedFilterDropdownFilterInput = ({
   const isActorSourceCompositeFilter = isFilterOnActorSourceSubField(
     subFieldNameUsedInDropdown,
   );
+
+  const isActorWorkspaceMemberCompositeFilter =
+    isFilterOnActorWorkspaceMemberSubField(subFieldNameUsedInDropdown);
 
   return (
     <>
@@ -49,9 +54,8 @@ export const AdvancedFilterDropdownFilterInput = ({
           <AdvancedFilterDropdownTextInput recordFilter={recordFilter} />
         ))}
       {filterType === 'RATING' && <ObjectFilterDropdownRatingInput />}
-      {DATE_FILTER_TYPES.includes(filterType) && (
-        <ObjectFilterDropdownDateInput />
-      )}
+      {filterType === 'DATE_TIME' && <ObjectFilterDropdownDateTimeInput />}
+      {filterType === 'DATE' && <ObjectFilterDropdownDateInput />}
       {filterType === 'RELATION' && (
         <DropdownContent widthInPixels={GenericDropdownContentWidth.ExtraLarge}>
           <ObjectFilterDropdownSearchInput />
@@ -65,8 +69,16 @@ export const AdvancedFilterDropdownFilterInput = ({
       {filterType === 'ACTOR' &&
         (isActorSourceCompositeFilter ? (
           <ObjectFilterDropdownSourceSelect dropdownId={filterDropdownId} />
+        ) : isActorWorkspaceMemberCompositeFilter ? (
+          <DropdownContent
+            widthInPixels={GenericDropdownContentWidth.ExtraLarge}
+          >
+            <ObjectFilterDropdownSearchInput />
+            <DropdownMenuSeparator />
+            <ObjectFilterDropdownActorSelect dropdownId={filterDropdownId} />
+          </DropdownContent>
         ) : (
-          <ObjectFilterDropdownTextInput />
+          <ObjectFilterDropdownTextInput filterDropdownId={filterDropdownId} />
         ))}
       {['SELECT', 'MULTI_SELECT'].includes(filterType) && (
         <DropdownContent widthInPixels={GenericDropdownContentWidth.ExtraLarge}>

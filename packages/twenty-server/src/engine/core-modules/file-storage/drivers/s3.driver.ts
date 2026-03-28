@@ -1,8 +1,8 @@
 import { Logger } from '@nestjs/common';
 
 import fs from 'fs';
-import { mkdir } from 'fs/promises';
-import { join } from 'path';
+import { readdir, readFile } from 'fs/promises';
+import { dirname, join } from 'path';
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 
@@ -20,6 +20,7 @@ import {
   S3,
   type S3ClientConfig,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { isDefined } from 'twenty-shared/utils';
 
 import { type StorageDriver } from 'src/engine/core-modules/file-storage/drivers/interfaces/storage-driver.interface';
@@ -32,15 +33,25 @@ export interface S3DriverOptions extends S3ClientConfig {
   bucketName: string;
   endpoint?: string;
   region: string;
+  presignEnabled?: boolean;
+  presignEndpoint?: string;
 }
 
 export class S3Driver implements StorageDriver {
   private s3Client: S3;
+  private presignClient: S3 | undefined;
   private bucketName: string;
   private readonly logger = new Logger(S3Driver.name);
 
   constructor(options: S3DriverOptions) {
-    const { bucketName, region, endpoint, ...s3Options } = options;
+    const {
+      bucketName,
+      region,
+      endpoint,
+      presignEnabled,
+      presignEndpoint,
+      ...s3Options
+    } = options;
 
     if (!bucketName || !region) {
       return;
@@ -48,106 +59,21 @@ export class S3Driver implements StorageDriver {
 
     this.s3Client = new S3({ ...s3Options, region, endpoint });
     this.bucketName = bucketName;
+
+    if (presignEnabled) {
+      this.presignClient = presignEndpoint
+        ? new S3({ ...s3Options, region, endpoint: presignEndpoint })
+        : this.s3Client;
+    }
   }
 
   public get client(): S3 {
     return this.s3Client;
   }
 
-  async write(params: {
-    file: Buffer | Uint8Array | string;
-    name: string;
-    folder: string;
-    mimeType: string | undefined;
-  }): Promise<void> {
-    const command = new PutObjectCommand({
-      Key: `${params.folder}/${params.name}`,
-      Body: params.file,
-      ContentType: params.mimeType,
-      Bucket: this.bucketName,
-    });
-
-    await this.s3Client.send(command);
-  }
-
-  // @ts-expect-error legacy noImplicitAny
-  private async emptyS3Directory(folderPath) {
-    this.logger.log(`${folderPath} - emptying folder`);
-
-    const listParams = {
-      Bucket: this.bucketName,
-      Prefix: folderPath,
-    };
-
-    const listObjectsCommand = new ListObjectsV2Command(listParams);
-    const listedObjects = await this.s3Client.send(listObjectsCommand);
-
-    this.logger.log(
-      `${folderPath} - listed objects`,
-      listedObjects.Contents,
-      listedObjects.IsTruncated,
-      listedObjects.Contents?.length,
-    );
-
-    if (listedObjects.Contents?.length === 0) return;
-
-    const deleteParams = {
-      Bucket: this.bucketName,
-      Delete: {
-        Objects: listedObjects.Contents?.map(({ Key }) => {
-          return { Key };
-        }),
-      },
-    };
-
-    const deleteObjectCommand = new DeleteObjectsCommand(deleteParams);
-
-    await this.s3Client.send(deleteObjectCommand);
-
-    this.logger.log(`${folderPath} - objects deleted`);
-
-    if (listedObjects.IsTruncated) {
-      this.logger.log(`${folderPath} - folder is truncated`);
-
-      await this.emptyS3Directory(folderPath);
-    }
-  }
-
-  async delete(params: {
-    folderPath: string;
-    filename?: string;
-  }): Promise<void> {
-    this.logger.log(
-      `${params.folderPath} - deleting file ${params.filename} from folder ${params.folderPath}`,
-    );
-
-    if (params.filename) {
-      const deleteCommand = new DeleteObjectCommand({
-        Key: `${params.folderPath}/${params.filename}`,
-        Bucket: this.bucketName,
-      });
-
-      await this.s3Client.send(deleteCommand);
-    } else {
-      await this.emptyS3Directory(params.folderPath);
-
-      this.logger.log(`${params.folderPath} - folder is empty`);
-
-      const deleteEmptyFolderCommand = new DeleteObjectCommand({
-        Key: `${params.folderPath}`,
-        Bucket: this.bucketName,
-      });
-
-      await this.s3Client.send(deleteEmptyFolderCommand);
-    }
-  }
-
-  async read(params: {
-    folderPath: string;
-    filename: string;
-  }): Promise<Readable> {
+  async readFile(params: { filePath: string }): Promise<Readable> {
     const command = new GetObjectCommand({
-      Key: `${params.folderPath}/${params.filename}`,
+      Key: params.filePath,
       Bucket: this.bucketName,
     });
 
@@ -171,15 +97,142 @@ export class S3Driver implements StorageDriver {
     }
   }
 
-  async move(params: {
-    from: { folderPath: string; filename: string };
-    to: { folderPath: string; filename: string };
+  async writeFile(params: {
+    filePath: string;
+    sourceFile: Buffer | Uint8Array | string;
+    mimeType: string | undefined;
   }): Promise<void> {
+    const command = new PutObjectCommand({
+      Key: params.filePath,
+      Body: params.sourceFile,
+      ContentType: params.mimeType,
+      Bucket: this.bucketName,
+    });
+
+    await this.s3Client.send(command);
+  }
+
+  private async createFolder(path: string) {
+    return fs.mkdirSync(path, { recursive: true });
+  }
+
+  async downloadFile(params: {
+    onStoragePath: string;
+    localPath: string;
+  }): Promise<void> {
+    await this.createFolder(dirname(params.localPath));
+
+    const fileStream = await this.readFile({
+      filePath: params.onStoragePath,
+    });
+
+    await pipeline(fileStream, fs.createWriteStream(params.localPath));
+  }
+
+  async downloadFolder(params: {
+    onStoragePath: string;
+    localPath: string;
+  }): Promise<void> {
+    const listedObjects = await this.fetchS3FolderContents(
+      params.onStoragePath,
+    );
+
+    if (!listedObjects.Contents || listedObjects.Contents.length === 0) {
+      return;
+    }
+
+    for (const object of listedObjects.Contents) {
+      const folderAndFilePaths = this.extractFolderAndFilePaths(object.Key);
+
+      if (!isDefined(folderAndFilePaths)) {
+        continue;
+      }
+
+      const { fromFolderPath, filename } = folderAndFilePaths;
+
+      const relativePath = fromFolderPath
+        .replace(params.onStoragePath + '/', '')
+        .replace(params.onStoragePath, '');
+
+      const localFolderPath = relativePath
+        ? join(params.localPath, relativePath)
+        : params.localPath;
+
+      await this.createFolder(localFolderPath);
+
+      const fileStream = await this.readFile({
+        filePath: `${fromFolderPath}/${filename}`,
+      });
+
+      const toPath = join(localFolderPath, filename);
+
+      await pipeline(fileStream, fs.createWriteStream(toPath));
+    }
+  }
+
+  async uploadFolder(params: {
+    localPath: string;
+    onStoragePath: string;
+  }): Promise<void> {
+    const entries = await readdir(params.localPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const localEntryPath = join(params.localPath, entry.name);
+
+      if (entry.isDirectory()) {
+        await this.uploadFolder({
+          localPath: localEntryPath,
+          onStoragePath: join(params.onStoragePath, entry.name),
+        });
+      } else {
+        const fileContent = await readFile(localEntryPath);
+
+        await this.writeFile({
+          filePath: `${params.onStoragePath}/${entry.name}`,
+          sourceFile: fileContent,
+          mimeType: undefined,
+        });
+      }
+    }
+  }
+
+  async delete(params: {
+    folderPath: string;
+    filename?: string;
+  }): Promise<void> {
+    if (params.filename) {
+      const deleteCommand = new DeleteObjectCommand({
+        Key: `${params.folderPath}/${params.filename}`,
+        Bucket: this.bucketName,
+      });
+
+      await this.s3Client.send(deleteCommand);
+    } else {
+      await this.emptyS3Directory(params.folderPath);
+
+      const deleteEmptyFolderCommand = new DeleteObjectCommand({
+        Key: `${params.folderPath}`,
+        Bucket: this.bucketName,
+      });
+
+      await this.s3Client.send(deleteEmptyFolderCommand);
+    }
+  }
+
+  async move(params: {
+    from: { folderPath: string; filename?: string };
+    to: { folderPath: string; filename?: string };
+  }): Promise<void> {
+    if (!params.from.filename || !params.to.filename) {
+      await this.moveS3Folder(params);
+
+      return;
+    }
+
     const fromKey = `${params.from.folderPath}/${params.from.filename}`;
     const toKey = `${params.to.folderPath}/${params.to.filename}`;
 
     try {
-      // Check if the source file exists
       await this.s3Client.send(
         new HeadObjectCommand({
           Bucket: this.bucketName,
@@ -187,7 +240,6 @@ export class S3Driver implements StorageDriver {
         }),
       );
 
-      // Copy the object to the new location
       await this.s3Client.send(
         new CopyObjectCommand({
           CopySource: `${this.bucketName}/${fromKey}`,
@@ -196,7 +248,6 @@ export class S3Driver implements StorageDriver {
         }),
       );
 
-      // Delete the original object
       await this.s3Client.send(
         new DeleteObjectCommand({
           Bucket: this.bucketName,
@@ -210,26 +261,8 @@ export class S3Driver implements StorageDriver {
           FileStorageExceptionCode.FILE_NOT_FOUND,
         );
       }
-      // For other errors, throw the original error
       throw error;
     }
-  }
-
-  extractFolderAndFilePaths(objectKey: string | undefined) {
-    if (!isDefined(objectKey)) {
-      return;
-    }
-
-    const result = /(?<folder>.*)\/(?<file>.*)/.exec(objectKey);
-
-    if (!isDefined(result) || !isDefined(result.groups)) {
-      return;
-    }
-
-    const fromFolderPath = result.groups.folder;
-    const filename = result.groups.file;
-
-    return { fromFolderPath, filename };
   }
 
   async copy(params: {
@@ -245,7 +278,6 @@ export class S3Driver implements StorageDriver {
 
     if (isDefined(params.from.filename)) {
       try {
-        // Check if the source file exists
         await this.s3Client.send(
           new HeadObjectCommand({
             Bucket: this.bucketName,
@@ -253,7 +285,6 @@ export class S3Driver implements StorageDriver {
           }),
         );
 
-        // Copy the object to the new location
         await this.s3Client.send(
           new CopyObjectCommand({
             CopySource: `${this.bucketName}/${fromKey}`,
@@ -270,7 +301,6 @@ export class S3Driver implements StorageDriver {
             FileStorageExceptionCode.FILE_NOT_FOUND,
           );
         }
-        // For other errors, throw the original error
         throw error;
       }
     }
@@ -305,92 +335,71 @@ export class S3Driver implements StorageDriver {
       }
 
       await this.copy({
-        from: {
-          folderPath: fromFolderPath,
-          filename,
-        },
+        from: { folderPath: fromFolderPath, filename },
         to: { folderPath: toFolderPath, filename },
       });
     }
   }
 
-  async download(params: {
-    from: { folderPath: string; filename?: string };
-    to: { folderPath: string; filename?: string };
-  }): Promise<void> {
-    if (!params.from.filename && params.to.filename) {
-      throw new Error('Cannot copy folder to file');
-    }
-
-    if (isDefined(params.from.filename)) {
-      try {
-        const dir = params.to.folderPath;
-
-        await mkdir(dir, { recursive: true });
-
-        const fileStream = await this.read({
-          folderPath: params.from.folderPath,
-          filename: params.from.filename,
-        });
-
-        const toPath = join(
-          params.to.folderPath,
-          params.to.filename || params.from.filename,
-        );
-
-        await pipeline(fileStream, fs.createWriteStream(toPath));
-
-        return;
-      } catch (error) {
-        if (error.name === 'NotFound') {
-          throw new FileStorageException(
-            'File not found',
-            FileStorageExceptionCode.FILE_NOT_FOUND,
-          );
-        }
-        // For other errors, throw the original error
-        throw error;
+  async checkFileExists(params: { filePath: string }): Promise<boolean> {
+    try {
+      await this.s3Client.send(
+        new HeadObjectCommand({
+          Bucket: this.bucketName,
+          Key: params.filePath,
+        }),
+      );
+    } catch (error) {
+      if (error instanceof NotFound) {
+        return false;
       }
+
+      throw error;
     }
 
-    const listedObjects = await this.s3Client.send(
-      new ListObjectsV2Command({
+    return true;
+  }
+
+  async checkFolderExists(params: { folderPath: string }): Promise<boolean> {
+    try {
+      const listCommand = new ListObjectsV2Command({
         Bucket: this.bucketName,
-        Prefix: params.from.folderPath,
-      }),
-    );
-
-    if (!listedObjects.Contents || listedObjects.Contents.length === 0) {
-      throw new Error(
-        `No objects found in the source folder ${params.from.folderPath}.`,
-      );
-    }
-
-    for (const object of listedObjects.Contents) {
-      const folderAndFilePaths = this.extractFolderAndFilePaths(object.Key);
-
-      if (!isDefined(folderAndFilePaths)) {
-        continue;
-      }
-
-      const { fromFolderPath, filename } = folderAndFilePaths;
-      const toFolderPath = fromFolderPath.replace(
-        params.from.folderPath,
-        params.to.folderPath,
-      );
-
-      if (!isDefined(toFolderPath)) {
-        continue;
-      }
-
-      await this.download({
-        from: {
-          folderPath: fromFolderPath,
-          filename,
-        },
-        to: { folderPath: toFolderPath, filename },
+        Prefix: params.folderPath,
+        MaxKeys: 1,
       });
+
+      const result = await this.s3Client.send(listCommand);
+
+      return (result.Contents && result.Contents.length > 0) || false;
+    } catch (error) {
+      if (error instanceof NotFound) {
+        return false;
+      }
+
+      throw error;
     }
+  }
+
+  async getPresignedUrl(params: {
+    filePath: string;
+    expiresInSeconds?: number;
+    responseContentType?: string;
+    responseContentDisposition?: string;
+  }): Promise<string | null> {
+    if (!this.presignClient) {
+      return null;
+    }
+
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: params.filePath,
+      ResponseContentType: params.responseContentType,
+      ResponseContentDisposition: params.responseContentDisposition,
+    });
+
+    return getSignedUrl(this.presignClient, command, {
+      expiresIn: params.expiresInSeconds ?? 900,
+    });
   }
 
   async checkBucketExists(args: HeadBucketCommandInput) {
@@ -419,45 +428,94 @@ export class S3Driver implements StorageDriver {
     return this.s3Client.createBucket(args);
   }
 
-  async checkFileExists(params: {
-    folderPath: string;
-    filename: string;
-  }): Promise<boolean> {
-    try {
-      await this.s3Client.send(
-        new HeadObjectCommand({
-          Bucket: this.bucketName,
-          Key: `${params.folderPath}/${params.filename}`,
-        }),
-      );
-    } catch (error) {
-      if (error instanceof NotFound) {
-        return false;
-      }
+  private async fetchS3FolderContents(folderPath: string) {
+    const listParams = {
+      Bucket: this.bucketName,
+      Prefix: folderPath,
+    };
 
-      throw error;
-    }
+    const listObjectsCommand = new ListObjectsV2Command(listParams);
+    const listedObjects = await this.s3Client.send(listObjectsCommand);
 
-    return true;
+    return listedObjects;
   }
 
-  async checkFolderExists(folderPath: string): Promise<boolean> {
-    try {
-      const listCommand = new ListObjectsV2Command({
-        Bucket: this.bucketName,
-        Prefix: folderPath,
-        MaxKeys: 1,
-      });
+  private async emptyS3Directory(folderPath: string) {
+    const listedObjects = await this.fetchS3FolderContents(folderPath);
 
-      const result = await this.s3Client.send(listCommand);
+    if (listedObjects.Contents?.length === 0) return;
 
-      return (result.Contents && result.Contents.length > 0) || false;
-    } catch (error) {
-      if (error instanceof NotFound) {
-        return false;
+    const deleteParams = {
+      Bucket: this.bucketName,
+      Delete: {
+        Objects: listedObjects.Contents?.map(({ Key }) => {
+          return { Key };
+        }),
+      },
+    };
+
+    const deleteObjectCommand = new DeleteObjectsCommand(deleteParams);
+
+    await this.s3Client.send(deleteObjectCommand);
+
+    if (listedObjects.IsTruncated) {
+      await this.emptyS3Directory(folderPath);
+    }
+  }
+
+  private extractFolderAndFilePaths(objectKey: string | undefined) {
+    if (!isDefined(objectKey)) {
+      return;
+    }
+
+    const result = /(?<folder>.*)\/(?<file>.*)/.exec(objectKey);
+
+    if (!isDefined(result) || !isDefined(result.groups)) {
+      return;
+    }
+
+    const fromFolderPath = result.groups.folder;
+    const filename = result.groups.file;
+
+    return { fromFolderPath, filename };
+  }
+
+  private async moveS3Folder(params: {
+    from: { folderPath: string };
+    to: { folderPath: string };
+  }): Promise<void> {
+    const fromKey = `${params.from.folderPath}`;
+
+    const listedObjects = await this.fetchS3FolderContents(fromKey);
+
+    if (!listedObjects.Contents || listedObjects.Contents.length === 0) {
+      throw new Error(
+        `No objects found in the source folder ${params.from.folderPath}.`,
+      );
+    }
+
+    for (const object of listedObjects.Contents) {
+      const folderAndFilePaths = this.extractFolderAndFilePaths(object.Key);
+
+      if (!isDefined(folderAndFilePaths)) {
+        continue;
       }
 
-      throw error;
+      const { fromFolderPath, filename } = folderAndFilePaths;
+
+      const toFolderPath = fromFolderPath.replace(
+        params.from.folderPath,
+        params.to.folderPath,
+      );
+
+      if (!isDefined(toFolderPath)) {
+        continue;
+      }
+
+      await this.move({
+        from: { folderPath: fromFolderPath, filename },
+        to: { folderPath: toFolderPath, filename },
+      });
     }
   }
 }

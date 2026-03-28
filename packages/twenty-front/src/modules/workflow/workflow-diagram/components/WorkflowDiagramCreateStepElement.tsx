@@ -1,11 +1,12 @@
-import styled from '@emotion/styled';
+import { WorkflowDiagramConnector } from '@/workflow/workflow-diagram/components/WorkflowDiagramConnector';
+import { VERTICAL_DISTANCE_BETWEEN_TWO_NODES } from '@/workflow/workflow-diagram/constants/VerticalDistanceBetweenTwoNodes';
+import { useStartNodeCreation } from '@/workflow/workflow-diagram/hooks/useStartNodeCreation';
+import { type WorkflowDiagramStepNodeData } from '@/workflow/workflow-diagram/types/WorkflowDiagram';
+import { styled } from '@linaria/react';
+import { t } from '@lingui/core/macro';
+import { isDefined } from 'twenty-shared/utils';
 import { IconPlus } from 'twenty-ui/display';
 import { IconButton } from 'twenty-ui/input';
-import { WorkflowDiagramConnector } from '@/workflow/workflow-diagram/components/WorkflowDiagramConnector';
-import { useStartNodeCreation } from '@/workflow/workflow-diagram/hooks/useStartNodeCreation';
-import React from 'react';
-import { type WorkflowDiagramStepNodeData } from '@/workflow/workflow-diagram/types/WorkflowDiagram';
-import { VERTICAL_DISTANCE_BETWEEN_TWO_NODES } from '@/workflow/workflow-diagram/constants/VerticalDistanceBetweenTwoNodes';
 
 const StyledContainer = styled.div`
   align-items: center;
@@ -20,19 +21,23 @@ const StyledVerticalLineContainer = styled.div`
   width: 56px;
 `;
 
+const StyledLabelContainer = styled.div`
+  position: absolute;
+  top: 14px;
+`;
+
 type WorkflowDiagramCreateStepElementProps = {
   data: WorkflowDiagramStepNodeData;
+  Label?: React.ReactNode;
 };
 
 export const WorkflowDiagramCreateStepElement = ({
   data,
+  Label,
 }: WorkflowDiagramCreateStepElementProps) => {
   const { startNodeCreation } = useStartNodeCreation();
 
-  const addNode = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-
+  const addNode = () => {
     startNodeCreation({
       parentStepId: data.stepId,
       nextStepId: undefined,
@@ -48,10 +53,13 @@ export const WorkflowDiagramCreateStepElement = ({
       <StyledVerticalLineContainer>
         <WorkflowDiagramConnector />
       </StyledVerticalLineContainer>
+
+      {isDefined(Label) && <StyledLabelContainer>{Label}</StyledLabelContainer>}
+
       <IconButton
         Icon={IconPlus}
         size="small"
-        ariaLabel="Add a step"
+        ariaLabel={t`Add a step`}
         onClick={addNode}
       />
     </StyledContainer>

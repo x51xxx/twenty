@@ -1,48 +1,55 @@
+import { RECORD_TABLE_ROW_HEIGHT } from '@/object-record/record-table/constants/RecordTableRowHeight';
 import { useRecordTableContextOrThrow } from '@/object-record/record-table/contexts/RecordTableContext';
 import { isRecordTableCellFocusActiveComponentState } from '@/object-record/record-table/states/isRecordTableCellFocusActiveComponentState';
 import { recordTableFocusPositionComponentState } from '@/object-record/record-table/states/recordTableFocusPositionComponentState';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { getRecordTableCellId } from '@/object-record/record-table/utils/getRecordTableCellId';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 import { useEffect } from 'react';
 import { isDefined } from 'twenty-shared/utils';
 
 export const RecordTableScrollToFocusedCellEffect = () => {
   const { recordTableId } = useRecordTableContextOrThrow();
 
-  const isRecordTableCellFocusActive = useRecoilComponentValue(
+  const isRecordTableCellFocusActive = useAtomComponentStateValue(
     isRecordTableCellFocusActiveComponentState,
     recordTableId,
   );
 
-  const focusPosition = useRecoilComponentValue(
+  const recordTableFocusPosition = useAtomComponentStateValue(
     recordTableFocusPositionComponentState,
     recordTableId,
   );
 
-  // Handle cell focus
   useEffect(() => {
     if (!isRecordTableCellFocusActive) {
       return;
     }
 
-    if (!focusPosition) {
+    if (!recordTableFocusPosition) {
       return;
     }
 
     const focusElement = document.getElementById(
-      `record-table-cell-${focusPosition.column}-${focusPosition.row}`,
+      getRecordTableCellId(
+        recordTableId,
+        recordTableFocusPosition.column,
+        recordTableFocusPosition.row,
+      ),
     );
 
     if (!focusElement) {
       return;
     }
 
-    const isSecondColumn = focusPosition.column === 1;
+    const isSecondColumn = recordTableFocusPosition.column === 1;
 
     if (isSecondColumn) {
       const checkBoxColumnCell = document.getElementById(
-        `record-table-cell-0-0`,
+        getRecordTableCellId(recordTableId, 0, 0),
       );
-      const firstColumnCell = document.getElementById(`record-table-cell-1-0`);
+      const firstColumnCell = document.getElementById(
+        getRecordTableCellId(recordTableId, 1, 0),
+      );
 
       if (isDefined(checkBoxColumnCell) && isDefined(firstColumnCell)) {
         const checkBoxColumnWidth = checkBoxColumnCell.offsetWidth;
@@ -51,8 +58,8 @@ export const RecordTableScrollToFocusedCellEffect = () => {
       }
     }
 
-    focusElement.style.scrollMarginTop = '32px';
-    focusElement.style.scrollMarginBottom = '32px';
+    focusElement.style.scrollMarginTop = `${RECORD_TABLE_ROW_HEIGHT}px`;
+    focusElement.style.scrollMarginBottom = `${RECORD_TABLE_ROW_HEIGHT}px`;
 
     focusElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
@@ -62,7 +69,7 @@ export const RecordTableScrollToFocusedCellEffect = () => {
         focusElement.style.scrollMarginBottom = '';
       }
     };
-  }, [focusPosition, isRecordTableCellFocusActive]);
+  }, [recordTableId, recordTableFocusPosition, isRecordTableCellFocusActive]);
 
   return null;
 };

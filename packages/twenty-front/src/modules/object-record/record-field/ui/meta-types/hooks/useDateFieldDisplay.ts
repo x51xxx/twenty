@@ -1,10 +1,9 @@
 import { useContext } from 'react';
 
-import { useRecordFieldValue } from '@/object-record/record-store/contexts/RecordFieldValueSelectorContext';
-
 import { type FieldDefinition } from '@/object-record/record-field/ui/types/FieldDefinition';
 import { type FieldDateMetadata } from '@/object-record/record-field/ui/types/FieldMetadata';
-import { FieldContext } from '../../contexts/FieldContext';
+import { useRecordFieldValue } from '@/object-record/record-store/hooks/useRecordFieldValue';
+import { FieldContext } from '@/object-record/record-field/ui/contexts/FieldContext';
 
 export const useDateFieldDisplay = () => {
   const { recordId, fieldDefinition, clearable } = useContext(FieldContext);
@@ -14,6 +13,7 @@ export const useDateFieldDisplay = () => {
   const fieldValue = useRecordFieldValue<string | undefined>(
     recordId,
     fieldName,
+    fieldDefinition,
   );
 
   return {

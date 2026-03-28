@@ -1,14 +1,13 @@
-import { selector } from 'recoil';
+import { objectMetadataItemsWithFieldsSelector } from '@/object-metadata/states/objectMetadataItemsWithFieldsSelector';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
+import { createAtomSelector } from '@/ui/utilities/state/jotai/utils/createAtomSelector';
 
-import { objectMetadataItemsState } from '@/object-metadata/states/objectMetadataItemsState';
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
-
-export const objectMetadataItemsByNamePluralMapSelector = selector<
-  Map<string, ObjectMetadataItem>
+export const objectMetadataItemsByNamePluralMapSelector = createAtomSelector<
+  Map<string, EnrichedObjectMetadataItem>
 >({
   key: 'objectMetadataItemsByNamePluralMapSelector',
   get: ({ get }) => {
-    const objectMetadataItems = get(objectMetadataItemsState);
+    const objectMetadataItems = get(objectMetadataItemsWithFieldsSelector);
 
     return new Map(
       objectMetadataItems.map((objectMetadataItem) => [

@@ -4,7 +4,6 @@ import {
   Module,
   RequestMethod,
 } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ServeStaticModule } from '@nestjs/serve-static';
 
@@ -17,15 +16,18 @@ import { SentryModule } from '@sentry/nestjs/setup';
 import { CoreGraphQLApiModule } from 'src/engine/api/graphql/core-graphql-api.module';
 import { GraphQLConfigModule } from 'src/engine/api/graphql/graphql-config/graphql-config.module';
 import { GraphQLConfigService } from 'src/engine/api/graphql/graphql-config/graphql-config.service';
-import { McpModule } from 'src/engine/api/mcp/mcp.module';
 import { MetadataGraphQLApiModule } from 'src/engine/api/graphql/metadata-graphql-api.module';
+import { McpModule } from 'src/engine/api/mcp/mcp.module';
 import { RestApiModule } from 'src/engine/api/rest/rest-api.module';
+import { WorkspaceAuthContextMiddleware } from 'src/engine/core-modules/auth/middlewares/workspace-auth-context.middleware';
 import { MetricsModule } from 'src/engine/core-modules/metrics/metrics.module';
+import { DataloaderModule } from 'src/engine/dataloaders/dataloader.module';
 import { DataSourceModule } from 'src/engine/metadata-modules/data-source/data-source.module';
-import { WorkspaceMetadataCacheModule } from 'src/engine/metadata-modules/workspace-metadata-cache/workspace-metadata-cache.module';
+import { WorkspaceMetadataVersionModule } from 'src/engine/metadata-modules/workspace-metadata-version/workspace-metadata-version.module';
 import { GraphQLHydrateRequestFromTokenMiddleware } from 'src/engine/middlewares/graphql-hydrate-request-from-token.middleware';
 import { MiddlewareModule } from 'src/engine/middlewares/middleware.module';
 import { RestCoreMiddleware } from 'src/engine/middlewares/rest-core.middleware';
+import { GlobalWorkspaceDataSourceModule } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-datasource.module';
 import { TwentyORMModule } from 'src/engine/twenty-orm/twenty-orm.module';
 import { WorkspaceCacheStorageModule } from 'src/engine/workspace-cache-storage/workspace-cache-storage.module';
 import { ModulesModule } from 'src/modules/modules.module';
@@ -46,16 +48,13 @@ const MIGRATED_REST_METHODS = [
 @Module({
   imports: [
     SentryModule.forRoot(),
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: process.env.NODE_ENV === 'test' ? '.env.test' : '.env',
-    }),
     GraphQLModule.forRootAsync<YogaDriverConfig>({
       driver: YogaDriver,
-      imports: [GraphQLConfigModule, MetricsModule],
+      imports: [GraphQLConfigModule, MetricsModule, DataloaderModule],
       useClass: GraphQLConfigService,
     }),
     TwentyORMModule,
+    GlobalWorkspaceDataSourceModule,
     ClickHouseModule,
     // Core engine module, contains all the core modules
     CoreEngineModule,
@@ -70,7 +69,7 @@ const MIGRATED_REST_METHODS = [
     McpModule,
     DataSourceModule,
     MiddlewareModule,
-    WorkspaceMetadataCacheModule,
+    WorkspaceMetadataVersionModule,
     // I18n module for translations
     I18nModule,
     // Conditional modules
@@ -80,7 +79,16 @@ const MIGRATED_REST_METHODS = [
 export class AppModule {
   private static getConditionalModules(): DynamicModule[] {
     const modules: DynamicModule[] = [];
-    const frontPath = join(__dirname, '..', 'front');
+    const frontPath = join(__dirname, 'front');
+
+    // NestJS DevTools - can be useful for debugging and profiling
+    /* if (process.env.NODE_ENV === NodeEnvironment.DEVELOPMENT) {
+      modules.push(
+        DevtoolsModule.register({
+          http: true,
+        }),
+      );
+    } */
 
     if (existsSync(frontPath)) {
       modules.push(
@@ -104,15 +112,23 @@ export class AppModule {
 
   configure(consumer: MiddlewareConsumer) {
     consumer
-      .apply(GraphQLHydrateRequestFromTokenMiddleware)
+      .apply(
+        GraphQLHydrateRequestFromTokenMiddleware,
+        WorkspaceAuthContextMiddleware,
+      )
       .forRoutes({ path: 'graphql', method: RequestMethod.ALL });
 
     consumer
-      .apply(GraphQLHydrateRequestFromTokenMiddleware)
+      .apply(
+        GraphQLHydrateRequestFromTokenMiddleware,
+        WorkspaceAuthContextMiddleware,
+      )
       .forRoutes({ path: 'metadata', method: RequestMethod.ALL });
 
     for (const method of MIGRATED_REST_METHODS) {
-      consumer.apply(RestCoreMiddleware).forRoutes({ path: 'rest/*', method });
+      consumer
+        .apply(RestCoreMiddleware, WorkspaceAuthContextMiddleware)
+        .forRoutes({ path: 'rest/*path', method });
     }
   }
 }

@@ -1,12 +1,15 @@
 import { Field, InputType } from '@nestjs/graphql';
 
 import {
+  IsArray,
   IsBoolean,
-  IsNotIn,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
+  Max,
+  Min,
 } from 'class-validator';
 
 import { UUIDScalarType } from 'src/engine/api/graphql/workspace-schema-builder/graphql-types/scalars';
@@ -16,128 +19,6 @@ export class UpdateWorkspaceInput {
   @Field({ nullable: true })
   @IsString()
   @IsOptional()
-  @Matches(/^(?!api-).*^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/)
-  @IsNotIn([
-    'demo',
-    'api',
-    't',
-    'companies',
-    'telemetry',
-    'logs',
-    'metrics',
-    'next',
-    'main',
-    'admin',
-    'dashboard',
-    'dash',
-    'billing',
-    'db',
-    'favicon',
-    'www',
-    'mail',
-    'docs',
-    'dev',
-    'app',
-    'staging',
-    'production',
-    'developer',
-    'files',
-    'cdn',
-    'storage',
-    'about',
-    'help',
-    'support',
-    'contact',
-    'privacy',
-    'terms',
-    'careers',
-    'jobs',
-    'blog',
-    'news',
-    'events',
-    'community',
-    'forum',
-    'chat',
-    'test',
-    'testing',
-    'feedback',
-    'config',
-    'settings',
-    'media',
-    'image',
-    'audio',
-    'video',
-    'images',
-    'partners',
-    'partnership',
-    'partnerships',
-    'assets',
-    'login',
-    'signin',
-    'signup',
-    'legal',
-    'shop',
-    'merch',
-    'store',
-    'auth',
-    'register',
-    'payment',
-    'fr',
-    'de',
-    'it',
-    'es',
-    'pt',
-    'nl',
-    'be',
-    'ch',
-    'us',
-    'ca',
-    'au',
-    'nz',
-    'za',
-    'eu',
-    'uk',
-    'ru',
-    'ua',
-    'pl',
-    'ro',
-    'bg',
-    'gr',
-    'cz',
-    'sk',
-    'hu',
-    'hr',
-    'si',
-    'rs',
-    'me',
-    'ba',
-    'mk',
-    'al',
-    'az',
-    'tr',
-    'cy',
-    'lv',
-    'lt',
-    'ee',
-    'fi',
-    'is',
-    'no',
-    'se',
-    'dk',
-    'asia',
-    'africa',
-    'america',
-    'europe',
-    'north-america',
-    'south-africa',
-    'north-africa',
-    'south-america',
-    'oceania',
-    'paris',
-    'london',
-    'new-york',
-    'san-francisco',
-  ])
   subdomain?: string;
 
   @Field({ nullable: true })
@@ -188,6 +69,21 @@ export class UpdateWorkspaceInput {
   @IsOptional()
   isPasswordAuthEnabled?: boolean;
 
+  @Field({ nullable: true })
+  @IsBoolean()
+  @IsOptional()
+  isGoogleAuthBypassEnabled?: boolean;
+
+  @Field({ nullable: true })
+  @IsBoolean()
+  @IsOptional()
+  isMicrosoftAuthBypassEnabled?: boolean;
+
+  @Field({ nullable: true })
+  @IsBoolean()
+  @IsOptional()
+  isPasswordAuthBypassEnabled?: boolean;
+
   @Field(() => UUIDScalarType, { nullable: true })
   @IsUUID()
   @IsOptional()
@@ -197,4 +93,49 @@ export class UpdateWorkspaceInput {
   @IsBoolean()
   @IsOptional()
   isTwoFactorAuthenticationEnforced?: boolean;
+
+  @Field({ nullable: true })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  trashRetentionDays?: number;
+
+  @Field({ nullable: true })
+  @IsInt()
+  @Min(30) // Minimum 30 days retention for audit compliance
+  @Max(1095) // Maximum 3 years (matches ClickHouse table-level TTL)
+  @IsOptional()
+  eventLogRetentionDays?: number;
+
+  @Field({ nullable: true })
+  @IsString()
+  @IsOptional()
+  fastModel?: string;
+
+  @Field({ nullable: true })
+  @IsString()
+  @IsOptional()
+  smartModel?: string;
+
+  @Field({ nullable: true })
+  @IsString()
+  @IsOptional()
+  aiAdditionalInstructions?: string;
+
+  @Field(() => [String], { nullable: true })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  editableProfileFields?: string[];
+
+  @Field(() => [String], { nullable: true })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  enabledAiModelIds?: string[];
+
+  @Field({ nullable: true })
+  @IsBoolean()
+  @IsOptional()
+  useRecommendedModels?: boolean;
 }

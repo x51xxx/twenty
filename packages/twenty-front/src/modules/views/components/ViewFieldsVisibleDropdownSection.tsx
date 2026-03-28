@@ -10,7 +10,9 @@ import { visibleRecordFieldsComponentSelector } from '@/object-record/record-fie
 import { DraggableItem } from '@/ui/layout/draggable-list/components/DraggableItem';
 import { DraggableList } from '@/ui/layout/draggable-list/components/DraggableList';
 import { DropdownMenuItemsContainer } from '@/ui/layout/dropdown/components/DropdownMenuItemsContainer';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { dropdownYPositionComponentState } from '@/ui/layout/dropdown/states/internal/dropdownYPositionComponentState';
+import { useAtomComponentSelectorValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentSelectorValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 import { ViewType } from '@/views/types/ViewType';
 import { useContext } from 'react';
 import { isDefined } from 'twenty-shared/utils';
@@ -37,7 +39,7 @@ export const ViewFieldsVisibleDropdownSection = () => {
     useGetFieldMetadataItemByIdOrThrow();
 
   const handleReorderFields =
-    viewType === ViewType.Kanban
+    viewType === ViewType.KANBAN
       ? handleReorderBoardFields
       : processOptionDropdownDragEnd;
 
@@ -45,7 +47,7 @@ export const ViewFieldsVisibleDropdownSection = () => {
     useChangeRecordFieldVisibility(recordIndexId);
 
   const handleChangeFieldVisibility =
-    viewType === ViewType.Kanban
+    viewType === ViewType.KANBAN
       ? handleBoardFieldVisibilityChange
       : changeRecordFieldVisibility;
 
@@ -58,7 +60,7 @@ export const ViewFieldsVisibleDropdownSection = () => {
   const fieldMetadataItemLabelIdentifier =
     getLabelIdentifierFieldMetadataItem(objectMetadataItem);
 
-  const visibleRecordFields = useRecoilComponentValue(
+  const visibleRecordFields = useAtomComponentSelectorValue(
     visibleRecordFieldsComponentSelector,
   );
 
@@ -76,6 +78,10 @@ export const ViewFieldsVisibleDropdownSection = () => {
     )
     .toSorted(sortByProperty('position'));
 
+  const dropdownYPosition = useAtomComponentStateValue(
+    dropdownYPositionComponentState,
+  );
+
   return (
     <>
       <DropdownMenuItemsContainer>
@@ -83,8 +89,8 @@ export const ViewFieldsVisibleDropdownSection = () => {
           <MenuItemDraggable
             LeftIcon={getIcon(fieldMetadataItemLabelIdentifier.icon)}
             text={fieldMetadataItemLabelIdentifier.label}
-            accent={'placeholder'}
-            showGrip={true}
+            accent="placeholder"
+            gripMode="always"
             isDragDisabled
           />
         )}
@@ -107,6 +113,8 @@ export const ViewFieldsVisibleDropdownSection = () => {
                       key={recordField.fieldMetadataItemId}
                       draggableId={recordField.fieldMetadataItemId}
                       index={fieldIndex + 1}
+                      isInsideScrollableContainer
+                      containerOffsetY={dropdownYPosition}
                       itemComponent={
                         <MenuItemDraggable
                           key={recordField.fieldMetadataItemId}
@@ -124,7 +132,7 @@ export const ViewFieldsVisibleDropdownSection = () => {
                             },
                           ]}
                           text={fieldMetadataItem.label}
-                          showGrip
+                          gripMode="always"
                         />
                       }
                     />

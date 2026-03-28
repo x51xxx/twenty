@@ -1,14 +1,11 @@
 import { useContext } from 'react';
 
-import { useRecordFieldValue } from '@/object-record/record-store/contexts/RecordFieldValueSelectorContext';
-
 import { type FieldRichTextValue } from '@/object-record/record-field/ui/types/FieldMetadata';
 import { assertFieldMetadata } from '@/object-record/record-field/ui/types/guards/assertFieldMetadata';
 import { isFieldRichText } from '@/object-record/record-field/ui/types/guards/isFieldRichText';
-import type { PartialBlock } from '@blocknote/core';
-import { isDefined, parseJson } from 'twenty-shared/utils';
+import { useRecordFieldValue } from '@/object-record/record-store/hooks/useRecordFieldValue';
 import { FieldMetadataType } from '~/generated-metadata/graphql';
-import { FieldContext } from '../../contexts/FieldContext';
+import { FieldContext } from '@/object-record/record-field/ui/contexts/FieldContext';
 
 export const useRichTextFieldDisplay = () => {
   const { recordId, fieldDefinition } = useContext(FieldContext);
@@ -24,14 +21,11 @@ export const useRichTextFieldDisplay = () => {
   const fieldValue = useRecordFieldValue<FieldRichTextValue | undefined>(
     recordId,
     fieldName,
+    fieldDefinition,
   );
-
-  const fieldValueParsed = isDefined(fieldValue)
-    ? parseJson<PartialBlock[]>(fieldValue)
-    : null;
 
   return {
     fieldDefinition,
-    fieldValue: fieldValueParsed,
+    fieldValue,
   };
 };

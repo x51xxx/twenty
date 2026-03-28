@@ -1,74 +1,84 @@
+import { currentWorkspaceMemberState } from '@/auth/states/currentWorkspaceMemberState';
+import { CalendarStartDay } from 'twenty-shared/constants';
+
+import { detectCalendarStartDay } from '@/localization/utils/detection/detectCalendarStartDay';
 import { useApplyObjectFilterDropdownFilterValue } from '@/object-record/object-filter-dropdown/hooks/useApplyObjectFilterDropdownFilterValue';
-import { fieldMetadataItemUsedInDropdownComponentSelector } from '@/object-record/object-filter-dropdown/states/fieldMetadataItemUsedInDropdownComponentSelector';
 import { objectFilterDropdownCurrentRecordFilterComponentState } from '@/object-record/object-filter-dropdown/states/objectFilterDropdownCurrentRecordFilterComponentState';
 import { selectedOperandInDropdownComponentState } from '@/object-record/object-filter-dropdown/states/selectedOperandInDropdownComponentState';
 import { getRelativeDateDisplayValue } from '@/object-record/object-filter-dropdown/utils/getRelativeDateDisplayValue';
-import { DateTimePicker } from '@/ui/input/components/internal/date/components/InternalDatePicker';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
-import { computeVariableDateViewFilterValue } from '@/views/view-filter-value/utils/computeVariableDateViewFilterValue';
-import { resolveDateViewFilterValue } from '@/views/view-filter-value/utils/resolveDateViewFilterValue';
-import { useState } from 'react';
+import { DatePicker } from '@/ui/input/components/internal/date/components/DatePicker';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
+import { UserContext } from '@/users/contexts/UserContext';
+import { stringifyRelativeDateFilter } from '@/views/view-filter-value/utils/stringifyRelativeDateFilter';
+import { useContext } from 'react';
+import { type FirstDayOfTheWeek, ViewFilterOperand } from 'twenty-shared/types';
 import {
-  ViewFilterOperand,
-  type VariableDateViewFilterValueDirection,
-  type VariableDateViewFilterValueUnit,
-} from 'twenty-shared/types';
-import { isDefined } from 'twenty-shared/utils';
-import { FieldMetadataType } from '~/generated-metadata/graphql';
+  isDefined,
+  type RelativeDateFilter,
+  resolveDateFilter,
+} from 'twenty-shared/utils';
+import { dateLocaleState } from '~/localization/states/dateLocaleState';
+import { formatDateString } from '~/utils/string/formatDateString';
 
 export const ObjectFilterDropdownDateInput = () => {
-  const fieldMetadataItemUsedInDropdown = useRecoilComponentValue(
-    fieldMetadataItemUsedInDropdownComponentSelector,
-  );
+  const { dateFormat, timeZone } = useContext(UserContext);
+  const dateLocale = useAtomStateValue(dateLocaleState);
+  const currentWorkspaceMember = useAtomStateValue(currentWorkspaceMemberState);
 
-  const selectedOperandInDropdown = useRecoilComponentValue(
+  const selectedOperandInDropdown = useAtomComponentStateValue(
     selectedOperandInDropdownComponentState,
   );
 
-  const objectFilterDropdownCurrentRecordFilter = useRecoilComponentValue(
+  const objectFilterDropdownCurrentRecordFilter = useAtomComponentStateValue(
     objectFilterDropdownCurrentRecordFilterComponentState,
   );
 
   const { applyObjectFilterDropdownFilterValue } =
     useApplyObjectFilterDropdownFilterValue();
 
-  const initialFilterValue = isDefined(objectFilterDropdownCurrentRecordFilter)
-    ? resolveDateViewFilterValue(objectFilterDropdownCurrentRecordFilter)
-    : null;
+  const handleAbsoluteDateChange = (newPlainDate: string | null) => {
+    if (!isDefined(newPlainDate)) {
+      applyObjectFilterDropdownFilterValue('', '');
+      return;
+    }
 
-  const [internalDate, setInternalDate] = useState<Date | null>(
-    initialFilterValue instanceof Date ? initialFilterValue : null,
-  );
+    const newFilterValue = newPlainDate;
 
-  const isDateTimeInput =
-    fieldMetadataItemUsedInDropdown?.type === FieldMetadataType.DATE_TIME;
+    // TODO: remove this and use getDisplayValue instead
+    const formattedDate = formatDateString({
+      value: newPlainDate,
+      timeZone,
+      dateFormat,
+      localeCatalog: dateLocale.localeCatalog,
+    });
 
-  const handleAbsoluteDateChange = (newDate: Date | null) => {
-    setInternalDate(newDate);
-
-    const newFilterValue = newDate?.toISOString() ?? '';
-    const newDisplayValue = isDefined(newDate)
-      ? isDateTimeInput
-        ? newDate.toLocaleString()
-        : newDate.toLocaleDateString()
-      : '';
+    const newDisplayValue = isDefined(newPlainDate) ? formattedDate : '';
 
     applyObjectFilterDropdownFilterValue(newFilterValue, newDisplayValue);
   };
 
   const handleRelativeDateChange = (
-    relativeDate: {
-      direction: VariableDateViewFilterValueDirection;
-      amount?: number;
-      unit: VariableDateViewFilterValueUnit;
-    } | null,
+    relativeDate: RelativeDateFilter | null,
   ) => {
+    const userDefinedCalendarStartDay =
+      CalendarStartDay[
+        currentWorkspaceMember?.calendarStartDay ?? CalendarStartDay.SYSTEM
+      ];
+    const defaultSystemCalendarStartDay = detectCalendarStartDay();
+
+    const resolvedCalendarStartDay = (
+      userDefinedCalendarStartDay === CalendarStartDay[CalendarStartDay.SYSTEM]
+        ? defaultSystemCalendarStartDay
+        : userDefinedCalendarStartDay
+    ) as FirstDayOfTheWeek;
+
     const newFilterValue = relativeDate
-      ? computeVariableDateViewFilterValue(
-          relativeDate.direction,
-          relativeDate.amount,
-          relativeDate.unit,
-        )
+      ? stringifyRelativeDateFilter({
+          ...relativeDate,
+          timezone: timeZone,
+          firstDayOfTheWeek: resolvedCalendarStartDay,
+        })
       : '';
 
     const newDisplayValue = relativeDate
@@ -79,31 +89,36 @@ export const ObjectFilterDropdownDateInput = () => {
   };
 
   const isRelativeOperand =
-    selectedOperandInDropdown === ViewFilterOperand.IsRelative;
+    selectedOperandInDropdown === ViewFilterOperand.IS_RELATIVE;
 
   const handleClear = () => {
     isRelativeOperand
       ? handleRelativeDateChange(null)
       : handleAbsoluteDateChange(null);
   };
+
   const resolvedValue = objectFilterDropdownCurrentRecordFilter
-    ? resolveDateViewFilterValue(objectFilterDropdownCurrentRecordFilter)
+    ? resolveDateFilter(objectFilterDropdownCurrentRecordFilter)
     : null;
 
   const relativeDate =
-    resolvedValue && !(resolvedValue instanceof Date)
+    isDefined(resolvedValue) && typeof resolvedValue === 'object'
+      ? resolvedValue
+      : undefined;
+
+  const safePlainDateValue: string | undefined =
+    isDefined(resolvedValue) && typeof resolvedValue === 'string'
       ? resolvedValue
       : undefined;
 
   return (
-    <DateTimePicker
+    <DatePicker
+      instanceId={`object-filter-dropdown-date-input`}
       relativeDate={relativeDate}
-      highlightedDateRange={relativeDate}
       isRelative={isRelativeOperand}
-      date={internalDate}
+      plainDateString={safePlainDateValue ?? null}
       onChange={handleAbsoluteDateChange}
       onRelativeDateChange={handleRelativeDateChange}
-      isDateTimeInput={isDateTimeInput}
       onClear={handleClear}
     />
   );

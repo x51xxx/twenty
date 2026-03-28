@@ -1,55 +1,82 @@
-import { ApolloError } from '@apollo/client';
-import styled from '@emotion/styled';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { styled } from '@linaria/react';
 import { useParams } from 'react-router-dom';
-import { useRecoilValue } from 'recoil';
+import { useDebouncedCallback } from 'use-debounce';
 
-import { currentWorkspaceState } from '@/auth/states/currentWorkspaceState';
 import { SaveAndCancelButtons } from '@/settings/components/SaveAndCancelButtons/SaveAndCancelButtons';
 import { SettingsPageContainer } from '@/settings/components/SettingsPageContainer';
-import { AppPath } from '@/types/AppPath';
-import { SettingsPath } from '@/types/SettingsPath';
+import { SettingsRolesQueryEffect } from '@/settings/roles/components/SettingsRolesQueryEffect';
+import { useSaveDraftRoleToDB } from '@/settings/roles/role/hooks/useSaveDraftRoleToDB';
+import { settingsDraftRoleFamilyState } from '@/settings/roles/states/settingsDraftRoleFamilyState';
+import { settingsPersistedRoleFamilyState } from '@/settings/roles/states/settingsPersistedRoleFamilyState';
 import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
-import { useModal } from '@/ui/layout/modal/hooks/useModal';
 import { SubMenuTopBarContainer } from '@/ui/layout/page/components/SubMenuTopBarContainer';
+import { TabList } from '@/ui/layout/tab-list/components/TabList';
+import { activeTabIdComponentState } from '@/ui/layout/tab-list/states/activeTabIdComponentState';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 import { t } from '@lingui/core/macro';
-import { isDefined } from 'twenty-shared/utils';
-import { H2Title, IconTrash } from 'twenty-ui/display';
-import { Button } from 'twenty-ui/input';
+import { AppPath, SettingsPath } from 'twenty-shared/types';
+import { getSettingsPath, isDefined } from 'twenty-shared/utils';
+import {
+  IconList,
+  IconListCheck,
+  IconLock,
+  IconSettings,
+} from 'twenty-ui/display';
 import { Section } from 'twenty-ui/layout';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
+import { useMutation, useQuery } from '@apollo/client/react';
 import {
   type CreateAgentInput,
-  useCreateOneAgentMutation,
-  useFindOneAgentQuery,
-  useUpdateOneAgentMutation,
+  CreateOneAgentDocument,
+  FindOneAgentDocument,
+  UpdateOneAgentDocument,
 } from '~/generated-metadata/graphql';
 import { useNavigateApp } from '~/hooks/useNavigateApp';
 import { useNavigateSettings } from '~/hooks/useNavigateSettings';
-import { getSettingsPath } from '~/utils/navigation/getSettingsPath';
-import { SettingsAgentDeleteConfirmationModal } from './components/SettingsAgentDeleteConfirmationModal';
+
+import { useAtomFamilyStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomFamilyStateValue';
+import { useSetAtomFamilyState } from '@/ui/utilities/state/jotai/hooks/useSetAtomFamilyState';
+import { useEffect, useState } from 'react';
+import { isDeeplyEqual } from '~/utils/isDeeplyEqual';
 import { SettingsAgentDetailSkeletonLoader } from './components/SettingsAgentDetailSkeletonLoader';
-import { SettingsAgentHandoffSection } from './components/SettingsAgentHandoffSection';
-import { SettingsAIAgentForm } from './forms/components/SettingsAIAgentForm';
+import { SettingsAgentEvalsTab } from './components/SettingsAgentEvalsTab';
+import { SettingsAgentLogsTab } from './components/SettingsAgentLogsTab';
+import { SettingsAgentRoleTab } from './components/SettingsAgentRoleTab';
+import { SettingsAgentSettingsTab } from './components/SettingsAgentSettingsTab';
+import { SETTINGS_AGENT_DETAIL_TABS } from './constants/SettingsAgentDetailTabs';
 import { useSettingsAgentFormState } from './hooks/useSettingsAgentFormState';
 
 const StyledContentContainer = styled.div`
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: ${({ theme }) => theme.spacing(8)};
+  gap: ${themeCssVariables.spacing[8]};
   width: 100%;
 `;
 
-const DELETE_AGENT_MODAL_ID = 'delete-agent-modal';
+const StyledTabListContainer = styled.div`
+  margin-bottom: ${themeCssVariables.spacing[8]};
+`;
 
 export const SettingsAgentForm = ({ mode }: { mode: 'create' | 'edit' }) => {
   const { agentId = '' } = useParams<{ agentId: string }>();
   const navigate = useNavigateSettings();
   const navigateApp = useNavigateApp();
   const { enqueueErrorSnackBar } = useSnackBar();
-  const { openModal } = useModal();
-  const currentWorkspace = useRecoilValue(currentWorkspaceState);
+  const [isReadonlyMode, setIsReadonlyMode] = useState(false);
+  const [originalFormValues, setOriginalFormValues] = useState<
+    ReturnType<typeof useSettingsAgentFormState>['formValues'] | null
+  >(null);
 
   const isEditMode = mode === 'edit';
+  const isCreateMode = mode === 'create';
+
+  const tabListComponentId = `${SETTINGS_AGENT_DETAIL_TABS.COMPONENT_INSTANCE_ID}-${agentId}`;
+  const activeTabId = useAtomComponentStateValue(
+    activeTabIdComponentState,
+    tabListComponentId,
+  );
 
   const {
     formValues,
@@ -60,51 +87,204 @@ export const SettingsAgentForm = ({ mode }: { mode: 'create' | 'edit' }) => {
     validateForm,
   } = useSettingsAgentFormState(mode);
 
-  const { data, loading } = useFindOneAgentQuery({
+  const {
+    data,
+    loading,
+    error: agentQueryError,
+  } = useQuery(FindOneAgentDocument, {
     variables: { id: agentId },
-    skip: !isEditMode || !agentId,
-    onCompleted: (data) => {
+    skip: isCreateMode || !agentId,
+  });
+
+  useEffect(() => {
+    if (data) {
       const agent = data?.findOneAgent;
       if (isDefined(agent)) {
-        resetForm({
+        if (isDefined(agent.applicationId)) {
+          setIsReadonlyMode(true);
+        }
+        const initialValues = {
           name: agent.name,
           label: agent.label,
           description: agent.description,
           icon: agent.icon || 'IconRobot',
           modelId: agent.modelId,
-          role: agent.roleId ?? undefined,
+          role: agent.roleId,
           prompt: agent.prompt,
           isCustom: agent.isCustom,
-        });
+          modelConfiguration: agent.modelConfiguration || {},
+          responseFormat: agent.responseFormat || { type: 'text', schema: {} },
+          evaluationInputs: agent.evaluationInputs ?? [],
+        };
+        resetForm(initialValues);
+        setOriginalFormValues(initialValues);
       } else {
         enqueueErrorSnackBar({
           message: t`Agent not found`,
         });
         navigateApp(AppPath.NotFound);
       }
-    },
-    onError: (error) => {
+    }
+  }, [data, resetForm, enqueueErrorSnackBar, navigateApp]);
+
+  useEffect(() => {
+    if (agentQueryError) {
       enqueueErrorSnackBar({
-        apolloError: error,
+        apolloError: agentQueryError,
       });
       navigateApp(AppPath.NotFound);
-    },
-  });
+    }
+  }, [agentQueryError, enqueueErrorSnackBar, navigateApp]);
 
-  const [createAgent] = useCreateOneAgentMutation();
-  const [updateAgent] = useUpdateOneAgentMutation();
+  const [createAgent] = useMutation(CreateOneAgentDocument);
+  const [updateAgent] = useMutation(UpdateOneAgentDocument);
 
   const agent = data?.findOneAgent;
 
-  const isAskAIAgent = agent?.id === currentWorkspace?.defaultAgent?.id;
+  const settingsDraftRole = useAtomFamilyStateValue(
+    settingsDraftRoleFamilyState,
+    formValues.role || '',
+  );
+  const setSettingsDraftRole = useSetAtomFamilyState(
+    settingsDraftRoleFamilyState,
+    formValues.role || '',
+  );
+  const settingsPersistedRole = useAtomFamilyStateValue(
+    settingsPersistedRoleFamilyState,
+    formValues.role || '',
+  );
 
-  if (isEditMode && !loading && !agent) {
+  const { saveDraftRoleToDB } = useSaveDraftRoleToDB({
+    roleId: formValues.role || '',
+    isCreateMode: false,
+  });
+
+  const isRoleDirty =
+    isDefined(formValues.role) &&
+    !isDeeplyEqual(settingsDraftRole, settingsPersistedRole);
+
+  const autoSave = useDebouncedCallback(async () => {
+    if (
+      isCreateMode ||
+      isReadonlyMode ||
+      !validateForm() ||
+      isSubmitting ||
+      !agent
+    ) {
+      return;
+    }
+
+    const hasChanges =
+      originalFormValues && !isDeeplyEqual(formValues, originalFormValues);
+
+    if (!hasChanges && !isRoleDirty) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      if (isRoleDirty && isDefined(formValues.role)) {
+        try {
+          await saveDraftRoleToDB();
+        } catch (error) {
+          if (CombinedGraphQLErrors.is(error)) {
+            enqueueErrorSnackBar({
+              apolloError: error,
+            });
+          } else {
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            enqueueErrorSnackBar({
+              message: t`Failed to save role permissions: ${errorMessage}`,
+            });
+          }
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      await updateAgent({
+        variables: {
+          input: {
+            id: agent.id,
+            name: formValues.name || '',
+            label: formValues.label,
+            description: formValues.description,
+            icon: formValues.icon,
+            modelId: formValues.modelId,
+            roleId: formValues.role,
+            prompt: formValues.prompt,
+            modelConfiguration: formValues.modelConfiguration,
+            responseFormat: formValues.responseFormat,
+            evaluationInputs: formValues.evaluationInputs,
+          },
+        },
+      });
+
+      setOriginalFormValues({ ...formValues });
+    } catch (error) {
+      enqueueErrorSnackBar({
+        apolloError: CombinedGraphQLErrors.is(error) ? error : undefined,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, 1_000);
+
+  useEffect(() => {
+    if (isEditMode && !loading && isDefined(originalFormValues)) {
+      autoSave();
+    }
+  }, [
+    formValues,
+    isRoleDirty,
+    isEditMode,
+    loading,
+    originalFormValues,
+    autoSave,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      autoSave.flush();
+    };
+  }, [autoSave]);
+
+  if (!isCreateMode && !loading && !agent) {
     return null;
   }
 
-  const canSave = validateForm() && !isSubmitting;
+  const canSave = !isReadonlyMode && validateForm() && !isSubmitting;
+
+  const tabs = [
+    {
+      id: SETTINGS_AGENT_DETAIL_TABS.TABS_IDS.SETTINGS,
+      title: t`Settings`,
+      Icon: IconSettings,
+    },
+    {
+      id: SETTINGS_AGENT_DETAIL_TABS.TABS_IDS.ROLE,
+      title: t`Role`,
+      Icon: IconLock,
+    },
+    {
+      id: SETTINGS_AGENT_DETAIL_TABS.TABS_IDS.EVALS,
+      title: t`Evals`,
+      Icon: IconListCheck,
+    },
+    {
+      id: SETTINGS_AGENT_DETAIL_TABS.TABS_IDS.LOGS,
+      title: t`Logs`,
+      Icon: IconList,
+    },
+  ];
 
   const handleSave = async () => {
+    if (isReadonlyMode) {
+      return;
+    }
+
     if (!validateForm()) {
       return;
     }
@@ -112,15 +292,38 @@ export const SettingsAgentForm = ({ mode }: { mode: 'create' | 'edit' }) => {
     setIsSubmitting(true);
 
     try {
-      if (!isEditMode) {
+      if (isRoleDirty && isDefined(formValues.role)) {
+        try {
+          await saveDraftRoleToDB();
+        } catch (error) {
+          if (CombinedGraphQLErrors.is(error)) {
+            enqueueErrorSnackBar({
+              apolloError: error,
+            });
+          } else {
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            enqueueErrorSnackBar({
+              message: t`Failed to save role permissions: ${errorMessage}`,
+            });
+          }
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      if (isCreateMode) {
         const input: CreateAgentInput = {
           name: formValues.name,
           label: formValues.label,
           description: formValues.description,
           icon: formValues.icon,
           modelId: formValues.modelId,
-          roleId: formValues.role || undefined,
+          roleId: formValues.role,
           prompt: formValues.prompt,
+          modelConfiguration: formValues.modelConfiguration,
+          responseFormat: formValues.responseFormat,
+          evaluationInputs: formValues.evaluationInputs,
         };
 
         await createAgent({
@@ -143,8 +346,11 @@ export const SettingsAgentForm = ({ mode }: { mode: 'create' | 'edit' }) => {
             description: formValues.description,
             icon: formValues.icon,
             modelId: formValues.modelId,
-            roleId: formValues.role || undefined,
+            roleId: formValues.role,
             prompt: formValues.prompt,
+            modelConfiguration: formValues.modelConfiguration,
+            responseFormat: formValues.responseFormat,
+            evaluationInputs: formValues.evaluationInputs,
           },
         },
       });
@@ -152,33 +358,55 @@ export const SettingsAgentForm = ({ mode }: { mode: 'create' | 'edit' }) => {
       navigate(SettingsPath.AI);
     } catch (error) {
       enqueueErrorSnackBar({
-        apolloError: error instanceof ApolloError ? error : undefined,
+        apolloError: CombinedGraphQLErrors.is(error) ? error : undefined,
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const title = isEditMode ? (loading ? t`Agent` : agent?.label) : t`New Agent`;
-  const pageTitle = isEditMode ? t`Edit Agent` : t`New Agent`;
-  const pageDescription = isEditMode
-    ? t`Update agent information`
-    : t`Create a new AI agent`;
-  const breadcrumbText = isEditMode
+  const handleCancel = () => {
+    resetForm();
+
+    if (isRoleDirty && isDefined(settingsPersistedRole)) {
+      setSettingsDraftRole(settingsPersistedRole);
+    }
+
+    navigate(SettingsPath.AI);
+  };
+
+  const title = !isCreateMode
+    ? loading
+      ? t`Agent`
+      : agent?.label
+    : t`New Agent`;
+  const breadcrumbText = !isCreateMode
     ? loading
       ? t`Agent`
       : agent?.label
     : t`New Agent`;
 
+  const isRoleTab = activeTabId === SETTINGS_AGENT_DETAIL_TABS.TABS_IDS.ROLE;
+  const isSettingsTab =
+    activeTabId === SETTINGS_AGENT_DETAIL_TABS.TABS_IDS.SETTINGS;
+  const isEvalsTab = activeTabId === SETTINGS_AGENT_DETAIL_TABS.TABS_IDS.EVALS;
+  const isLogsTab = activeTabId === SETTINGS_AGENT_DETAIL_TABS.TABS_IDS.LOGS;
+
+  const isFormDisabled =
+    isReadonlyMode || (isEditMode ? !agent?.isCustom : false);
+  const isEvalsDisabled =
+    process.env.NODE_ENV === 'development' ? isReadonlyMode : isFormDisabled;
+
   return (
     <>
+      <SettingsRolesQueryEffect />
       <SubMenuTopBarContainer
         title={title}
         actionButton={
-          !isEditMode || !isAskAIAgent ? (
+          isCreateMode ? (
             <SaveAndCancelButtons
               onSave={handleSave}
-              onCancel={() => navigate(SettingsPath.AI)}
+              onCancel={handleCancel}
               isSaveDisabled={!canSave}
               isLoading={isSubmitting}
               isCancelDisabled={isSubmitting}
@@ -196,49 +424,52 @@ export const SettingsAgentForm = ({ mode }: { mode: 'create' | 'edit' }) => {
       >
         <SettingsPageContainer>
           <Section>
-            {!isAskAIAgent && (
-              <H2Title title={pageTitle} description={pageDescription} />
-            )}
             {isEditMode && loading ? (
               <SettingsAgentDetailSkeletonLoader />
             ) : (
-              <StyledContentContainer>
-                {isAskAIAgent ? (
-                  <SettingsAgentHandoffSection agentId={agent?.id ?? ''} />
-                ) : (
-                  <>
-                    <SettingsAIAgentForm
+              <>
+                <StyledTabListContainer>
+                  <TabList
+                    tabs={tabs}
+                    className="tab-list"
+                    componentInstanceId={tabListComponentId}
+                  />
+                </StyledTabListContainer>
+                <StyledContentContainer>
+                  {isRoleTab && (
+                    <SettingsAgentRoleTab
                       formValues={formValues}
                       onFieldChange={handleFieldChange}
+                      disabled={isFormDisabled}
+                      agentId={agentId}
+                      agentLabel={formValues.label}
                     />
-                    {isEditMode && agent && formValues.isCustom && (
-                      <Section>
-                        <H2Title
-                          title={t`Danger zone`}
-                          description={t`Delete this agent`}
-                        />
-                        <Button
-                          accent="danger"
-                          variant="secondary"
-                          title={t`Delete Agent`}
-                          Icon={IconTrash}
-                          onClick={() => openModal(DELETE_AGENT_MODAL_ID)}
-                        />
-                      </Section>
-                    )}
-                  </>
-                )}
-              </StyledContentContainer>
+                  )}
+                  {isSettingsTab && (
+                    <SettingsAgentSettingsTab
+                      formValues={formValues}
+                      onFieldChange={handleFieldChange}
+                      disabled={isFormDisabled}
+                      agent={agent}
+                    />
+                  )}
+                  {isEvalsTab && (
+                    <SettingsAgentEvalsTab
+                      agentId={agentId}
+                      evaluationInputs={formValues.evaluationInputs}
+                      onEvaluationInputsChange={(inputs) =>
+                        handleFieldChange('evaluationInputs', inputs)
+                      }
+                      disabled={isEvalsDisabled}
+                    />
+                  )}
+                  {isLogsTab && <SettingsAgentLogsTab agentId={agentId} />}
+                </StyledContentContainer>
+              </>
             )}
           </Section>
         </SettingsPageContainer>
       </SubMenuTopBarContainer>
-      {isEditMode && agent && (
-        <SettingsAgentDeleteConfirmationModal
-          agentId={agent.id}
-          agentName={agent.label}
-        />
-      )}
     </>
   );
 };

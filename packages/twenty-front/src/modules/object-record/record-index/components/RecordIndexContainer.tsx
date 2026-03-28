@@ -1,40 +1,40 @@
-import styled from '@emotion/styled';
-import { useRecoilState } from 'recoil';
+import { styled } from '@linaria/react';
 
 import { ObjectOptionsDropdown } from '@/object-record/object-options-dropdown/components/ObjectOptionsDropdown';
-import { RecordIndexBoardContainer } from '@/object-record/record-index/components/RecordIndexBoardContainer';
-import { RecordIndexBoardDataLoader } from '@/object-record/record-index/components/RecordIndexBoardDataLoader';
-import { RecordIndexBoardDataLoaderEffect } from '@/object-record/record-index/components/RecordIndexBoardDataLoaderEffect';
+import { RecordBoardContainer } from '@/object-record/record-board/components/RecordBoardContainer';
 import { RecordIndexTableContainer } from '@/object-record/record-index/components/RecordIndexTableContainer';
 import { RecordIndexViewBarEffect } from '@/object-record/record-index/components/RecordIndexViewBarEffect';
 import { recordIndexViewTypeState } from '@/object-record/record-index/states/recordIndexViewTypeState';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 
 import { InformationBannerWrapper } from '@/information-banner/components/InformationBannerWrapper';
 import { useRecordIndexContextOrThrow } from '@/object-record/record-index/contexts/RecordIndexContext';
 import { SpreadsheetImportProvider } from '@/spreadsheet-import/provider/components/SpreadsheetImportProvider';
 
+import { RecordIndexCalendarContainer } from '@/object-record/record-index/components/RecordIndexCalendarContainer';
 import { RecordIndexFiltersToContextStoreEffect } from '@/object-record/record-index/components/RecordIndexFiltersToContextStoreEffect';
-import { RecordIndexTableContainerEffect } from '@/object-record/record-index/components/RecordIndexTableContainerEffect';
 import { ViewBar } from '@/views/components/ViewBar';
 import { ViewType } from '@/views/types/ViewType';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 const StyledContainer = styled.div`
   display: flex;
   flex-direction: column;
   height: 100%;
-  width: 100%;
-
   overflow: hidden;
+
+  width: 100%;
 `;
 
 const StyledContainerWithPadding = styled.div`
   box-sizing: border-box;
-  height: calc(100% - ${({ theme }) => theme.spacing(10)});
-  margin-left: ${({ theme }) => theme.spacing(2)};
+  flex: 1;
+  margin-left: ${themeCssVariables.spacing[2]};
+  min-height: 0;
 `;
 
 export const RecordIndexContainer = () => {
-  const [recordIndexViewType] = useRecoilState(recordIndexViewTypeState);
+  const recordIndexViewType = useAtomStateValue(recordIndexViewTypeState);
 
   const {
     objectNamePlural,
@@ -54,7 +54,7 @@ export const RecordIndexContainer = () => {
               <ObjectOptionsDropdown
                 recordIndexId={recordIndexId}
                 objectMetadataItem={objectMetadataItem}
-                viewType={recordIndexViewType ?? ViewType.Table}
+                viewType={recordIndexViewType ?? ViewType.TABLE}
               />
             }
           />
@@ -64,27 +64,26 @@ export const RecordIndexContainer = () => {
           />
         </SpreadsheetImportProvider>
         <RecordIndexFiltersToContextStoreEffect />
-        {recordIndexViewType === ViewType.Table && (
+        {recordIndexViewType === ViewType.TABLE && (
           <>
-            <RecordIndexTableContainer
-              recordTableId={recordIndexId}
-              viewBarId={recordIndexId}
-            />
-            <RecordIndexTableContainerEffect />
+            <RecordIndexTableContainer recordTableId={recordIndexId} />
           </>
         )}
-        {recordIndexViewType === ViewType.Kanban && (
+        {recordIndexViewType === ViewType.KANBAN && (
           <StyledContainerWithPadding>
-            <RecordIndexBoardContainer
+            <RecordBoardContainer
               recordBoardId={recordIndexId}
               viewBarId={recordIndexId}
               objectNameSingular={objectNameSingular}
             />
-            <RecordIndexBoardDataLoader
-              objectNameSingular={objectNameSingular}
-              recordBoardId={recordIndexId}
+          </StyledContainerWithPadding>
+        )}
+        {recordIndexViewType === ViewType.CALENDAR && (
+          <StyledContainerWithPadding>
+            <RecordIndexCalendarContainer
+              recordCalendarInstanceId={recordIndexId}
+              viewBarInstanceId={recordIndexId}
             />
-            <RecordIndexBoardDataLoaderEffect recordBoardId={recordIndexId} />
           </StyledContainerWithPadding>
         )}
       </StyledContainer>

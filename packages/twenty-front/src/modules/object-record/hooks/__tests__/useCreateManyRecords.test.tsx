@@ -1,8 +1,7 @@
-import { mocked } from '@storybook/test';
 import { act, renderHook } from '@testing-library/react';
 import { v4 } from 'uuid';
 
-import { CoreObjectNameSingular } from '@/object-metadata/types/CoreObjectNameSingular';
+import { CoreObjectNameSingular } from 'twenty-shared/types';
 import {
   query,
   response,
@@ -18,11 +17,12 @@ jest.mock('uuid', () => ({
 
 jest.mock('@/object-record/hooks/useRefetchAggregateQueries');
 const mockRefetchAggregateQueries = jest.fn();
-(useRefetchAggregateQueries as jest.Mock).mockReturnValue({
+jest.mocked(useRefetchAggregateQueries).mockReturnValue({
   refetchAggregateQueries: mockRefetchAggregateQueries,
 });
 
-mocked(v4)
+jest
+  .mocked(v4)
   .mockReturnValueOnce(variables.data[0].id)
   .mockReturnValueOnce(variables.data[1].id);
 

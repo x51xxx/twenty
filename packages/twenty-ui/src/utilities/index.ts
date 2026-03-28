@@ -12,16 +12,23 @@ export { AnimatedContainer } from './animation/components/AnimatedContainer';
 export { AnimatedEaseIn } from './animation/components/AnimatedEaseIn';
 export { AnimatedEaseInOut } from './animation/components/AnimatedEaseInOut';
 export { AnimatedFadeOut } from './animation/components/AnimatedFadeOut';
+export { AnimatedIconCrossfade } from './animation/components/AnimatedIconCrossfade';
 export { AnimatedRotate } from './animation/components/AnimatedRotate';
 export { AnimatedTextWord } from './animation/components/AnimatedTextWord';
 export { AnimatedTranslation } from './animation/components/AnimatedTranslation';
-export { stringToHslColor } from './color/utils/stringToHslColor';
+export { getMainColorNameFromPaletteColorName } from './color/utils/getMainColorNameFromPaletteColorName';
+export {
+  stringToThemeColor,
+  stringToThemeColorP3String,
+} from './color/utils/stringToThemeColorP3String';
+export { themeColorSchema } from './color/utils/themeColorSchema';
 export { REACT_APP_SERVER_BASE_URL } from './config';
 export { getOsControlSymbol } from './device/getOsControlSymbol';
 export { getOsShortcutSeparator } from './device/getOsShortcutSeparator';
 export { getUserDevice } from './device/getUserDevice';
 export { AutogrowWrapper } from './dimensions/components/AutogrowWrapper';
 export { useMouseDownNavigation } from './navigation/hooks/useMouseDownNavigation';
+export { useResetLocationHash } from './navigation/hooks/useResetLocationHash';
 export { isNavigationModifierPressed } from './navigation/isNavigationModifierPressed';
 export type { TriggerEventType } from './navigation/types/trigger-event.type';
 export { useIsMobile } from './responsive/hooks/useIsMobile';

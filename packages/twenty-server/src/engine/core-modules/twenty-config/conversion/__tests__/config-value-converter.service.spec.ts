@@ -25,6 +25,7 @@ jest.mock(
       string: createMockTransformer(),
       array: createMockTransformer(),
       enum: createMockTransformer(),
+      json: createMockTransformer(),
     };
 
     return {
@@ -59,6 +60,12 @@ const typeTransformers = typeTransformersModule.typeTransformers as {
     getTransformers: jest.Mock;
   };
   enum: {
+    toApp: jest.Mock;
+    toStorage: jest.Mock;
+    getValidators: jest.Mock;
+    getTransformers: jest.Mock;
+  };
+  json: {
     toApp: jest.Mock;
     toStorage: jest.Mock;
     getValidators: jest.Mock;
@@ -101,7 +108,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         AUTH_PASSWORD_ENABLED: {
           type: ConfigVariableType.BOOLEAN,
-          group: ConfigVariablesGroup.Other,
+          group: ConfigVariablesGroup.ADVANCED_SETTINGS,
           description: 'Enable or disable password authentication for users',
         },
       });
@@ -124,7 +131,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         CACHE_STORAGE_TTL: {
           type: ConfigVariableType.NUMBER,
-          group: ConfigVariablesGroup.ServerConfig,
+          group: ConfigVariablesGroup.SERVER_CONFIG,
           description: 'Time-to-live for cache storage in seconds',
         },
       });
@@ -147,7 +154,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         FRONTEND_URL: {
           type: ConfigVariableType.STRING,
-          group: ConfigVariablesGroup.ServerConfig,
+          group: ConfigVariablesGroup.SERVER_CONFIG,
           description: 'Frontend URL',
         },
       });
@@ -172,7 +179,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         LOG_LEVELS: {
           type: ConfigVariableType.ARRAY,
-          group: ConfigVariablesGroup.Logging,
+          group: ConfigVariablesGroup.LOGGING,
           description: 'Levels of logging to be captured',
           options: ['log', 'error', 'warn', 'debug', 'verbose'],
         },
@@ -198,7 +205,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         NODE_ENV: {
           type: ConfigVariableType.ENUM,
-          group: ConfigVariablesGroup.ServerConfig,
+          group: ConfigVariablesGroup.SERVER_CONFIG,
           description: 'Node environment',
           options: ['development', 'production', 'test'],
         },
@@ -254,7 +261,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         CACHE_STORAGE_TTL: {
           type: ConfigVariableType.NUMBER,
-          group: ConfigVariablesGroup.ServerConfig,
+          group: ConfigVariablesGroup.SERVER_CONFIG,
           description: 'Time-to-live for cache storage in seconds',
         },
       });
@@ -281,7 +288,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         AUTH_PASSWORD_ENABLED: {
           type: ConfigVariableType.BOOLEAN,
-          group: ConfigVariablesGroup.Other,
+          group: ConfigVariablesGroup.ADVANCED_SETTINGS,
           description: 'Enable or disable password authentication for users',
         },
       });
@@ -304,7 +311,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         CACHE_STORAGE_TTL: {
           type: ConfigVariableType.NUMBER,
-          group: ConfigVariablesGroup.ServerConfig,
+          group: ConfigVariablesGroup.SERVER_CONFIG,
           description: 'Time-to-live for cache storage in seconds',
         },
       });
@@ -327,7 +334,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         FRONTEND_URL: {
           type: ConfigVariableType.STRING,
-          group: ConfigVariablesGroup.ServerConfig,
+          group: ConfigVariablesGroup.SERVER_CONFIG,
           description: 'Frontend URL',
         },
       });
@@ -352,7 +359,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         LOG_LEVELS: {
           type: ConfigVariableType.ARRAY,
-          group: ConfigVariablesGroup.Logging,
+          group: ConfigVariablesGroup.LOGGING,
           description: 'Levels of logging to be captured',
           options: ['log', 'error', 'warn', 'debug', 'verbose'],
         },
@@ -379,7 +386,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         NODE_ENV: {
           type: ConfigVariableType.ENUM,
-          group: ConfigVariablesGroup.ServerConfig,
+          group: ConfigVariablesGroup.SERVER_CONFIG,
           description: 'Node environment',
           options: ['development', 'production', 'test'],
         },
@@ -434,7 +441,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         CUSTOM_OBJECT: {
           type: 'unknown-type' as ConfigVariableType,
-          group: ConfigVariablesGroup.Other,
+          group: ConfigVariablesGroup.ADVANCED_SETTINGS,
           description: 'Custom object',
         },
       });
@@ -453,7 +460,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         CACHE_STORAGE_TTL: {
           type: ConfigVariableType.NUMBER,
-          group: ConfigVariablesGroup.ServerConfig,
+          group: ConfigVariablesGroup.SERVER_CONFIG,
           description: 'Time-to-live for cache storage in seconds',
         },
       });
@@ -478,7 +485,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         AUTH_PASSWORD_ENABLED: {
           type: ConfigVariableType.BOOLEAN,
-          group: ConfigVariablesGroup.Other,
+          group: ConfigVariablesGroup.ADVANCED_SETTINGS,
           description: 'Enable or disable password authentication for users',
         },
       });
@@ -501,7 +508,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         CACHE_STORAGE_TTL: {
           type: ConfigVariableType.NUMBER,
-          group: ConfigVariablesGroup.ServerConfig,
+          group: ConfigVariablesGroup.SERVER_CONFIG,
           description: 'Time-to-live for cache storage in seconds',
         },
       });
@@ -524,7 +531,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         FRONTEND_URL: {
           type: ConfigVariableType.STRING,
-          group: ConfigVariablesGroup.ServerConfig,
+          group: ConfigVariablesGroup.SERVER_CONFIG,
           description: 'Frontend URL',
         },
       });
@@ -547,7 +554,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         LOG_LEVELS: {
           type: ConfigVariableType.ARRAY,
-          group: ConfigVariablesGroup.Logging,
+          group: ConfigVariablesGroup.LOGGING,
           description: 'Levels of logging to be captured',
           options: ['log', 'error', 'warn', 'debug', 'verbose'],
         },
@@ -571,7 +578,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         NODE_ENV: {
           type: ConfigVariableType.ENUM,
-          group: ConfigVariablesGroup.ServerConfig,
+          group: ConfigVariablesGroup.SERVER_CONFIG,
           description: 'Node environment',
           options: ['development', 'production', 'test'],
         },
@@ -595,7 +602,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         NODE_ENV: {
           type: ConfigVariableType.ENUM,
-          group: ConfigVariablesGroup.ServerConfig,
+          group: ConfigVariablesGroup.SERVER_CONFIG,
           description: 'Node environment',
           options: ['development', 'production', 'test'],
         },
@@ -630,7 +637,7 @@ describe('ConfigValueConverterService', () => {
       jest.spyOn(TypedReflect, 'getMetadata').mockReturnValueOnce({
         LOG_LEVELS: {
           type: ConfigVariableType.ARRAY,
-          group: ConfigVariablesGroup.Logging,
+          group: ConfigVariablesGroup.LOGGING,
           description: 'Levels of logging to be captured',
           options: ['log', 'error', 'warn', 'debug', 'verbose'],
         },

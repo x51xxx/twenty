@@ -1,38 +1,43 @@
 import { Separator } from '@/settings/components/Separator';
 import {
-  StyledSettingsOptionCardContent,
-  StyledSettingsOptionCardDescription,
-  StyledSettingsOptionCardIcon,
-  StyledSettingsOptionCardTitle,
-} from '@/settings/components/SettingsOptions/SettingsOptionCardContentBase';
+  StyledSettingsCardDescription,
+  StyledSettingsCardIcon,
+  StyledSettingsCardTextContainer,
+  StyledSettingsCardTitle,
+} from '@/settings/components/SettingsOptions/SettingsCardContentBase';
 import { SettingsOptionIconCustomizer } from '@/settings/components/SettingsOptions/SettingsOptionIconCustomizer';
-import { useTheme } from '@emotion/react';
-import styled from '@emotion/styled';
-import { useId } from 'react';
-import { type IconComponent } from 'twenty-ui/display';
+import { styled } from '@linaria/react';
+import { useContext, useId } from 'react';
+import {
+  type IconComponent,
+  OverflowingTextWithTooltip,
+} from 'twenty-ui/display';
 import { Toggle } from 'twenty-ui/input';
+import { ThemeContext, themeCssVariables } from 'twenty-ui/theme-constants';
 
-const StyledSettingsOptionCardToggleContent = styled(
-  StyledSettingsOptionCardContent,
-)`
+const StyledSettingsCardToggleContent = styled.div<{ disabled?: boolean }>`
+  align-items: center;
+  background-color: ${themeCssVariables.background.secondary};
   cursor: ${({ disabled }) => (disabled ? 'default' : 'pointer')};
-  position: relative;
+  display: flex;
+  gap: ${themeCssVariables.spacing[3]};
+  padding: ${themeCssVariables.spacing[4]};
   pointer-events: ${({ disabled }) => (disabled ? 'none' : 'auto')};
+  position: relative;
 
   &:hover {
-    background: ${({ theme }) => theme.background.transparent.lighter};
+    background: ${themeCssVariables.background.transparent.lighter};
   }
 `;
 
-const StyledSettingsOptionCardToggleButton = styled(Toggle)<{
-  toggleCentered?: boolean;
-}>`
-  align-self: ${({ toggleCentered }) =>
-    toggleCentered ? 'center' : 'flex-start'};
+const StyledSettingsCardToggleButtonContainer = styled.span`
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
   margin-left: auto;
 `;
 
-const StyledSettingsOptionCardToggleCover = styled.span`
+const StyledSettingsCardToggleCover = styled.span`
   cursor: pointer;
   inset: 0;
   position: absolute;
@@ -61,38 +66,42 @@ export const SettingsOptionCardContentToggle = ({
   checked,
   onChange,
 }: SettingsOptionCardContentToggleProps) => {
-  const theme = useTheme();
+  const { theme } = useContext(ThemeContext);
   const toggleId = useId();
 
   return (
     <>
-      <StyledSettingsOptionCardToggleContent disabled={disabled}>
+      <StyledSettingsCardToggleContent disabled={disabled}>
         {Icon && (
-          <StyledSettingsOptionCardIcon>
+          <StyledSettingsCardIcon>
             <SettingsOptionIconCustomizer Icon={Icon} />
-          </StyledSettingsOptionCardIcon>
+          </StyledSettingsCardIcon>
         )}
-        <div>
-          <StyledSettingsOptionCardTitle>
+        <StyledSettingsCardTextContainer>
+          <StyledSettingsCardTitle>
             <label htmlFor={toggleId}>
               {title}
-              <StyledSettingsOptionCardToggleCover />
+              <StyledSettingsCardToggleCover />
             </label>
-          </StyledSettingsOptionCardTitle>
-          <StyledSettingsOptionCardDescription>
-            {description}
-          </StyledSettingsOptionCardDescription>
-        </div>
-        <StyledSettingsOptionCardToggleButton
-          id={toggleId}
-          value={checked}
-          onChange={onChange}
-          disabled={disabled}
-          toggleSize="small"
-          color={advancedMode ? theme.color.yellow : theme.color.blue}
-          toggleCentered={toggleCentered}
-        />
-      </StyledSettingsOptionCardToggleContent>
+          </StyledSettingsCardTitle>
+          {description && (
+            <StyledSettingsCardDescription>
+              <OverflowingTextWithTooltip text={description} />
+            </StyledSettingsCardDescription>
+          )}
+        </StyledSettingsCardTextContainer>
+        <StyledSettingsCardToggleButtonContainer>
+          <Toggle
+            id={toggleId}
+            value={checked}
+            onChange={onChange}
+            disabled={disabled}
+            toggleSize="small"
+            color={advancedMode ? theme.color.yellow : theme.color.blue}
+            centered={toggleCentered}
+          />
+        </StyledSettingsCardToggleButtonContainer>
+      </StyledSettingsCardToggleContent>
       {divider && <Separator />}
     </>
   );

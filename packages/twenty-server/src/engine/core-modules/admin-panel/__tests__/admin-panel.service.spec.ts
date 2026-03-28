@@ -1,22 +1,21 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 
-import axios from 'axios';
-
 import { AdminPanelService } from 'src/engine/core-modules/admin-panel/admin-panel.service';
-import {
-  AuthException,
-  AuthExceptionCode,
-} from 'src/engine/core-modules/auth/auth.exception';
+import { AuditService } from 'src/engine/core-modules/audit/services/audit.service';
 import { LoginTokenService } from 'src/engine/core-modules/auth/token/services/login-token.service';
-import { DomainManagerService } from 'src/engine/core-modules/domain-manager/services/domain-manager.service';
+import { WorkspaceDomainsService } from 'src/engine/core-modules/domain/workspace-domains/services/workspace-domains.service';
+import { FileService } from 'src/engine/core-modules/file/services/file.service';
+import { SecureHttpClientService } from 'src/engine/core-modules/secure-http-client/secure-http-client.service';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
-import { User } from 'src/engine/core-modules/user/user.entity';
+import { UserEntity } from 'src/engine/core-modules/user/user.entity';
 
 const UserFindOneMock = jest.fn();
 const LoginTokenServiceGenerateLoginTokenMock = jest.fn();
 const TwentyConfigServiceGetAllMock = jest.fn();
 const TwentyConfigServiceGetVariableWithMetadataMock = jest.fn();
+const mockHttpClientGet = jest.fn();
+const mockGetHttpClient = jest.fn().mockReturnValue({ get: mockHttpClientGet });
 
 jest.mock(
   'src/engine/core-modules/twenty-config/constants/config-variables-group-metadata',
@@ -49,7 +48,7 @@ describe('AdminPanelService', () => {
       providers: [
         AdminPanelService,
         {
-          provide: getRepositoryToken(User),
+          provide: getRepositoryToken(UserEntity),
           useValue: {
             findOne: UserFindOneMock,
           },
@@ -61,7 +60,7 @@ describe('AdminPanelService', () => {
           },
         },
         {
-          provide: DomainManagerService,
+          provide: WorkspaceDomainsService,
           useValue: {
             getWorkspaceUrls: jest.fn().mockReturnValue({
               customUrl: undefined,
@@ -77,6 +76,24 @@ describe('AdminPanelService', () => {
               TwentyConfigServiceGetVariableWithMetadataMock,
           },
         },
+        {
+          provide: AuditService,
+          useValue: {
+            createContext: jest.fn().mockReturnValue({
+              insertWorkspaceEvent: jest.fn(),
+            }),
+          },
+        },
+        {
+          provide: FileService,
+          useValue: {},
+        },
+        {
+          provide: SecureHttpClientService,
+          useValue: {
+            getHttpClient: mockGetHttpClient,
+          },
+        },
       ],
     }).compile();
 
@@ -85,79 +102,6 @@ describe('AdminPanelService', () => {
 
   it('should be defined', async () => {
     expect(service).toBeDefined();
-  });
-
-  it('should impersonate a user and return workspace and loginToken on success', async () => {
-    const mockUser = {
-      id: 'user-id',
-      email: 'user@example.com',
-      userWorkspaces: [
-        {
-          workspace: {
-            id: 'workspace-id',
-            allowImpersonation: true,
-            subdomain: 'example-subdomain',
-          },
-        },
-      ],
-    };
-
-    UserFindOneMock.mockReturnValueOnce(mockUser);
-    LoginTokenServiceGenerateLoginTokenMock.mockReturnValueOnce({
-      token: 'mock-login-token',
-      expiresAt: new Date(),
-    });
-
-    const result = await service.impersonate('user-id', 'workspace-id');
-
-    expect(UserFindOneMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          id: 'user-id',
-          userWorkspaces: {
-            workspaceId: 'workspace-id',
-            workspace: { allowImpersonation: true },
-          },
-        }),
-        relations: { userWorkspaces: { workspace: true } },
-      }),
-    );
-
-    expect(LoginTokenServiceGenerateLoginTokenMock).toHaveBeenCalledWith(
-      'user@example.com',
-      'workspace-id',
-    );
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        workspace: {
-          id: 'workspace-id',
-          workspaceUrls: {
-            customUrl: undefined,
-            subdomainUrl: 'https://twenty.twenty.com',
-          },
-        },
-        loginToken: expect.objectContaining({
-          token: 'mock-login-token',
-          expiresAt: expect.any(Date),
-        }),
-      }),
-    );
-  });
-
-  it('should throw an error when user is not found', async () => {
-    UserFindOneMock.mockReturnValueOnce(null);
-
-    await expect(
-      service.impersonate('invalid-user-id', 'workspace-id'),
-    ).rejects.toThrow(
-      new AuthException(
-        'User not found or impersonation not enable on workspace',
-        AuthExceptionCode.INVALID_INPUT,
-      ),
-    );
-
-    expect(UserFindOneMock).toHaveBeenCalled();
   });
 
   describe('getConfigVariablesGrouped', () => {
@@ -319,18 +263,16 @@ describe('AdminPanelService', () => {
 
   describe('getVersionInfo', () => {
     const mockEnvironmentGet = jest.fn();
-    const mockAxiosGet = jest.fn();
 
     beforeEach(() => {
       mockEnvironmentGet.mockReset();
-      mockAxiosGet.mockReset();
-      jest.spyOn(axios, 'get').mockImplementation(mockAxiosGet);
+      mockHttpClientGet.mockReset();
       service['twentyConfigService'].get = mockEnvironmentGet;
     });
 
     it('should return current and latest version when everything works', async () => {
       mockEnvironmentGet.mockReturnValue('1.0.0');
-      mockAxiosGet.mockResolvedValue({
+      mockHttpClientGet.mockResolvedValue({
         data: {
           results: [
             { name: '2.0.0' },
@@ -351,7 +293,7 @@ describe('AdminPanelService', () => {
 
     it('should handle undefined APP_VERSION', async () => {
       mockEnvironmentGet.mockReturnValue(undefined);
-      mockAxiosGet.mockResolvedValue({
+      mockHttpClientGet.mockResolvedValue({
         data: {
           results: [{ name: '2.0.0' }, { name: 'latest' }],
         },
@@ -367,7 +309,7 @@ describe('AdminPanelService', () => {
 
     it('should handle Docker Hub API error', async () => {
       mockEnvironmentGet.mockReturnValue('1.0.0');
-      mockAxiosGet.mockRejectedValue(new Error('API Error'));
+      mockHttpClientGet.mockRejectedValue(new Error('API Error'));
 
       const result = await service.getVersionInfo();
 
@@ -379,7 +321,7 @@ describe('AdminPanelService', () => {
 
     it('should handle empty Docker Hub tags', async () => {
       mockEnvironmentGet.mockReturnValue('1.0.0');
-      mockAxiosGet.mockResolvedValue({
+      mockHttpClientGet.mockResolvedValue({
         data: {
           results: [],
         },
@@ -395,7 +337,7 @@ describe('AdminPanelService', () => {
 
     it('should handle invalid semver tags', async () => {
       mockEnvironmentGet.mockReturnValue('1.0.0');
-      mockAxiosGet.mockResolvedValue({
+      mockHttpClientGet.mockResolvedValue({
         data: {
           results: [
             { name: '2.0.0' },

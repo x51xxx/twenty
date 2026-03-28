@@ -2,7 +2,6 @@ import { Field, HideField, ObjectType } from '@nestjs/graphql';
 
 import {
   Authorize,
-  BeforeDeleteOne,
   CursorConnection,
   FilterableField,
   IDField,
@@ -14,11 +13,10 @@ import { UUIDScalarType } from 'src/engine/api/graphql/workspace-schema-builder/
 import { FieldMetadataDTO } from 'src/engine/metadata-modules/field-metadata/dtos/field-metadata.dto';
 import { IndexMetadataDTO } from 'src/engine/metadata-modules/index-metadata/dtos/index-metadata.dto';
 import { ObjectStandardOverridesDTO } from 'src/engine/metadata-modules/object-metadata/dtos/object-standard-overrides.dto';
-import { BeforeDeleteOneObject } from 'src/engine/metadata-modules/object-metadata/hooks/before-delete-one-object.hook';
 
 @ObjectType('Object')
 @Authorize({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   authorize: (context: any) => ({
     workspaceId: { eq: context?.req?.workspace?.id },
   }),
@@ -28,12 +26,14 @@ import { BeforeDeleteOneObject } from 'src/engine/metadata-modules/object-metada
   disableSort: true,
   maxResultsSize: 1000,
 })
-@BeforeDeleteOne(BeforeDeleteOneObject)
 @CursorConnection('fields', () => FieldMetadataDTO)
 @CursorConnection('indexMetadatas', () => IndexMetadataDTO)
 export class ObjectMetadataDTO {
   @IDField(() => UUIDScalarType)
   id: string;
+
+  @Field()
+  universalIdentifier: string;
 
   @Field()
   nameSingular: string;
@@ -59,6 +59,9 @@ export class ObjectMetadataDTO {
   @Field({ nullable: true })
   shortcut?: string;
 
+  @Field({ nullable: true })
+  color?: string;
+
   @FilterableField()
   isCustom: boolean;
 
@@ -79,6 +82,9 @@ export class ObjectMetadataDTO {
 
   @HideField()
   workspaceId: string;
+
+  @Field(() => UUIDScalarType)
+  applicationId: string;
 
   @Field()
   createdAt: Date;

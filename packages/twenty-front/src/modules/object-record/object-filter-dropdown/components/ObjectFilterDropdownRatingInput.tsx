@@ -1,14 +1,14 @@
-import { RATING_VALUES } from '@/object-record/record-field/ui/meta-types/constants/RatingValues';
-import { type FieldRatingValue } from '@/object-record/record-field/ui/types/FieldMetadata';
-import { RatingInput } from '@/ui/field/input/components/RatingInput';
-
 import { useApplyObjectFilterDropdownFilterValue } from '@/object-record/object-filter-dropdown/hooks/useApplyObjectFilterDropdownFilterValue';
 import { useObjectFilterDropdownFilterValue } from '@/object-record/object-filter-dropdown/hooks/useObjectFilterDropdownFilterValue';
-import styled from '@emotion/styled';
+import { RatingInput } from '@/ui/field/input/components/RatingInput';
+import { styled } from '@linaria/react';
+import { RATING_VALUES } from 'twenty-shared/constants';
+import { type FieldRatingValue } from 'twenty-shared/types';
 import { isDefined } from 'twenty-shared/utils';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 const StyledRatingInputContainer = styled.div`
-  padding: ${({ theme }) => theme.spacing(2)};
+  padding: ${themeCssVariables.spacing[2]};
 `;
 
 const convertFieldRatingValueToNumber = (

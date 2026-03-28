@@ -1,20 +1,31 @@
-import { currentWorkspaceMembersState } from '@/auth/states/currentWorkspaceMembersStates';
+import { currentWorkspaceMembersState } from '@/auth/states/currentWorkspaceMembersState';
 import { TableCell } from '@/ui/layout/table/components/TableCell';
 import { TableRow } from '@/ui/layout/table/components/TableRow';
-import styled from '@emotion/styled';
-import { useRecoilValue } from 'recoil';
-import { Avatar, OverflowingTextWithTooltip } from 'twenty-ui/display';
-import { type WorkspaceMember } from '~/generated-metadata/graphql';
+import { UserContext } from '@/users/contexts/UserContext';
+import { useContext } from 'react';
+import { t } from '@lingui/core/macro';
+import { styled } from '@linaria/react';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
+import {
+  Avatar,
+  IconKey,
+  OverflowingTextWithTooltip,
+  useIcons,
+} from 'twenty-ui/display';
+import { ThemeContext, themeCssVariables } from 'twenty-ui/theme-constants';
+import { type Agent, type ApiKeyForRole } from '~/generated-metadata/graphql';
+import { dateLocaleState } from '~/localization/states/dateLocaleState';
+import { formatDateString } from '~/utils/string/formatDateString';
+import { type PartialWorkspaceMember } from '@/settings/roles/types/RoleWithPartialMembers';
 
 const StyledIconWrapper = styled.div`
   align-items: center;
   display: flex;
   flex-shrink: 0;
-  margin-right: ${({ theme }) => theme.spacing(2)};
 `;
 
 const StyledNameCell = styled.div`
-  color: ${({ theme }) => theme.font.color.primary};
+  color: ${themeCssVariables.font.color.primary};
   flex: 1;
   min-width: 0;
 `;
@@ -22,49 +33,99 @@ const StyledNameCell = styled.div`
 const StyledNameContainer = styled.div`
   align-items: center;
   display: flex;
+  gap: ${themeCssVariables.spacing[2]};
   overflow: hidden;
   width: 100%;
 `;
 
-const StyledTableCell = styled(TableCell)`
-  overflow: hidden;
-`;
+export type RoleTarget =
+  | { type: 'member'; data: PartialWorkspaceMember }
+  | { type: 'agent'; data: Agent }
+  | { type: 'apiKey'; data: ApiKeyForRole };
 
 type SettingsRoleAssignmentTableRowProps = {
-  workspaceMember: WorkspaceMember;
+  roleTarget: RoleTarget;
 };
 
 export const SettingsRoleAssignmentTableRow = ({
-  workspaceMember,
+  roleTarget,
 }: SettingsRoleAssignmentTableRowProps) => {
-  const currentWorkspaceMembers = useRecoilValue(currentWorkspaceMembersState);
-  const enrichedWorkspaceMember = currentWorkspaceMembers.find(
-    (member) => member.id === workspaceMember.id,
+  const currentWorkspaceMembers = useAtomStateValue(
+    currentWorkspaceMembersState,
   );
+  const { theme } = useContext(ThemeContext);
+  const { getIcon } = useIcons();
+  const { dateFormat, timeZone } = useContext(UserContext);
+  const dateLocale = useAtomStateValue(dateLocaleState);
+
+  const renderIcon = () => {
+    switch (roleTarget.type) {
+      case 'member': {
+        const enrichedWorkspaceMember = currentWorkspaceMembers.find(
+          (member) => member.id === roleTarget.data.id,
+        );
+        return (
+          <Avatar
+            avatarUrl={enrichedWorkspaceMember?.avatarUrl}
+            placeholderColorSeed={enrichedWorkspaceMember?.id}
+            placeholder={enrichedWorkspaceMember?.name.firstName ?? ''}
+            type="rounded"
+            size="md"
+          />
+        );
+      }
+      case 'agent': {
+        const Icon = getIcon(roleTarget.data.icon || 'IconRobot');
+        return <Icon size={theme.icon.size.md} />;
+      }
+      case 'apiKey': {
+        return <IconKey size={theme.icon.size.md} />;
+      }
+    }
+  };
+
+  const renderName = () => {
+    switch (roleTarget.type) {
+      case 'member':
+        return `${roleTarget.data.name.firstName} ${roleTarget.data.name.lastName}`;
+      case 'agent':
+        return roleTarget.data.label;
+      case 'apiKey':
+        return roleTarget.data.name;
+    }
+  };
+
+  const renderSecondaryInfo = () => {
+    switch (roleTarget.type) {
+      case 'member':
+        return roleTarget.data.userEmail;
+      case 'agent':
+        return roleTarget.data.description;
+      case 'apiKey':
+        return roleTarget.data.expiresAt
+          ? formatDateString({
+              value: roleTarget.data.expiresAt,
+              timeZone,
+              dateFormat,
+              localeCatalog: dateLocale.localeCatalog,
+            })
+          : t`Never expires`;
+    }
+  };
 
   return (
     <TableRow gridAutoColumns="2fr 4fr">
-      <StyledTableCell>
+      <TableCell overflow="hidden">
         <StyledNameContainer>
-          <StyledIconWrapper>
-            <Avatar
-              avatarUrl={enrichedWorkspaceMember?.avatarUrl}
-              placeholderColorSeed={enrichedWorkspaceMember?.id}
-              placeholder={enrichedWorkspaceMember?.name.firstName ?? ''}
-              type="rounded"
-              size="md"
-            />
-          </StyledIconWrapper>
+          <StyledIconWrapper>{renderIcon()}</StyledIconWrapper>
           <StyledNameCell>
-            <OverflowingTextWithTooltip
-              text={`${workspaceMember.name.firstName} ${workspaceMember.name.lastName}`}
-            />
+            <OverflowingTextWithTooltip text={renderName()} />
           </StyledNameCell>
         </StyledNameContainer>
-      </StyledTableCell>
-      <StyledTableCell>
-        <OverflowingTextWithTooltip text={workspaceMember.userEmail} />
-      </StyledTableCell>
+      </TableCell>
+      <TableCell overflow="hidden">
+        <OverflowingTextWithTooltip text={renderSecondaryInfo()} />
+      </TableCell>
     </TableRow>
   );
 };

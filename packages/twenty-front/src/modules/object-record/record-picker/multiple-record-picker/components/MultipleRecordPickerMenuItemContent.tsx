@@ -1,27 +1,27 @@
-import styled from '@emotion/styled';
+import { t } from '@lingui/core/macro';
 
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import { getAvatarType } from '@/object-metadata/utils/getAvatarType';
 import { MultipleRecordPickerComponentInstanceContext } from '@/object-record/record-picker/multiple-record-picker/states/contexts/MultipleRecordPickerComponentInstanceContext';
 import { multipleRecordPickerIsSelectedComponentFamilySelector } from '@/object-record/record-picker/multiple-record-picker/states/selectors/multipleRecordPickerIsSelectedComponentFamilySelector';
 import { getMultipleRecordPickerSelectableListId } from '@/object-record/record-picker/multiple-record-picker/utils/getMultipleRecordPickerSelectableListId';
 import { type RecordPickerPickableMorphItem } from '@/object-record/record-picker/types/RecordPickerPickableMorphItem';
 import { SelectableListItem } from '@/ui/layout/selectable-list/components/SelectableListItem';
-import { isSelectedItemIdComponentFamilySelector } from '@/ui/layout/selectable-list/states/selectors/isSelectedItemIdComponentFamilySelector';
+import { isSelectedItemIdComponentFamilyState } from '@/ui/layout/selectable-list/states/isSelectedItemIdComponentFamilyState';
 import { useAvailableComponentInstanceIdOrThrow } from '@/ui/utilities/state/component-state/hooks/useAvailableComponentInstanceIdOrThrow';
-import { useRecoilComponentFamilyValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentFamilyValue';
+import { useAtomComponentFamilySelectorValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentFamilySelectorValue';
+import { useAtomComponentFamilyStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentFamilyStateValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+import { capitalize } from 'twenty-shared/utils';
 import { Avatar } from 'twenty-ui/display';
 import { MenuItemMultiSelectAvatar } from 'twenty-ui/navigation';
-import { type SearchRecord } from '~/generated-metadata/graphql';
 
-export const StyledSelectableItem = styled(SelectableListItem)`
-  height: 100%;
-  width: 100%;
-`;
+import { multipleRecordPickerSearchableObjectMetadataItemsComponentState } from '@/object-record/record-picker/multiple-record-picker/states/multipleRecordPickerSearchableObjectMetadataItemsComponentState';
+import { type SearchRecord } from '~/generated/graphql';
 
 type MultipleRecordPickerMenuItemContentProps = {
   searchRecord: SearchRecord;
-  objectMetadataItem: ObjectMetadataItem;
+  objectMetadataItem: EnrichedObjectMetadataItem;
   onChange: (morphItem: RecordPickerPickableMorphItem) => void;
 };
 
@@ -37,13 +37,13 @@ export const MultipleRecordPickerMenuItemContent = ({
   const selectableListComponentInstanceId =
     getMultipleRecordPickerSelectableListId(componentInstanceId);
 
-  const isSelectedByKeyboard = useRecoilComponentFamilyValue(
-    isSelectedItemIdComponentFamilySelector,
+  const isSelectedItemId = useAtomComponentFamilyStateValue(
+    isSelectedItemIdComponentFamilyState,
     searchRecord.recordId,
     selectableListComponentInstanceId,
   );
 
-  const isRecordSelectedWithObjectItem = useRecoilComponentFamilyValue(
+  const isRecordSelectedWithObjectItem = useAtomComponentFamilySelectorValue(
     multipleRecordPickerIsSelectedComponentFamilySelector,
     searchRecord.recordId,
     componentInstanceId,
@@ -58,19 +58,28 @@ export const MultipleRecordPickerMenuItemContent = ({
     });
   };
 
+  const labelSingular = objectMetadataItem.labelSingular;
   const displayText =
-    searchRecord.label?.trim() ||
-    `Untitled ${objectMetadataItem.labelSingular}`;
+    searchRecord.label?.trim() || t`Untitled ${labelSingular}`;
+
+  const multipleRecordPickerSearchableObjectMetadataItems =
+    useAtomComponentStateValue(
+      multipleRecordPickerSearchableObjectMetadataItemsComponentState,
+      componentInstanceId,
+    );
+
+  const showObjectName =
+    multipleRecordPickerSearchableObjectMetadataItems.length > 1;
 
   return (
-    <StyledSelectableItem
+    <SelectableListItem
       itemId={searchRecord.recordId}
       key={searchRecord.recordId}
       onEnter={() => handleSelectChange(!isRecordSelectedWithObjectItem)}
     >
       <MenuItemMultiSelectAvatar
         onSelectChange={(isSelected) => handleSelectChange(isSelected)}
-        isKeySelected={isSelectedByKeyboard}
+        isKeySelected={isSelectedItemId}
         selected={isRecordSelectedWithObjectItem}
         avatar={
           <Avatar
@@ -82,7 +91,12 @@ export const MultipleRecordPickerMenuItemContent = ({
           />
         }
         text={displayText}
+        contextualText={
+          showObjectName
+            ? capitalize(objectMetadataItem.labelSingular)
+            : undefined
+        }
       />
-    </StyledSelectableItem>
+    </SelectableListItem>
   );
 };

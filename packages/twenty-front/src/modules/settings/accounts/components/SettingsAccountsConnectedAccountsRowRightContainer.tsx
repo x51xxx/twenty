@@ -2,14 +2,15 @@ import { type ConnectedAccount } from '@/accounts/types/ConnectedAccount';
 import { SettingsAccountsRowDropdownMenu } from '@/settings/accounts/components/SettingsAccountsRowDropdownMenu';
 import { SyncStatus } from '@/settings/accounts/constants/SyncStatus';
 import { computeSyncStatus } from '@/settings/accounts/utils/computeSyncStatus';
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import { t } from '@lingui/core/macro';
 import { Status } from 'twenty-ui/display';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 const StyledRowRightContainer = styled.div`
   align-items: center;
   display: flex;
-  gap: ${({ theme }) => theme.spacing(4)};
+  gap: ${themeCssVariables.spacing[4]};
 `;
 
 export const SettingsAccountsConnectedAccountsRowRightContainer = ({
@@ -17,13 +18,10 @@ export const SettingsAccountsConnectedAccountsRowRightContainer = ({
 }: {
   account: ConnectedAccount;
 }) => {
-  const messageChannelSyncStatus = account.messageChannels[0]?.syncStatus;
-  const calendarChannelSyncStatus = account.calendarChannels[0]?.syncStatus;
+  const messageChannel = account.messageChannels[0];
+  const calendarChannel = account.calendarChannels[0];
 
-  const status = computeSyncStatus(
-    messageChannelSyncStatus,
-    calendarChannelSyncStatus,
-  );
+  const status = computeSyncStatus(messageChannel, calendarChannel);
 
   return (
     <StyledRowRightContainer>
@@ -43,6 +41,9 @@ export const SettingsAccountsConnectedAccountsRowRightContainer = ({
           weight="medium"
           isLoaderVisible
         />
+      )}
+      {status === SyncStatus.PENDING_CONFIGURATION && (
+        <Status color="orange" text={t`Setup incomplete`} weight="medium" />
       )}
       <SettingsAccountsRowDropdownMenu account={account} />
     </StyledRowRightContainer>

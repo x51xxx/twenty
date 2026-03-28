@@ -1,185 +1,125 @@
-import {
-  MessageImportDriverException,
-  MessageImportDriverExceptionCode,
-} from 'src/modules/messaging/message-import-manager/drivers/exceptions/message-import-driver.exception';
-import gmailApiErrorMocks from 'src/modules/messaging/message-import-manager/drivers/gmail/mocks/gmail-api-error-mocks';
-import { parseGmailMessagesImportError } from 'src/modules/messaging/message-import-manager/drivers/gmail/utils/parse-gmail-messages-import-error.util';
+import { MessageImportDriverExceptionCode } from 'src/modules/messaging/message-import-manager/drivers/exceptions/message-import-driver.exception';
+import { getGmailApiError } from 'src/modules/messaging/message-import-manager/drivers/gmail/mocks/gmail-api-error-mocks';
+import { GmailMessagesImportErrorHandler } from 'src/modules/messaging/message-import-manager/drivers/gmail/services/gmail-messages-import-error-handler.service';
 
 const messageExternalId = '123';
 
-describe('parseGmailMessagesImportError', () => {
-  it('should handle 400 Bad Request', () => {
-    const error = gmailApiErrorMocks.getError(400);
-    const exception = parseGmailMessagesImportError(
-      error.error,
-      messageExternalId,
-    );
+describe('GmailMessagesImportErrorHandler', () => {
+  let handler: GmailMessagesImportErrorHandler;
 
-    expect(exception).toBeInstanceOf(MessageImportDriverException);
-    expect(exception?.code).toBe(MessageImportDriverExceptionCode.UNKNOWN);
-    expect(exception?.message).toBe(
-      `${error.error.errors[0].message} for message with externalId: ${messageExternalId}`,
+  beforeEach(() => {
+    handler = new GmailMessagesImportErrorHandler();
+  });
+
+  it('should handle 400 Bad Request', () => {
+    const error = getGmailApiError({ code: 400 });
+
+    expect(() => handler.handleError(error, messageExternalId)).toThrow(
+      expect.objectContaining({
+        code: MessageImportDriverExceptionCode.UNKNOWN,
+      }),
     );
   });
 
   it('should handle 400 Invalid Grant', () => {
-    const error = gmailApiErrorMocks.getError(400, 'invalid_grant');
-    const exception = parseGmailMessagesImportError(
-      error.error,
-      messageExternalId,
-    );
+    const error = getGmailApiError({ code: 400, reason: 'invalid_grant' });
 
-    expect(exception).toBeInstanceOf(MessageImportDriverException);
-    expect(exception?.code).toBe(
-      MessageImportDriverExceptionCode.INSUFFICIENT_PERMISSIONS,
-    );
-    expect(exception?.message).toBe(
-      `${error.error.errors[0].message} for message with externalId: ${messageExternalId}`,
+    expect(() => handler.handleError(error, messageExternalId)).toThrow(
+      expect.objectContaining({
+        code: MessageImportDriverExceptionCode.INSUFFICIENT_PERMISSIONS,
+      }),
     );
   });
 
   it('should handle 400 Failed Precondition', () => {
-    const error = gmailApiErrorMocks.getError(400, 'failedPrecondition');
-    const exception = parseGmailMessagesImportError(
-      error.error,
-      messageExternalId,
-    );
+    const error = getGmailApiError({ code: 400, reason: 'failedPrecondition' });
 
-    expect(exception).toBeInstanceOf(MessageImportDriverException);
-    expect(exception?.code).toBe(
-      MessageImportDriverExceptionCode.TEMPORARY_ERROR,
+    expect(() => handler.handleError(error, messageExternalId)).toThrow(
+      expect.objectContaining({
+        code: MessageImportDriverExceptionCode.TEMPORARY_ERROR,
+      }),
     );
   });
 
   it('should handle 401 Invalid Credentials', () => {
-    const error = gmailApiErrorMocks.getError(401);
-    const exception = parseGmailMessagesImportError(
-      error.error,
-      messageExternalId,
-    );
+    const error = getGmailApiError({ code: 401 });
 
-    expect(exception).toBeInstanceOf(MessageImportDriverException);
-    expect(exception?.code).toBe(
-      MessageImportDriverExceptionCode.INSUFFICIENT_PERMISSIONS,
-    );
-    expect(exception?.message).toBe(
-      `${error.error.errors[0].message} for message with externalId: ${messageExternalId}`,
+    expect(() => handler.handleError(error, messageExternalId)).toThrow(
+      expect.objectContaining({
+        code: MessageImportDriverExceptionCode.INSUFFICIENT_PERMISSIONS,
+      }),
     );
   });
 
   it('should handle 403 Daily Limit Exceeded', () => {
-    const error = gmailApiErrorMocks.getError(403, 'dailyLimit');
-    const exception = parseGmailMessagesImportError(
-      error.error,
-      messageExternalId,
-    );
+    const error = getGmailApiError({ code: 403, reason: 'dailyLimit' });
 
-    expect(exception).toBeInstanceOf(MessageImportDriverException);
-    expect(exception?.code).toBe(
-      MessageImportDriverExceptionCode.TEMPORARY_ERROR,
-    );
-    expect(exception?.message).toBe(
-      `${error.error.errors[0].message} for message with externalId: ${messageExternalId}`,
+    expect(() => handler.handleError(error, messageExternalId)).toThrow(
+      expect.objectContaining({
+        code: MessageImportDriverExceptionCode.TEMPORARY_ERROR,
+      }),
     );
   });
 
   it('should handle 403 User Rate Limit Exceeded', () => {
-    const error = gmailApiErrorMocks.getError(403, 'userRateLimit');
-    const exception = parseGmailMessagesImportError(
-      error.error,
-      messageExternalId,
-    );
+    const error = getGmailApiError({ code: 403, reason: 'userRateLimit' });
 
-    expect(exception).toBeInstanceOf(MessageImportDriverException);
-    expect(exception?.code).toBe(
-      MessageImportDriverExceptionCode.TEMPORARY_ERROR,
-    );
-    expect(exception?.message).toBe(
-      `${error.error.errors[0].message} for message with externalId: ${messageExternalId}`,
+    expect(() => handler.handleError(error, messageExternalId)).toThrow(
+      expect.objectContaining({
+        code: MessageImportDriverExceptionCode.TEMPORARY_ERROR,
+      }),
     );
   });
 
   it('should handle 403 Rate Limit Exceeded', () => {
-    const error = gmailApiErrorMocks.getError(403, 'rateLimit');
-    const exception = parseGmailMessagesImportError(
-      error.error,
-      messageExternalId,
-    );
+    const error = getGmailApiError({ code: 403, reason: 'rateLimit' });
 
-    expect(exception).toBeInstanceOf(MessageImportDriverException);
-    expect(exception?.code).toBe(
-      MessageImportDriverExceptionCode.TEMPORARY_ERROR,
-    );
-    expect(exception?.message).toBe(
-      `${error.error.errors[0].message} for message with externalId: ${messageExternalId}`,
+    expect(() => handler.handleError(error, messageExternalId)).toThrow(
+      expect.objectContaining({
+        code: MessageImportDriverExceptionCode.TEMPORARY_ERROR,
+      }),
     );
   });
 
   it('should handle 403 Domain Policy Error', () => {
-    const error = gmailApiErrorMocks.getError(403, 'domainPolicy');
-    const exception = parseGmailMessagesImportError(
-      error.error,
-      messageExternalId,
-    );
+    const error = getGmailApiError({ code: 403, reason: 'domainPolicy' });
 
-    expect(exception).toBeInstanceOf(MessageImportDriverException);
-    expect(exception?.code).toBe(
-      MessageImportDriverExceptionCode.INSUFFICIENT_PERMISSIONS,
-    );
-    expect(exception?.message).toBe(
-      `${error.error.errors[0].message} for message with externalId: ${messageExternalId}`,
+    expect(() => handler.handleError(error, messageExternalId)).toThrow(
+      expect.objectContaining({
+        code: MessageImportDriverExceptionCode.INSUFFICIENT_PERMISSIONS,
+      }),
     );
   });
 
-  it('should handle 404 Not Found', () => {
-    const error = gmailApiErrorMocks.getError(404);
-    const exception = parseGmailMessagesImportError(
-      error.error,
-      messageExternalId,
-    );
+  it('should handle 404 Not Found by returning silently', () => {
+    const error = getGmailApiError({ code: 404 });
 
-    expect(exception).toBe(undefined);
+    expect(() => handler.handleError(error, messageExternalId)).not.toThrow();
   });
 
-  it('should handle 410 Gone', () => {
-    const error = gmailApiErrorMocks.getError(410);
-    const exception = parseGmailMessagesImportError(
-      error.error,
-      messageExternalId,
-    );
+  it('should handle 410 Gone by returning silently', () => {
+    const error = getGmailApiError({ code: 410 });
 
-    expect(exception).toBe(undefined);
+    expect(() => handler.handleError(error, messageExternalId)).not.toThrow();
   });
 
   it('should handle 429 Too Many Requests', () => {
-    const error = gmailApiErrorMocks.getError(429, 'concurrent');
-    const exception = parseGmailMessagesImportError(
-      error.error,
-      messageExternalId,
-    );
+    const error = getGmailApiError({ code: 429 });
 
-    expect(exception).toBeInstanceOf(MessageImportDriverException);
-    expect(exception?.code).toBe(
-      MessageImportDriverExceptionCode.TEMPORARY_ERROR,
-    );
-    expect(exception?.message).toBe(
-      `${error.error.errors[0].message} for message with externalId: ${messageExternalId}`,
+    expect(() => handler.handleError(error, messageExternalId)).toThrow(
+      expect.objectContaining({
+        code: MessageImportDriverExceptionCode.TEMPORARY_ERROR,
+      }),
     );
   });
 
   it('should handle 500 Backend Error', () => {
-    const error = gmailApiErrorMocks.getError(500);
-    const exception = parseGmailMessagesImportError(
-      error.error,
-      messageExternalId,
-    );
+    const error = getGmailApiError({ code: 500 });
 
-    expect(exception).toBeInstanceOf(MessageImportDriverException);
-    expect(exception?.code).toBe(
-      MessageImportDriverExceptionCode.TEMPORARY_ERROR,
-    );
-    expect(exception?.message).toBe(
-      `${error.error.errors[0].message} for message with externalId: ${messageExternalId}`,
+    expect(() => handler.handleError(error, messageExternalId)).toThrow(
+      expect.objectContaining({
+        code: MessageImportDriverExceptionCode.TEMPORARY_ERROR,
+      }),
     );
   });
 });

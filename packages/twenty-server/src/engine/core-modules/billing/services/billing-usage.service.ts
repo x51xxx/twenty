@@ -4,32 +4,35 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { isDefined } from 'twenty-shared/utils';
-import { Repository } from 'typeorm';
+import { type Repository } from 'typeorm';
 
 import {
   BillingException,
   BillingExceptionCode,
 } from 'src/engine/core-modules/billing/billing.exception';
-import { type BillingMeteredProductUsageOutput } from 'src/engine/core-modules/billing/dtos/outputs/billing-metered-product-usage.output';
-import { BillingCustomer } from 'src/engine/core-modules/billing/entities/billing-customer.entity';
+import { type BillingMeteredProductUsageDTO } from 'src/engine/core-modules/billing/dtos/billing-metered-product-usage.dto';
+import { BillingCustomerEntity } from 'src/engine/core-modules/billing/entities/billing-customer.entity';
+import { BillingSubscriptionEntity } from 'src/engine/core-modules/billing/entities/billing-subscription.entity';
 import { SubscriptionStatus } from 'src/engine/core-modules/billing/enums/billing-subscription-status.enum';
 import { BillingSubscriptionItemService } from 'src/engine/core-modules/billing/services/billing-subscription-item.service';
 import { BillingSubscriptionService } from 'src/engine/core-modules/billing/services/billing-subscription.service';
 import { StripeBillingMeterEventService } from 'src/engine/core-modules/billing/stripe/services/stripe-billing-meter-event.service';
-import { type BillingUsageEvent } from 'src/engine/core-modules/billing/types/billing-usage-event.type';
+import { StripeCreditGrantService } from 'src/engine/core-modules/billing/stripe/services/stripe-credit-grant.service';
+import { type UsageEvent } from 'src/engine/core-modules/usage/types/usage-event.type';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
-import { type Workspace } from 'src/engine/core-modules/workspace/workspace.entity';
+import { type WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 
 @Injectable()
 export class BillingUsageService {
   protected readonly logger = new Logger(BillingUsageService.name);
   constructor(
-    @InjectRepository(BillingCustomer)
-    private readonly billingCustomerRepository: Repository<BillingCustomer>,
+    @InjectRepository(BillingCustomerEntity)
+    private readonly billingCustomerRepository: Repository<BillingCustomerEntity>,
     private readonly billingSubscriptionService: BillingSubscriptionService,
     private readonly stripeBillingMeterEventService: StripeBillingMeterEventService,
     private readonly twentyConfigService: TwentyConfigService,
     private readonly billingSubscriptionItemService: BillingSubscriptionItemService,
+    private readonly stripeCreditGrantService: StripeCreditGrantService,
   ) {}
 
   async canFeatureBeUsed(workspaceId: string): Promise<boolean> {
@@ -38,25 +41,19 @@ export class BillingUsageService {
     }
 
     const billingSubscription =
-      await this.billingSubscriptionService.getCurrentBillingSubscriptionOrThrow(
-        {
-          workspaceId,
-        },
-      );
+      await this.billingSubscriptionService.getCurrentBillingSubscription({
+        workspaceId,
+      });
 
-    if (!billingSubscription) {
-      return false;
-    }
-
-    return true;
+    return !!billingSubscription;
   }
 
   async billUsage({
     workspaceId,
-    billingEvents,
+    usageEvents,
   }: {
     workspaceId: string;
-    billingEvents: BillingUsageEvent[];
+    usageEvents: UsageEvent[];
   }) {
     const workspaceStripeCustomer =
       await this.billingCustomerRepository.findOne({
@@ -73,11 +70,14 @@ export class BillingUsageService {
     }
 
     try {
-      await this.stripeBillingMeterEventService.sendBillingMeterEvent({
-        eventName: billingEvents[0].eventName,
-        value: billingEvents[0].value,
-        stripeCustomerId: workspaceStripeCustomer.stripeCustomerId,
-      });
+      await Promise.all(
+        usageEvents.map((usageEvent) =>
+          this.stripeBillingMeterEventService.sendBillingMeterEvent({
+            usageEvent,
+            stripeCustomerId: workspaceStripeCustomer.stripeCustomerId,
+          }),
+        ),
+      );
     } catch (error) {
       throw new BillingException(
         `Failed to send billing meter events to Stripe: ${error}`,
@@ -87,62 +87,92 @@ export class BillingUsageService {
   }
 
   async getMeteredProductsUsage(
-    workspace: Workspace,
-  ): Promise<BillingMeteredProductUsageOutput[]> {
+    workspace: WorkspaceEntity,
+  ): Promise<BillingMeteredProductUsageDTO[]> {
     const subscription =
       await this.billingSubscriptionService.getCurrentBillingSubscriptionOrThrow(
         { workspaceId: workspace.id },
       );
-
-    if (!isDefined(subscription)) {
-      throw new BillingException(
-        'Not-canceled subscription not found',
-        BillingExceptionCode.BILLING_SUBSCRIPTION_NOT_FOUND,
-      );
-    }
 
     const meteredSubscriptionItemDetails =
       await this.billingSubscriptionItemService.getMeteredSubscriptionItemDetails(
         subscription.id,
       );
 
-    let periodStart: Date;
-    let periodEnd: Date;
-
-    if (
-      subscription.status === SubscriptionStatus.Trialing &&
-      isDefined(subscription.trialStart) &&
-      isDefined(subscription.trialEnd)
-    ) {
-      periodStart = subscription.trialStart;
-      periodEnd = subscription.trialEnd;
-    } else {
-      periodStart = subscription.currentPeriodStart;
-      periodEnd = subscription.currentPeriodEnd;
-    }
+    const { periodStart, periodEnd } = this.getSubscriptionPeriod(subscription);
 
     return Promise.all(
-      meteredSubscriptionItemDetails.map(async (item) => {
-        const meterEventsSum =
-          await this.stripeBillingMeterEventService.sumMeterEvents(
-            item.stripeMeterId,
-            subscription.stripeCustomerId,
-            periodStart,
-            periodEnd,
-          );
-
-        return {
-          productKey: item.productKey,
+      meteredSubscriptionItemDetails.map((item) =>
+        this.buildMeteredProductUsage(
+          subscription,
+          item,
           periodStart,
           periodEnd,
-          usedCredits: meterEventsSum,
-          grantedCredits:
-            subscription.status === SubscriptionStatus.Trialing
-              ? item.freeTrialQuantity
-              : item.tierQuantity,
-          unitPriceCents: item.unitPriceCents,
-        };
-      }),
+        ),
+      ),
     );
+  }
+
+  private getSubscriptionPeriod(subscription: BillingSubscriptionEntity): {
+    periodStart: Date;
+    periodEnd: Date;
+  } {
+    const isTrialing =
+      subscription.status === SubscriptionStatus.Trialing &&
+      isDefined(subscription.trialStart) &&
+      isDefined(subscription.trialEnd);
+
+    if (isTrialing) {
+      return {
+        periodStart: subscription.trialStart!,
+        periodEnd: subscription.trialEnd!,
+      };
+    }
+
+    return {
+      periodStart: subscription.currentPeriodStart,
+      periodEnd: subscription.currentPeriodEnd,
+    };
+  }
+
+  private async buildMeteredProductUsage(
+    subscription: BillingSubscriptionEntity,
+    item: Awaited<
+      ReturnType<
+        typeof this.billingSubscriptionItemService.getMeteredSubscriptionItemDetails
+      >
+    >[number],
+    periodStart: Date,
+    periodEnd: Date,
+  ): Promise<BillingMeteredProductUsageDTO> {
+    const meterEventsSum =
+      await this.stripeBillingMeterEventService.sumMeterEvents(
+        item.stripeMeterId,
+        subscription.stripeCustomerId,
+        periodStart,
+        periodEnd,
+      );
+
+    const grantedCredits =
+      subscription.status === SubscriptionStatus.Trialing
+        ? item.freeTrialQuantity
+        : item.tierQuantity;
+
+    const rolloverCredits =
+      await this.stripeCreditGrantService.getCustomerCreditBalance(
+        subscription.stripeCustomerId,
+        item.unitPriceCents,
+      );
+
+    return {
+      productKey: item.productKey,
+      periodStart,
+      periodEnd,
+      usedCredits: meterEventsSum,
+      grantedCredits,
+      rolloverCredits,
+      totalGrantedCredits: grantedCredits + rolloverCredits,
+      unitPriceCents: item.unitPriceCents,
+    };
   }
 }

@@ -1,4 +1,4 @@
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import { useCallback, useState } from 'react';
 
 import { Heading } from '@/spreadsheet-import/components/Heading';
@@ -9,30 +9,19 @@ import { SpreadsheetImportStepType } from '@/spreadsheet-import/steps/types/Spre
 import { exceedsMaxRecords } from '@/spreadsheet-import/utils/exceedsMaxRecords';
 import { mapWorkbook } from '@/spreadsheet-import/utils/mapWorkbook';
 
-import { Modal } from '@/ui/layout/modal/components/Modal';
+import { ModalContent } from 'twenty-ui/layout';
 import { useLingui } from '@lingui/react/macro';
-import { Radio, RadioGroup } from 'twenty-ui/input';
+import { Radio } from 'twenty-ui/input';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { type WorkBook } from 'xlsx-ugnis';
-
-const StyledContent = styled(Modal.Content)`
-  align-items: center;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: ${({ theme }) => theme.spacing(8)};
-`;
-
-const StyledHeading = styled(Heading)`
-  display: flex;
-`;
 
 const StyledRadioContainer = styled.div`
   display: flex;
   flex-direction: column;
 `;
 
-const StyledRadio = styled(Radio)`
-  margin-bottom: ${({ theme }) => theme.spacing(6)};
+const StyledRadioItemContainer = styled.div`
+  margin-bottom: ${themeCssVariables.spacing[6]};
 `;
 
 type SelectSheetStepProps = {
@@ -55,6 +44,7 @@ export const SelectSheetStep = ({
   onBack,
   currentStepState,
 }: SelectSheetStepProps) => {
+  const { t } = useLingui();
   const [isLoading, setIsLoading] = useState(false);
 
   const [value, setValue] = useState(sheetNames[0]);
@@ -70,7 +60,8 @@ export const SelectSheetStep = ({
           maxRecords,
         )
       ) {
-        onError(`Too many records. Up to ${maxRecords.toString()} allowed`);
+        const maxRecordsString = maxRecords.toString();
+        onError(t`Too many records. Up to ${maxRecordsString} allowed`);
         return;
       }
       try {
@@ -93,6 +84,7 @@ export const SelectSheetStep = ({
       setPreviousStepState,
       setCurrentStepState,
       uploadStepHook,
+      t,
     ],
   );
 
@@ -105,24 +97,25 @@ export const SelectSheetStep = ({
     [handleContinue],
   );
 
-  const { t } = useLingui();
-
   return (
     <>
-      <StyledContent>
-        <StyledHeading title={t`Select the sheet to use`} />
+      <ModalContent isVerticallyCentered isHorizontallyCentered gap={8}>
+        <Heading title={t`Select the sheet to use`} />
         <StyledRadioContainer>
-          <RadioGroup onValueChange={(value) => setValue(value)} value={value}>
-            {sheetNames.map((sheetName) => (
-              <StyledRadio
+          {sheetNames.map((sheetName) => (
+            <StyledRadioItemContainer key={sheetName}>
+              <Radio
                 value={sheetName}
-                key={sheetName}
                 label={sheetName}
+                checked={value === sheetName}
+                onCheckedChange={(checked) => {
+                  if (checked) setValue(sheetName);
+                }}
               />
-            ))}
-          </RadioGroup>
+            </StyledRadioItemContainer>
+          ))}
         </StyledRadioContainer>
-      </StyledContent>
+      </ModalContent>
       <StepNavigationButton
         onContinue={() => handleOnContinue(value)}
         onBack={onBack}

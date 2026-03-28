@@ -1,4 +1,4 @@
-import { Field, InputType, OmitType } from '@nestjs/graphql';
+import { Field, HideField, InputType, OmitType } from '@nestjs/graphql';
 
 import { Type } from 'class-transformer';
 import { IsOptional, IsUUID, ValidateNested } from 'class-validator';
@@ -11,12 +11,26 @@ import { FieldMetadataDTO } from 'src/engine/metadata-modules/field-metadata/dto
 @InputType()
 export class CreateFieldInput extends OmitType(
   FieldMetadataDTO,
-  ['id', 'createdAt', 'updatedAt', 'standardOverrides'] as const,
+  [
+    'id',
+    'createdAt',
+    'updatedAt',
+    'standardOverrides',
+    'applicationId',
+    'morphId',
+    'universalIdentifier',
+  ] as const,
   InputType,
 ) {
   @IsUUID()
   @Field(() => UUIDScalarType)
   objectMetadataId: string;
+
+  @HideField()
+  universalIdentifier?: string;
+
+  @HideField()
+  applicationId?: string;
 
   @Field(() => Boolean, { nullable: true })
   @IsOptional()

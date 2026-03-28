@@ -1,5 +1,5 @@
 import { type WorkflowDiagram } from '@/workflow/workflow-diagram/types/WorkflowDiagram';
-import { mergeWorkflowDiagrams } from '../mergeWorkflowDiagrams';
+import { mergeWorkflowDiagrams } from '@/workflow/workflow-diagram/utils/mergeWorkflowDiagrams';
 
 it('Preserves the properties defined in the previous version but not in the next one', () => {
   const previousDiagram: WorkflowDiagram = {
@@ -56,6 +56,7 @@ it('Preserves the properties defined in the previous version but not in the next
         "stepId": "",
       },
       "id": "1",
+      "measured": undefined,
       "position": {
         "x": 0,
         "y": 0,
@@ -121,6 +122,7 @@ it('Replaces duplicated properties with the next value', () => {
         "stepId": "",
       },
       "id": "1",
+      "measured": undefined,
       "position": {
         "x": 0,
         "y": 0,

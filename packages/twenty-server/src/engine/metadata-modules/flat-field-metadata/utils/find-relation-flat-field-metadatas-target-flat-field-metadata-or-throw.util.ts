@@ -1,4 +1,3 @@
-import { FieldMetadataType } from 'twenty-shared/types';
 import { isDefined } from 'twenty-shared/utils';
 
 import {
@@ -6,33 +5,26 @@ import {
   FieldMetadataExceptionCode,
 } from 'src/engine/metadata-modules/field-metadata/field-metadata.exception';
 import { type MorphOrRelationFieldMetadataType } from 'src/engine/metadata-modules/field-metadata/types/morph-or-relation-field-metadata-type.type';
+import { type FlatEntityMaps } from 'src/engine/metadata-modules/flat-entity/types/flat-entity-maps.type';
+import { findFlatEntityByIdInFlatEntityMaps } from 'src/engine/metadata-modules/flat-entity/utils/find-flat-entity-by-id-in-flat-entity-maps.util';
 import { type FlatFieldMetadata } from 'src/engine/metadata-modules/flat-field-metadata/types/flat-field-metadata.type';
-import { isFlatFieldMetadataEntityOfType } from 'src/engine/metadata-modules/flat-field-metadata/utils/is-flat-field-metadata-of-type.util';
-import { type FlatObjectMetadataMaps } from 'src/engine/metadata-modules/flat-object-metadata-maps/types/flat-object-metadata-maps.type';
+import { isMorphOrRelationFlatFieldMetadata } from 'src/engine/metadata-modules/flat-field-metadata/utils/is-morph-or-relation-flat-field-metadata.util';
 
 export type GetRelationFlatFieldMetadatasUtilArgs = {
-  flatObjectMetadataMaps: FlatObjectMetadataMaps;
+  flatFieldMetadataMaps: FlatEntityMaps<FlatFieldMetadata>;
   flatFieldMetadata: FlatFieldMetadata<MorphOrRelationFieldMetadataType>;
 };
 
 export const findRelationFlatFieldMetadataTargetFlatFieldMetadataOrThrow = ({
-  flatObjectMetadataMaps,
+  flatFieldMetadataMaps,
   flatFieldMetadata,
-}: GetRelationFlatFieldMetadatasUtilArgs): FlatFieldMetadata<FieldMetadataType.RELATION> => {
-  const { relationTargetFieldMetadataId, relationTargetObjectMetadataId } =
-    flatFieldMetadata;
+}: GetRelationFlatFieldMetadatasUtilArgs): FlatFieldMetadata<MorphOrRelationFieldMetadataType> => {
+  const { relationTargetFieldMetadataId } = flatFieldMetadata;
 
-  const relatedFlatObjectMetadata =
-    flatObjectMetadataMaps.byId[relationTargetObjectMetadataId];
-
-  if (!isDefined(relatedFlatObjectMetadata)) {
-    throw new FieldMetadataException(
-      `Deleted field metadata relation object metadata target not found`,
-      FieldMetadataExceptionCode.OBJECT_METADATA_NOT_FOUND,
-    );
-  }
-  const relatedFlatFieldMetadata =
-    relatedFlatObjectMetadata.fieldsById[relationTargetFieldMetadataId];
+  const relatedFlatFieldMetadata = findFlatEntityByIdInFlatEntityMaps({
+    flatEntityId: relationTargetFieldMetadataId,
+    flatEntityMaps: flatFieldMetadataMaps,
+  });
 
   if (!isDefined(relatedFlatFieldMetadata)) {
     throw new FieldMetadataException(
@@ -41,14 +33,9 @@ export const findRelationFlatFieldMetadataTargetFlatFieldMetadataOrThrow = ({
     );
   }
 
-  if (
-    !isFlatFieldMetadataEntityOfType(
-      relatedFlatFieldMetadata,
-      FieldMetadataType.RELATION,
-    )
-  ) {
+  if (!isMorphOrRelationFlatFieldMetadata(relatedFlatFieldMetadata)) {
     throw new FieldMetadataException(
-      `Relation target field metadata is not a relation field metadata`,
+      `Relation target field metadata is not a relation or morph relation field metadata`,
       FieldMetadataExceptionCode.FIELD_METADATA_RELATION_MALFORMED,
     );
   }

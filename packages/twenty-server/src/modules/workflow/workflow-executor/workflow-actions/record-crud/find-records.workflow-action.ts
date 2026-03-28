@@ -1,42 +1,37 @@
 import { Injectable } from '@nestjs/common';
 
-import { type Entity } from '@microsoft/microsoft-graph-types';
-import { QUERY_MAX_RECORDS } from 'twenty-shared/constants';
-import { resolveInput } from 'twenty-shared/utils';
-import { type ObjectLiteral } from 'typeorm';
-
 import {
-  type ObjectRecordFilter,
-  type ObjectRecordOrderBy,
-  OrderByDirection,
-} from 'src/engine/api/graphql/workspace-query-builder/interfaces/object-record.interface';
+  type FieldMetadataComplexOption,
+  type FieldMetadataDefaultOption,
+} from 'twenty-shared/types';
+import {
+  computeRecordGqlOperationFilter,
+  isDefined,
+  isRecordFilterValueValid,
+  resolveInput,
+} from 'twenty-shared/utils';
+
 import { type WorkflowAction } from 'src/modules/workflow/workflow-executor/interfaces/workflow-action.interface';
 
-import { GraphqlQueryParser } from 'src/engine/api/graphql/graphql-query-runner/graphql-query-parsers/graphql-query.parser';
-import { type ObjectMetadataItemWithFieldMaps } from 'src/engine/metadata-modules/types/object-metadata-item-with-field-maps';
-import { type ObjectMetadataMaps } from 'src/engine/metadata-modules/types/object-metadata-maps';
-import { ScopedWorkspaceContextFactory } from 'src/engine/twenty-orm/factories/scoped-workspace-context.factory';
-import { type WorkspaceRepository } from 'src/engine/twenty-orm/repository/workspace.repository';
-import { TwentyORMGlobalManager } from 'src/engine/twenty-orm/twenty-orm-global.manager';
+import { FindRecordsService } from 'src/engine/core-modules/record-crud/services/find-records.service';
+import { findFlatEntityByIdInFlatEntityMaps } from 'src/engine/metadata-modules/flat-entity/utils/find-flat-entity-by-id-in-flat-entity-maps.util';
 import { WorkflowCommonWorkspaceService } from 'src/modules/workflow/common/workspace-services/workflow-common.workspace-service';
 import {
   WorkflowStepExecutorException,
   WorkflowStepExecutorExceptionCode,
 } from 'src/modules/workflow/workflow-executor/exceptions/workflow-step-executor.exception';
+import { WorkflowExecutionContextService } from 'src/modules/workflow/workflow-executor/services/workflow-execution-context.service';
 import { type WorkflowActionInput } from 'src/modules/workflow/workflow-executor/types/workflow-action-input';
 import { type WorkflowActionOutput } from 'src/modules/workflow/workflow-executor/types/workflow-action-output.type';
-import {
-  RecordCRUDActionException,
-  RecordCRUDActionExceptionCode,
-} from 'src/modules/workflow/workflow-executor/workflow-actions/record-crud/exceptions/record-crud-action.exception';
+import { findStepOrThrow } from 'src/modules/workflow/workflow-executor/utils/find-step-or-throw.util';
 import { isWorkflowFindRecordsAction } from 'src/modules/workflow/workflow-executor/workflow-actions/record-crud/guards/is-workflow-find-records-action.guard';
 import { type WorkflowFindRecordsActionInput } from 'src/modules/workflow/workflow-executor/workflow-actions/record-crud/types/workflow-record-crud-action-input.type';
 
 @Injectable()
 export class FindRecordsWorkflowAction implements WorkflowAction {
   constructor(
-    private readonly twentyORMGlobalManager: TwentyORMGlobalManager,
-    private readonly scopedWorkspaceContextFactory: ScopedWorkspaceContextFactory,
+    private readonly findRecordsService: FindRecordsService,
+    private readonly workflowExecutionContextService: WorkflowExecutionContextService,
     private readonly workflowCommonWorkspaceService: WorkflowCommonWorkspaceService,
   ) {}
 
@@ -44,15 +39,12 @@ export class FindRecordsWorkflowAction implements WorkflowAction {
     currentStepId,
     steps,
     context,
+    runInfo,
   }: WorkflowActionInput): Promise<WorkflowActionOutput> {
-    const step = steps.find((step) => step.id === currentStepId);
-
-    if (!step) {
-      throw new WorkflowStepExecutorException(
-        'Step not found',
-        WorkflowStepExecutorExceptionCode.STEP_NOT_FOUND,
-      );
-    }
+    const step = findStepOrThrow({
+      steps,
+      stepId: currentStepId,
+    });
 
     if (!isWorkflowFindRecordsAction(step)) {
       throw new WorkflowStepExecutorException(
@@ -66,115 +58,89 @@ export class FindRecordsWorkflowAction implements WorkflowAction {
       context,
     ) as WorkflowFindRecordsActionInput;
 
-    const workspaceId = this.scopedWorkspaceContextFactory.create().workspaceId;
+    const { workspaceId } = runInfo;
 
-    if (!workspaceId) {
-      throw new RecordCRUDActionException(
-        'Failed to read: Workspace ID is required',
-        RecordCRUDActionExceptionCode.INVALID_REQUEST,
+    const executionContext =
+      await this.workflowExecutionContextService.getExecutionContext(runInfo);
+
+    const { flatObjectMetadata, flatFieldMetadataMaps } =
+      await this.workflowCommonWorkspaceService.getObjectMetadataInfo(
+        workflowActionInput.objectName,
+        workspaceId,
       );
+
+    const fields = flatObjectMetadata.fieldIds
+      .map((fieldId) => {
+        const field = findFlatEntityByIdInFlatEntityMaps({
+          flatEntityId: fieldId,
+          flatEntityMaps: flatFieldMetadataMaps,
+        });
+
+        if (!field) {
+          return null;
+        }
+
+        return {
+          id: field.id,
+          name: field.name,
+          type: field.type,
+          label: field.label,
+          // Note: force cast is required until we deprecate the CreateFieldInput and UpdateFieldInput
+          // type derivation from the FieldMetadataDto
+          options: field.options as
+            | (FieldMetadataDefaultOption & { id: string })[]
+            | (FieldMetadataComplexOption & { id: string })[]
+            | null,
+        };
+      })
+      .filter(isDefined);
+
+    if (workflowActionInput.filter?.recordFilters) {
+      for (const filter of workflowActionInput.filter.recordFilters) {
+        if (!isRecordFilterValueValid(filter)) {
+          throw new WorkflowStepExecutorException(
+            `Filter condition has an empty value after variable resolution. This likely means a workflow variable could not be resolved. Filter field: ${filter.fieldMetadataId}, operand: ${filter.operand}`,
+            WorkflowStepExecutorExceptionCode.INVALID_STEP_INPUT,
+          );
+        }
+      }
     }
 
-    const repository =
-      await this.twentyORMGlobalManager.getRepositoryForWorkspace(
-        workspaceId,
-        workflowActionInput.objectName,
-        { shouldBypassPermissionChecks: true },
-      );
+    const gqlOperationFilter =
+      workflowActionInput.filter?.recordFilters &&
+      workflowActionInput.filter?.recordFilterGroups
+        ? computeRecordGqlOperationFilter({
+            fields,
+            recordFilters: workflowActionInput.filter.recordFilters,
+            recordFilterGroups: workflowActionInput.filter.recordFilterGroups,
+            filterValueDependencies: {
+              timeZone: 'UTC',
+            },
+          })
+        : {};
 
-    const { objectMetadataItemWithFieldsMaps, objectMetadataMaps } =
-      await this.workflowCommonWorkspaceService.getObjectMetadataItemWithFieldsMaps(
-        workflowActionInput.objectName,
-        workspaceId,
-      );
+    const toolOutput = await this.findRecordsService.execute({
+      objectName: workflowActionInput.objectName,
+      filter: gqlOperationFilter,
+      orderBy: workflowActionInput.orderBy?.gqlOperationOrderBy,
+      limit: workflowActionInput.limit,
+      authContext: executionContext.authContext,
+      rolePermissionConfig: executionContext.rolePermissionConfig,
+    });
 
-    const graphqlQueryParser = new GraphqlQueryParser(
-      objectMetadataItemWithFieldsMaps,
-      objectMetadataMaps,
-    );
+    if (!toolOutput.success) {
+      return { error: toolOutput.error || toolOutput.message };
+    }
 
-    const objectRecords = await this.getObjectRecords(
-      workflowActionInput,
-      objectMetadataItemWithFieldsMaps,
-      objectMetadataMaps,
-      repository,
-      graphqlQueryParser,
-    );
-
-    const totalCount = await this.getTotalCount(
-      workflowActionInput,
-      repository,
-      graphqlQueryParser,
-    );
+    const records = toolOutput.result?.records ?? [];
+    const totalCount = toolOutput.result?.count ?? 0;
 
     return {
       result: {
-        first: objectRecords[0],
-        last: objectRecords[objectRecords.length - 1],
+        first: records[0],
+        all: records,
         totalCount,
       },
     };
-  }
-
-  private async getObjectRecords<T extends ObjectLiteral>(
-    workflowActionInput: WorkflowFindRecordsActionInput,
-    _objectMetadataItemWithFieldsMaps: ObjectMetadataItemWithFieldMaps,
-    _objectMetadataMaps: ObjectMetadataMaps,
-    repository: WorkspaceRepository<T>,
-    graphqlQueryParser: GraphqlQueryParser,
-  ) {
-    const queryBuilder = repository.createQueryBuilder(
-      workflowActionInput.objectName,
-    );
-
-    const withFilterQueryBuilder = graphqlQueryParser.applyFilterToBuilder(
-      queryBuilder,
-      workflowActionInput.objectName,
-      workflowActionInput.filter?.gqlOperationFilter ??
-        ({} as ObjectRecordFilter),
-    );
-
-    const orderByWithIdCondition = [
-      ...(workflowActionInput.orderBy ?? []),
-      { id: OrderByDirection.AscNullsFirst },
-    ] as ObjectRecordOrderBy;
-
-    const withOrderByQueryBuilder = graphqlQueryParser.applyOrderToBuilder(
-      withFilterQueryBuilder,
-      orderByWithIdCondition,
-      workflowActionInput.objectName,
-      false,
-    );
-
-    return withOrderByQueryBuilder
-      .take(workflowActionInput.limit ?? QUERY_MAX_RECORDS)
-      .getMany();
-  }
-
-  private async getTotalCount(
-    workflowActionInput: WorkflowFindRecordsActionInput,
-    repository: WorkspaceRepository<Entity>,
-    graphqlQueryParser: GraphqlQueryParser,
-  ) {
-    const countQueryBuilder = repository.createQueryBuilder(
-      workflowActionInput.objectName,
-    );
-
-    const withFilterCountQueryBuilder = graphqlQueryParser.applyFilterToBuilder(
-      countQueryBuilder,
-      workflowActionInput.objectName,
-      workflowActionInput.filter?.gqlOperationFilter ??
-        ({} as ObjectRecordFilter),
-    );
-
-    const withDeletedCountQueryBuilder =
-      graphqlQueryParser.applyDeletedAtToBuilder(
-        withFilterCountQueryBuilder,
-        workflowActionInput.filter?.gqlOperationFilter
-          ? workflowActionInput.filter.gqlOperationFilter
-          : ({} as ObjectRecordFilter),
-      );
-
-    return withDeletedCountQueryBuilder.getCount();
   }
 }

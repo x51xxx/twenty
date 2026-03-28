@@ -3,11 +3,29 @@ import { Field, HideField, ObjectType } from '@nestjs/graphql';
 import { Relation } from 'typeorm';
 
 import { UUIDScalarType } from 'src/engine/api/graphql/workspace-schema-builder/graphql-types/scalars';
-import { WorkspaceMember } from 'src/engine/core-modules/user/dtos/workspace-member.dto';
+import { WorkspaceMemberDTO } from 'src/engine/core-modules/user/dtos/workspace-member.dto';
+import { AgentDTO } from 'src/engine/metadata-modules/ai/ai-agent/dtos/agent.dto';
 import { FieldPermissionDTO } from 'src/engine/metadata-modules/object-permission/dtos/field-permission.dto';
 import { ObjectPermissionDTO } from 'src/engine/metadata-modules/object-permission/dtos/object-permission.dto';
 import { PermissionFlagDTO } from 'src/engine/metadata-modules/permission-flag/dtos/permission-flag.dto';
-import { type RoleTargetsEntity } from 'src/engine/metadata-modules/role/role-targets.entity';
+import { type RoleTargetEntity } from 'src/engine/metadata-modules/role-target/role-target.entity';
+import { RowLevelPermissionPredicateGroupDTO } from 'src/engine/metadata-modules/row-level-permission-predicate/dtos/row-level-permission-predicate-group.dto';
+import { RowLevelPermissionPredicateDTO } from 'src/engine/metadata-modules/row-level-permission-predicate/dtos/row-level-permission-predicate.dto';
+
+@ObjectType('ApiKeyForRole')
+export class ApiKeyForRoleDTO {
+  @Field(() => UUIDScalarType, { nullable: false })
+  id: string;
+
+  @Field({ nullable: false })
+  name: string;
+
+  @Field(() => Date, { nullable: false })
+  expiresAt: Date;
+
+  @Field(() => Date, { nullable: true })
+  revokedAt?: Date | null;
+}
 
 @ObjectType('Role')
 export class RoleDTO {
@@ -15,25 +33,40 @@ export class RoleDTO {
   id: string;
 
   @Field(() => UUIDScalarType, { nullable: true })
-  standardId?: string;
+  universalIdentifier?: string;
 
   @Field({ nullable: false })
   label: string;
 
   @Field({ nullable: true })
-  description: string;
+  description?: string;
 
   @Field({ nullable: true })
-  icon: string;
+  icon?: string;
 
   @Field({ nullable: false })
   isEditable: boolean;
 
-  @HideField()
-  roleTargets: Relation<RoleTargetsEntity[]>;
+  @Field({ nullable: false })
+  canBeAssignedToUsers: boolean;
 
-  @Field(() => [WorkspaceMember], { nullable: true })
-  workspaceMembers?: WorkspaceMember[];
+  @Field({ nullable: false })
+  canBeAssignedToAgents: boolean;
+
+  @Field({ nullable: false })
+  canBeAssignedToApiKeys: boolean;
+
+  @HideField()
+  roleTargets?: Relation<RoleTargetEntity[]>;
+
+  @Field(() => [WorkspaceMemberDTO], { nullable: true })
+  workspaceMembers?: WorkspaceMemberDTO[];
+
+  @Field(() => [AgentDTO], { nullable: true })
+  agents?: AgentDTO[];
+
+  @Field(() => [ApiKeyForRoleDTO], { nullable: true })
+  apiKeys?: ApiKeyForRoleDTO[];
 
   @Field({ nullable: false })
   canUpdateAllSettings: boolean;
@@ -61,4 +94,10 @@ export class RoleDTO {
 
   @Field(() => [FieldPermissionDTO], { nullable: true })
   fieldPermissions?: FieldPermissionDTO[];
+
+  @Field(() => [RowLevelPermissionPredicateDTO], { nullable: true })
+  rowLevelPermissionPredicates?: RowLevelPermissionPredicateDTO[];
+
+  @Field(() => [RowLevelPermissionPredicateGroupDTO], { nullable: true })
+  rowLevelPermissionPredicateGroups?: RowLevelPermissionPredicateGroupDTO[];
 }

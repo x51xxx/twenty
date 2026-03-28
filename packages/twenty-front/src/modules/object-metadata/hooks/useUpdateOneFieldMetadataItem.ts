@@ -1,54 +1,35 @@
-import { useApolloClient, useMutation } from '@apollo/client';
-
+import { useMutation } from '@apollo/client/react';
 import {
-  type UpdateOneFieldMetadataItemMutation,
   type UpdateOneFieldMetadataItemMutationVariables,
+  UpdateOneFieldMetadataItemDocument,
 } from '~/generated-metadata/graphql';
 
-import { UPDATE_ONE_FIELD_METADATA_ITEM } from '../graphql/mutations';
-
-import { currentWorkspaceState } from '@/auth/states/currentWorkspaceState';
-import { useApolloCoreClient } from '@/object-metadata/hooks/useApolloCoreClient';
-import { useRefreshObjectMetadataItems } from '@/object-metadata/hooks/useRefreshObjectMetadataItems';
-import { CoreObjectNameSingular } from '@/object-metadata/types/CoreObjectNameSingular';
-import { useFindManyRecordsQuery } from '@/object-record/hooks/useFindManyRecordsQuery';
-import { GET_CURRENT_USER } from '@/users/graphql/queries/getCurrentUser';
-import { useSetRecoilState } from 'recoil';
-
-import { getRecordsFromRecordConnection } from '@/object-record/cache/utils/getRecordsFromRecordConnection';
-import { type RecordGqlConnection } from '@/object-record/graphql/types/RecordGqlConnection';
-import { useSetRecordGroups } from '@/object-record/record-group/hooks/useSetRecordGroups';
+import { useMetadataErrorHandler } from '@/metadata-error-handler/hooks/useMetadataErrorHandler';
+import { useUpdateMetadataStoreDraft } from '@/metadata-store/hooks/useUpdateMetadataStoreDraft';
+import { type FlatFieldMetadataItem } from '@/metadata-store/types/FlatFieldMetadataItem';
+import { lastFieldMetadataItemUpdateState } from '@/object-metadata/states/lastFieldMetadataItemUpdateState';
+import { type MetadataRequestResult } from '@/object-metadata/types/MetadataRequestResult.type';
+import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
+import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { t } from '@lingui/core/macro';
 import { isDefined } from 'twenty-shared/utils';
+import { CrudOperationType } from 'twenty-shared/types';
+import { v4 as uuidv4 } from 'uuid';
 
 export const useUpdateOneFieldMetadataItem = () => {
-  const apolloClient = useApolloClient();
-  const apolloCoreClient = useApolloCoreClient();
-  const { refreshObjectMetadataItems } =
-    useRefreshObjectMetadataItems('network-only');
+  const [updateOneFieldMetadataItemMutation] = useMutation(
+    UpdateOneFieldMetadataItemDocument,
+  );
 
-  const { setRecordGroupsFromViewGroups } = useSetRecordGroups();
-  const cache = useApolloClient().cache;
+  const { handleMetadataError } = useMetadataErrorHandler();
 
-  const setCurrentWorkspace = useSetRecoilState(currentWorkspaceState);
+  const { enqueueErrorSnackBar } = useSnackBar();
+  const { updateInDraft, applyChanges } = useUpdateMetadataStoreDraft();
 
-  const { findManyRecordsQuery: findManyViewsQuery } = useFindManyRecordsQuery({
-    objectNameSingular: CoreObjectNameSingular.View,
-    recordGqlFields: {
-      id: true,
-      viewGroups: {
-        id: true,
-        fieldMetadataId: true,
-        isVisible: true,
-        fieldValue: true,
-        position: true,
-      },
-    },
-  });
-
-  const [mutate] = useMutation<
-    UpdateOneFieldMetadataItemMutation,
-    UpdateOneFieldMetadataItemMutationVariables
-  >(UPDATE_ONE_FIELD_METADATA_ITEM);
+  const setLastFieldMetadataItemUpdate = useSetAtomState(
+    lastFieldMetadataItemUpdateState,
+  );
 
   const updateOneFieldMetadataItem = async ({
     objectMetadataId,
@@ -68,54 +49,58 @@ export const useUpdateOneFieldMetadataItem = () => {
       | 'options'
       | 'isLabelSyncedWithName'
     >;
-  }) => {
-    const result = await mutate({
-      variables: {
-        idToUpdate: fieldMetadataIdToUpdate,
-        updatePayload: updatePayload,
-      },
-    });
-
-    const objectMetadataItemsRefreshed = await refreshObjectMetadataItems();
-
-    const { data } = await apolloClient.query({ query: GET_CURRENT_USER });
-    setCurrentWorkspace(data?.currentUser?.currentWorkspace);
-
-    const { data: viewConnection } = await apolloCoreClient.query<{
-      views: RecordGqlConnection;
-    }>({
-      query: findManyViewsQuery,
-      variables: {
-        filter: {
-          objectMetadataId: {
-            eq: objectMetadataId,
-          },
+  }): Promise<
+    MetadataRequestResult<
+      Awaited<ReturnType<typeof updateOneFieldMetadataItemMutation>>
+    >
+  > => {
+    try {
+      const response = await updateOneFieldMetadataItemMutation({
+        variables: {
+          idToUpdate: fieldMetadataIdToUpdate,
+          updatePayload: updatePayload,
         },
-      },
-      fetchPolicy: 'network-only',
-    });
+      });
 
-    const viewRecords = getRecordsFromRecordConnection({
-      recordConnection: viewConnection?.views,
-    });
+      const updatedField = response.data?.updateOneField;
 
-    for (const view of viewRecords) {
-      const correspondingObjectMetadataItemRefreshed =
-        objectMetadataItemsRefreshed?.find(
-          (item) => item.id === objectMetadataId,
-        );
+      if (isDefined(updatedField)) {
+        const { __typename, object, ...fieldData } = updatedField;
 
-      if (isDefined(correspondingObjectMetadataItemRefreshed)) {
-        setRecordGroupsFromViewGroups(
-          view.id,
-          view.viewGroups,
-          correspondingObjectMetadataItemRefreshed,
-        );
+        updateInDraft('fieldMetadataItems', [
+          {
+            ...fieldData,
+            objectMetadataId: object?.id ?? objectMetadataId,
+          } as FlatFieldMetadataItem,
+        ]);
+        applyChanges();
       }
-      cache.evict({ id: `Views:${view.id}` });
-    }
 
-    return result;
+      setLastFieldMetadataItemUpdate({
+        fieldMetadataItemId: fieldMetadataIdToUpdate,
+        objectMetadataId,
+        id: uuidv4(),
+      });
+
+      return {
+        status: 'successful',
+        response,
+      };
+    } catch (error) {
+      if (CombinedGraphQLErrors.is(error)) {
+        handleMetadataError(error, {
+          primaryMetadataName: 'fieldMetadata',
+          operationType: CrudOperationType.UPDATE,
+        });
+      } else {
+        enqueueErrorSnackBar({ message: t`An error occurred.` });
+      }
+
+      return {
+        status: 'failed',
+        error,
+      };
+    }
   };
 
   return {

@@ -5,45 +5,59 @@ import { addMilliseconds } from 'date-fns';
 import { Repository } from 'typeorm';
 
 import {
-  AppToken,
+  AppTokenEntity,
   AppTokenType,
 } from 'src/engine/core-modules/app-token/app-token.entity';
-import { AuthException } from 'src/engine/core-modules/auth/auth.exception';
-import { DomainManagerService } from 'src/engine/core-modules/domain-manager/services/domain-manager.service';
+import {
+  AuthException,
+  AuthExceptionCode,
+} from 'src/engine/core-modules/auth/auth.exception';
+import { WorkspaceDomainsService } from 'src/engine/core-modules/domain/workspace-domains/services/workspace-domains.service';
 import { EmailService } from 'src/engine/core-modules/email/email.service';
+import { I18nService } from 'src/engine/core-modules/i18n/i18n.service';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
-import { User } from 'src/engine/core-modules/user/user.entity';
-import { Workspace } from 'src/engine/core-modules/workspace/workspace.entity';
+import { UserService } from 'src/engine/core-modules/user/services/user.service';
+import { type UserEntity } from 'src/engine/core-modules/user/user.entity';
+import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 
 import { ResetPasswordService } from './reset-password.service';
 
+jest.mock('@react-email/render', () => ({
+  render: jest.fn().mockImplementation(async (_, options) => {
+    if (options?.plainText) {
+      return 'Plain Text Email';
+    }
+
+    return '<html><body>HTML email content</body></html>';
+  }),
+}));
+
 describe('ResetPasswordService', () => {
   let service: ResetPasswordService;
-  let userRepository: Repository<User>;
-  let workspaceRepository: Repository<Workspace>;
-  let appTokenRepository: Repository<AppToken>;
+  let userService: UserService;
+  let workspaceRepository: Repository<WorkspaceEntity>;
+  let appTokenRepository: Repository<AppTokenEntity>;
   let emailService: EmailService;
   let twentyConfigService: TwentyConfigService;
-  let domainManagerService: DomainManagerService;
+  let workspaceDomainsService: WorkspaceDomainsService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResetPasswordService,
         {
-          provide: getRepositoryToken(User),
+          provide: UserService,
+          useValue: {
+            findUserByEmailOrThrow: jest.fn(),
+            findUserByIdOrThrow: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(WorkspaceEntity),
           useClass: Repository,
         },
         {
-          provide: getRepositoryToken(Workspace),
-          useClass: Repository,
-        },
-        {
-          provide: getRepositoryToken(AppToken),
-          useClass: Repository,
-        },
-        {
-          provide: getRepositoryToken(Workspace),
+          provide: getRepositoryToken(AppTokenEntity),
           useClass: Repository,
         },
         {
@@ -53,11 +67,8 @@ describe('ResetPasswordService', () => {
           },
         },
         {
-          provide: DomainManagerService,
+          provide: WorkspaceDomainsService,
           useValue: {
-            getBaseUrl: jest
-              .fn()
-              .mockResolvedValue(new URL('http://localhost:3001')),
             buildWorkspaceURL: jest.fn(),
           },
         },
@@ -67,21 +78,30 @@ describe('ResetPasswordService', () => {
             get: jest.fn(),
           },
         },
+        {
+          provide: I18nService,
+          useValue: {
+            getI18nInstance: jest.fn().mockReturnValue({
+              _: jest.fn().mockReturnValue('mocked-translation'),
+            }),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<ResetPasswordService>(ResetPasswordService);
-    userRepository = module.get<Repository<User>>(getRepositoryToken(User));
-    workspaceRepository = module.get<Repository<Workspace>>(
-      getRepositoryToken(Workspace),
+    userService = module.get<UserService>(UserService);
+    workspaceRepository = module.get<Repository<WorkspaceEntity>>(
+      getRepositoryToken(WorkspaceEntity),
     );
-    appTokenRepository = module.get<Repository<AppToken>>(
-      getRepositoryToken(AppToken),
+    appTokenRepository = module.get<Repository<AppTokenEntity>>(
+      getRepositoryToken(AppTokenEntity),
     );
     emailService = module.get<EmailService>(EmailService);
     twentyConfigService = module.get<TwentyConfigService>(TwentyConfigService);
-    domainManagerService =
-      module.get<DomainManagerService>(DomainManagerService);
+    workspaceDomainsService = module.get<WorkspaceDomainsService>(
+      WorkspaceDomainsService,
+    );
   });
 
   it('should be defined', () => {
@@ -93,10 +113,12 @@ describe('ResetPasswordService', () => {
       const mockUser = { id: '1', email: 'test@example.com' };
 
       jest
-        .spyOn(userRepository, 'findOneBy')
-        .mockResolvedValue(mockUser as User);
+        .spyOn(userService, 'findUserByEmailOrThrow')
+        .mockResolvedValue(mockUser as UserEntity);
       jest.spyOn(appTokenRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(appTokenRepository, 'save').mockResolvedValue({} as AppToken);
+      jest
+        .spyOn(appTokenRepository, 'save')
+        .mockResolvedValue({} as AppTokenEntity);
       jest.spyOn(twentyConfigService, 'get').mockReturnValue('1h');
 
       const result = await service.generatePasswordResetToken(
@@ -109,13 +131,59 @@ describe('ResetPasswordService', () => {
       expect(appTokenRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: '1',
+          workspaceId: 'workspace-id',
           type: AppTokenType.PasswordResetToken,
         }),
       );
     });
 
+    it('should resolve workspace when workspaceId is missing', async () => {
+      const mockUser = { id: '1', email: 'test@example.com' };
+      const mockWorkspace = { id: 'resolved-workspace-id' };
+
+      jest
+        .spyOn(userService, 'findUserByEmailOrThrow')
+        .mockResolvedValue(mockUser as UserEntity);
+      jest
+        .spyOn(workspaceRepository, 'findOne')
+        .mockResolvedValue(mockWorkspace as WorkspaceEntity);
+      jest.spyOn(appTokenRepository, 'findOne').mockResolvedValue(null);
+      jest
+        .spyOn(appTokenRepository, 'save')
+        .mockResolvedValue({} as AppTokenEntity);
+      jest.spyOn(twentyConfigService, 'get').mockReturnValue('1h');
+
+      const result =
+        await service.generatePasswordResetToken('test@example.com');
+
+      expect(result.workspaceId).toBe('resolved-workspace-id');
+      expect(appTokenRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspaceId: 'resolved-workspace-id',
+        }),
+      );
+    });
+
+    it('should throw an error if no password auth enabled workspace found', async () => {
+      const mockUser = { id: '1', email: 'test@example.com' };
+
+      jest
+        .spyOn(userService, 'findUserByEmailOrThrow')
+        .mockResolvedValue(mockUser as UserEntity);
+      jest.spyOn(workspaceRepository, 'findOne').mockResolvedValue(null);
+      jest.spyOn(twentyConfigService, 'get').mockReturnValue('1h');
+
+      await expect(
+        service.generatePasswordResetToken('test@example.com'),
+      ).rejects.toThrow(AuthException);
+    });
+
     it('should throw an error if user is not found', async () => {
-      jest.spyOn(userRepository, 'findOneBy').mockResolvedValue(null);
+      jest
+        .spyOn(userService, 'findUserByEmailOrThrow')
+        .mockRejectedValue(
+          new AuthException('User not found', AuthExceptionCode.INVALID_INPUT),
+        );
 
       await expect(
         service.generatePasswordResetToken(
@@ -135,11 +203,12 @@ describe('ResetPasswordService', () => {
       };
 
       jest
-        .spyOn(userRepository, 'findOneBy')
-        .mockResolvedValue(mockUser as User);
+        .spyOn(userService, 'findUserByEmailOrThrow')
+        .mockResolvedValue(mockUser as UserEntity);
       jest
         .spyOn(appTokenRepository, 'findOne')
-        .mockResolvedValue(mockExistingToken as AppToken);
+        .mockResolvedValue(mockExistingToken as AppTokenEntity);
+      jest.spyOn(twentyConfigService, 'get').mockReturnValue('1h');
 
       await expect(
         service.generatePasswordResetToken('test@example.com', 'workspace-id'),
@@ -157,41 +226,51 @@ describe('ResetPasswordService', () => {
       };
 
       jest
-        .spyOn(userRepository, 'findOneBy')
-        .mockResolvedValue(mockUser as User);
+        .spyOn(userService, 'findUserByEmailOrThrow')
+        .mockResolvedValue(mockUser as UserEntity);
       jest
         .spyOn(workspaceRepository, 'findOneBy')
-        .mockResolvedValue({ id: 'workspace-id' } as Workspace);
+        .mockResolvedValue({ id: 'workspace-id' } as WorkspaceEntity);
       jest
         .spyOn(twentyConfigService, 'get')
         .mockReturnValue('http://localhost:3000');
       jest
-        .spyOn(domainManagerService, 'buildWorkspaceURL')
+        .spyOn(workspaceDomainsService, 'buildWorkspaceURL')
         .mockReturnValue(
           new URL(
             'https://subdomain.localhost.com:3000/reset-password/passwordResetToken',
           ),
         );
 
-      const result = await service.sendEmailPasswordResetLink(
-        mockToken,
-        'test@example.com',
-        'en',
-      );
+      const result = await service.sendEmailPasswordResetLink({
+        resetToken: mockToken,
+        email: 'test@example.com',
+        locale: 'en',
+      });
 
       expect(result.success).toBe(true);
       expect(emailService.send).toHaveBeenCalled();
     });
 
     it('should throw an error if user is not found', async () => {
-      jest.spyOn(userRepository, 'findOneBy').mockResolvedValue(null);
+      const mockToken = {
+        workspaceId: 'workspace-id',
+        passwordResetToken: 'token123',
+        passwordResetTokenExpiresAt: new Date(),
+      };
+
+      jest
+        .spyOn(userService, 'findUserByEmailOrThrow')
+        .mockRejectedValue(
+          new AuthException('User not found', AuthExceptionCode.INVALID_INPUT),
+        );
 
       await expect(
-        service.sendEmailPasswordResetLink(
-          {} as any,
-          'nonexistent@example.com',
-          'en',
-        ),
+        service.sendEmailPasswordResetLink({
+          resetToken: mockToken,
+          email: 'nonexistent@example.com',
+          locale: 'en',
+        }),
       ).rejects.toThrow(AuthException);
     });
   });
@@ -207,14 +286,18 @@ describe('ResetPasswordService', () => {
 
       jest
         .spyOn(appTokenRepository, 'findOne')
-        .mockResolvedValue(mockToken as AppToken);
+        .mockResolvedValue(mockToken as AppTokenEntity);
       jest
-        .spyOn(userRepository, 'findOneBy')
-        .mockResolvedValue(mockUser as User);
+        .spyOn(userService, 'findUserByIdOrThrow')
+        .mockResolvedValue(mockUser as UserEntity);
 
       const result = await service.validatePasswordResetToken('validToken');
 
-      expect(result).toEqual({ id: '1', email: 'test@example.com' });
+      expect(result).toEqual({
+        id: '1',
+        email: 'test@example.com',
+        hasPassword: false,
+      });
     });
 
     it('should throw an error for an invalid token', async () => {
@@ -231,8 +314,8 @@ describe('ResetPasswordService', () => {
       const mockUser = { id: '1', email: 'test@example.com' };
 
       jest
-        .spyOn(userRepository, 'findOneBy')
-        .mockResolvedValue(mockUser as User);
+        .spyOn(userService, 'findUserByIdOrThrow')
+        .mockResolvedValue(mockUser as UserEntity);
       jest.spyOn(appTokenRepository, 'update').mockResolvedValue({} as any);
 
       const result = await service.invalidatePasswordResetToken('1');
@@ -245,7 +328,11 @@ describe('ResetPasswordService', () => {
     });
 
     it('should throw an error if user is not found', async () => {
-      jest.spyOn(userRepository, 'findOneBy').mockResolvedValue(null);
+      jest
+        .spyOn(userService, 'findUserByIdOrThrow')
+        .mockRejectedValue(
+          new AuthException('User not found', AuthExceptionCode.INVALID_INPUT),
+        );
 
       await expect(
         service.invalidatePasswordResetToken('nonexistent'),

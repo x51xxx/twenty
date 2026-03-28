@@ -1,8 +1,13 @@
+import { MessageParticipantRole } from 'twenty-shared/types';
+
 import { MESSAGE_DATA_SEED_IDS } from 'src/engine/workspace-manager/dev-seeder/data/constants/message-data-seeds.constant';
 import { PERSON_DATA_SEED_IDS } from 'src/engine/workspace-manager/dev-seeder/data/constants/person-data-seeds.constant';
-import { WORKSPACE_MEMBER_DATA_SEED_IDS } from 'src/engine/workspace-manager/dev-seeder/data/constants/workspace-member-data-seeds.constant';
+import {
+  WORKSPACE_MEMBER_DATA_SEED_IDS,
+  getWorkspaceMemberDataSeeds,
+} from 'src/engine/workspace-manager/dev-seeder/data/constants/workspace-member-data-seeds.constant';
 
-type MessageParticipantDataSeed = {
+export type MessageParticipantDataSeed = {
   id: string;
   createdAt: Date;
   updatedAt: Date;
@@ -11,7 +16,7 @@ type MessageParticipantDataSeed = {
   personId: string;
   displayName: string;
   handle: string;
-  role: string;
+  role: MessageParticipantRole;
   messageId: string;
 };
 
@@ -223,7 +228,9 @@ const CREATE_MESSAGE_PARTICIPANTS = (
 
   for (let I = 0; I < TOTAL_PARTICIPANTS; I++) {
     const IS_SENDER = I === 0;
-    const ROLE = IS_SENDER ? 'from' : 'to';
+    const ROLE = IS_SENDER
+      ? MessageParticipantRole.FROM
+      : MessageParticipantRole.TO;
     const HANDLE = IS_SENDER ? 'outgoing' : 'incoming';
 
     // Random date within the last 3 months
@@ -259,7 +266,9 @@ const CREATE_MESSAGE_PARTICIPANTS = (
   return { participants: PARTICIPANTS, nextIndex: participantIndex };
 };
 
-const GENERATE_MESSAGE_PARTICIPANT_SEEDS = (): MessageParticipantDataSeed[] => {
+const GENERATE_MESSAGE_PARTICIPANT_SEEDS = (
+  workspaceId: string,
+): MessageParticipantDataSeed[] => {
   const PARTICIPANT_SEEDS: MessageParticipantDataSeed[] = [];
   let PARTICIPANT_INDEX = 1;
 
@@ -270,7 +279,9 @@ const GENERATE_MESSAGE_PARTICIPANT_SEEDS = (): MessageParticipantDataSeed[] => {
   const PERSON_IDS = Object.keys(PERSON_DATA_SEED_IDS).map(
     (key) => PERSON_DATA_SEED_IDS[key as keyof typeof PERSON_DATA_SEED_IDS],
   );
-  const WORKSPACE_MEMBER_IDS = Object.values(WORKSPACE_MEMBER_DATA_SEED_IDS);
+  const WORKSPACE_MEMBER_IDS = getWorkspaceMemberDataSeeds(workspaceId).map(
+    (member) => member.id,
+  );
 
   for (const MESSAGE_ID of MESSAGE_IDS) {
     const RESULT = CREATE_MESSAGE_PARTICIPANTS(
@@ -287,5 +298,8 @@ const GENERATE_MESSAGE_PARTICIPANT_SEEDS = (): MessageParticipantDataSeed[] => {
   return PARTICIPANT_SEEDS;
 };
 
-export const MESSAGE_PARTICIPANT_DATA_SEEDS =
-  GENERATE_MESSAGE_PARTICIPANT_SEEDS();
+export const getMessageParticipantDataSeeds = (
+  workspaceId: string,
+): MessageParticipantDataSeed[] => {
+  return GENERATE_MESSAGE_PARTICIPANT_SEEDS(workspaceId);
+};

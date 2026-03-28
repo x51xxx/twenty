@@ -1,16 +1,17 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 
-import { useColumnDefinitionsFromFieldMetadata } from '@/object-metadata/hooks/useColumnDefinitionsFromFieldMetadata';
+import { useColumnDefinitionsFromObjectMetadata } from '@/object-metadata/hooks/useColumnDefinitionsFromObjectMetadata';
 import { useObjectMetadataItem } from '@/object-metadata/hooks/useObjectMetadataItem';
 import { useRecordIndexContextOrThrow } from '@/object-record/record-index/contexts/RecordIndexContext';
 import { viewFieldAggregateOperationState } from '@/object-record/record-table/record-table-footer/states/viewFieldAggregateOperationState';
 import { convertAggregateOperationToExtendedAggregateOperation } from '@/object-record/utils/convertAggregateOperationToExtendedAggregateOperation';
 import { useGetCurrentViewOnly } from '@/views/hooks/useGetCurrentViewOnly';
 import { type ViewField } from '@/views/types/ViewField';
-import { useRecoilCallback } from 'recoil';
 import { isDefined } from 'twenty-shared/utils';
+import { useStore } from 'jotai';
 
 export const RecordIndexTableContainerEffect = () => {
+  const store = useStore();
   const { objectNameSingular } = useRecordIndexContextOrThrow();
 
   const { objectMetadataItem } = useObjectMetadataItem({
@@ -18,48 +19,44 @@ export const RecordIndexTableContainerEffect = () => {
   });
 
   const { columnDefinitions } =
-    useColumnDefinitionsFromFieldMetadata(objectMetadataItem);
+    useColumnDefinitionsFromObjectMetadata(objectMetadataItem);
 
   const { currentView } = useGetCurrentViewOnly();
 
-  const setViewFieldAggregateOperation = useRecoilCallback(
-    ({ set, snapshot }) =>
-      (viewField: ViewField) => {
-        const aggregateOperationForViewField = snapshot
-          .getLoadable(
-            viewFieldAggregateOperationState({
-              viewFieldId: viewField.id,
-            }),
+  const setViewFieldAggregateOperation = useCallback(
+    (viewField: ViewField) => {
+      const aggregateOperationForViewField = store.get(
+        viewFieldAggregateOperationState.atomFamily({
+          viewFieldId: viewField.id,
+        }),
+      );
+
+      const viewFieldMetadataType = columnDefinitions.find(
+        (columnDefinition) =>
+          columnDefinition.fieldMetadataId === viewField.fieldMetadataId,
+      )?.type;
+
+      const convertedViewFieldAggregateOperation = isDefined(
+        viewField.aggregateOperation,
+      )
+        ? convertAggregateOperationToExtendedAggregateOperation(
+            viewField.aggregateOperation,
+            viewFieldMetadataType,
           )
-          .getValue();
+        : viewField.aggregateOperation;
 
-        const viewFieldMetadataType = columnDefinitions.find(
-          (columnDefinition) =>
-            columnDefinition.fieldMetadataId === viewField.fieldMetadataId,
-        )?.type;
-
-        const convertedViewFieldAggregateOperation = isDefined(
-          viewField.aggregateOperation,
-        )
-          ? convertAggregateOperationToExtendedAggregateOperation(
-              viewField.aggregateOperation,
-              viewFieldMetadataType,
-            )
-          : viewField.aggregateOperation;
-
-        if (
-          aggregateOperationForViewField !==
-          convertedViewFieldAggregateOperation
-        ) {
-          set(
-            viewFieldAggregateOperationState({
-              viewFieldId: viewField.id,
-            }),
-            convertedViewFieldAggregateOperation,
-          );
-        }
-      },
-    [columnDefinitions],
+      if (
+        aggregateOperationForViewField !== convertedViewFieldAggregateOperation
+      ) {
+        store.set(
+          viewFieldAggregateOperationState.atomFamily({
+            viewFieldId: viewField.id,
+          }),
+          convertedViewFieldAggregateOperation,
+        );
+      }
+    },
+    [columnDefinitions, store],
   );
 
   useEffect(() => {

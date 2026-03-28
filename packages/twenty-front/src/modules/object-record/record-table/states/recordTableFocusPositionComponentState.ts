@@ -1,13 +1,10 @@
 import { RecordTableComponentInstanceContext } from '@/object-record/record-table/states/context/RecordTableComponentInstanceContext';
-import { createComponentState } from '@/ui/utilities/state/component-state/utils/createComponentState';
-import { type TableCellPosition } from '../types/TableCellPosition';
+import { type TableCellPosition } from '@/object-record/record-table/types/TableCellPosition';
+import { createAtomComponentState } from '@/ui/utilities/state/jotai/utils/createAtomComponentState';
 
 export const recordTableFocusPositionComponentState =
-  createComponentState<TableCellPosition>({
+  createAtomComponentState<TableCellPosition | null>({
     key: 'recordTableFocusPositionComponentState',
-    defaultValue: {
-      row: 0,
-      column: 1,
-    },
+    defaultValue: null,
     componentInstanceContext: RecordTableComponentInstanceContext,
   });

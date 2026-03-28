@@ -1,54 +1,111 @@
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 
+import { useDeleteOneObjectMetadataItem } from '@/object-metadata/hooks/useDeleteOneObjectMetadataItem';
 import { useUpdateOneObjectMetadataItem } from '@/object-metadata/hooks/useUpdateOneObjectMetadataItem';
+import { isObjectMetadataReadOnly } from '@/object-record/read-only/utils/isObjectMetadataReadOnly';
+import { AdvancedSettingsWrapper } from '@/settings/components/AdvancedSettingsWrapper';
 import { SettingsUpdateDataModelObjectAboutForm } from '@/settings/data-model/object-details/components/SettingsUpdateDataModelObjectAboutForm';
+import { SettingsObjectSearchSection } from '@/settings/data-model/object-details/components/tabs/SettingsObjectSearchSection';
 import { SettingsDataModelObjectSettingsFormCard } from '@/settings/data-model/objects/forms/components/SettingsDataModelObjectSettingsFormCard';
-import { SettingsPath } from '@/types/SettingsPath';
-import styled from '@emotion/styled';
+import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
+import { ConfirmationModal } from '@/ui/layout/modal/components/ConfirmationModal';
+import { useModal } from '@/ui/layout/modal/hooks/useModal';
+import { styled } from '@linaria/react';
 import { useLingui } from '@lingui/react/macro';
-import { H2Title, IconArchive } from 'twenty-ui/display';
+import { SettingsPath } from 'twenty-shared/types';
+import { H2Title, IconArchive, IconTrash } from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
 import { Section } from 'twenty-ui/layout';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { useNavigateSettings } from '~/hooks/useNavigateSettings';
 
 type ObjectSettingsProps = {
-  objectMetadataItem: ObjectMetadataItem;
+  objectMetadataItem: EnrichedObjectMetadataItem;
+  isDeleting: boolean;
+  setIsDeleting: (isDeleting: boolean) => void;
 };
 
 const StyledContentContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.spacing(8)};
+  gap: ${themeCssVariables.spacing[8]};
 `;
 
-const StyledFormSection = styled(Section)`
-  padding-left: 0 !important;
+const StyledFormSectionContainer = styled.div`
+  > * {
+    padding-left: 0 !important;
+  }
 `;
 
-export const ObjectSettings = ({ objectMetadataItem }: ObjectSettingsProps) => {
+const StyledDangerButtonsContainer = styled.div`
+  display: flex;
+  gap: ${themeCssVariables.spacing[2]};
+`;
+
+const DELETE_OBJECT_MODAL_ID = 'delete-object-confirmation-modal';
+
+export const ObjectSettings = ({
+  objectMetadataItem,
+  isDeleting,
+  setIsDeleting,
+}: ObjectSettingsProps) => {
   const { t } = useLingui();
   const navigate = useNavigateSettings();
   const { updateOneObjectMetadataItem } = useUpdateOneObjectMetadataItem();
+  const { deleteOneObjectMetadataItem } = useDeleteOneObjectMetadataItem();
+  const { enqueueSuccessSnackBar } = useSnackBar();
+  const { openModal, closeModal } = useModal();
+
+  const isReadOnly = isObjectMetadataReadOnly({ objectMetadataItem });
+
   const handleDisable = async () => {
-    await updateOneObjectMetadataItem({
+    const result = await updateOneObjectMetadataItem({
       idToUpdate: objectMetadataItem.id,
       updatePayload: { isActive: false },
     });
-    navigate(SettingsPath.Objects);
+
+    if (result.status === 'successful') {
+      navigate(SettingsPath.Objects);
+    }
   };
+
+  const handleDelete = () => {
+    openModal(DELETE_OBJECT_MODAL_ID);
+  };
+
+  const confirmDelete = async () => {
+    setIsDeleting(true);
+    const result = await deleteOneObjectMetadataItem(objectMetadataItem.id);
+
+    if (result.status === 'successful') {
+      enqueueSuccessSnackBar({
+        message: t`Object deleted`,
+      });
+      closeModal(DELETE_OBJECT_MODAL_ID);
+      navigate(SettingsPath.Objects);
+      return;
+    }
+
+    setIsDeleting(false);
+    closeModal(DELETE_OBJECT_MODAL_ID);
+  };
+
+  const objectLabel = objectMetadataItem.labelPlural;
 
   return (
     <StyledContentContainer>
-      <StyledFormSection>
-        <H2Title
-          title={t`About`}
-          description={t`Name in both singular (e.g., 'Invoice') and plural (e.g., 'Invoices') forms.`}
-        />
-        <SettingsUpdateDataModelObjectAboutForm
-          objectMetadataItem={objectMetadataItem}
-        />
-      </StyledFormSection>
-      <StyledFormSection>
+      <StyledFormSectionContainer>
+        <Section>
+          <H2Title
+            title={t`About`}
+            description={t`Name in both singular (e.g., 'Invoice') and plural (e.g., 'Invoices') forms.`}
+          />
+          <SettingsUpdateDataModelObjectAboutForm
+            objectMetadataItem={objectMetadataItem}
+          />
+        </Section>
+      </StyledFormSectionContainer>
+      <StyledFormSectionContainer>
         <Section>
           <H2Title
             title={t`Options`}
@@ -58,18 +115,60 @@ export const ObjectSettings = ({ objectMetadataItem }: ObjectSettingsProps) => {
             objectMetadataItem={objectMetadataItem}
           />
         </Section>
-      </StyledFormSection>
-      <StyledFormSection>
-        <Section>
-          <H2Title title={t`Danger zone`} description={t`Deactivate object`} />
-          <Button
-            Icon={IconArchive}
-            title={t`Deactivate`}
-            size="small"
-            onClick={handleDisable}
-          />
-        </Section>
-      </StyledFormSection>
+      </StyledFormSectionContainer>
+      <AdvancedSettingsWrapper>
+        <StyledFormSectionContainer>
+          <Section>
+            <H2Title
+              title={t`Search`}
+              description={t`Configure how this object appears in search results`}
+            />
+            <SettingsObjectSearchSection
+              objectMetadataItem={objectMetadataItem}
+              isReadOnly={isReadOnly}
+            />
+          </Section>
+        </StyledFormSectionContainer>
+      </AdvancedSettingsWrapper>
+      {!isReadOnly && (
+        <StyledFormSectionContainer>
+          <Section>
+            <H2Title
+              title={t`Danger zone`}
+              description={t`Deactivate object`}
+            />
+            <StyledDangerButtonsContainer>
+              <Button
+                Icon={IconArchive}
+                title={t`Deactivate`}
+                size="small"
+                onClick={handleDisable}
+              />
+              {objectMetadataItem.isCustom && (
+                <Button
+                  Icon={IconTrash}
+                  title={t`Delete`}
+                  size="small"
+                  accent="danger"
+                  variant="secondary"
+                  onClick={handleDelete}
+                />
+              )}
+            </StyledDangerButtonsContainer>
+          </Section>
+        </StyledFormSectionContainer>
+      )}
+      <ConfirmationModal
+        modalInstanceId={DELETE_OBJECT_MODAL_ID}
+        title={t`Delete ${objectLabel} object?`}
+        subtitle={t`This will permanently delete the object and all its records. Type "yes" to confirm.`}
+        confirmButtonText={t`Delete`}
+        onConfirmClick={confirmDelete}
+        onClose={() => closeModal(DELETE_OBJECT_MODAL_ID)}
+        confirmationValue="yes"
+        confirmationPlaceholder="yes"
+        loading={isDeleting}
+      />
     </StyledContentContainer>
   );
 };

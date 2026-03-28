@@ -8,13 +8,13 @@ export const recordTableRowContextValue: RecordTableRowContextValue = {
   recordId: 'recordId',
   pathToShowPage: '/',
   objectNameSingular: 'objectNameSingular',
-  inView: true,
 };
 
-export const recordTableRowDraggableContextValue: RecordTableRowDraggableContextValue = {
-  dragHandleProps: {} as any,
-  isDragging: false,
-};
+export const recordTableRowDraggableContextValue: RecordTableRowDraggableContextValue =
+  {
+    dragHandleProps: {} as any,
+    isDragging: false,
+  };
 
 export const recordTableCellContextValue: RecordTableCellContextValue = {
   recordField: {

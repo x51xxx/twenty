@@ -1,54 +1,55 @@
+import { useEndRecordDrag } from '@/object-record/record-drag/hooks/useEndRecordDrag';
+import { useProcessTableWithGroupRecordDrop } from '@/object-record/record-drag/hooks/useProcessTableWithGroupRecordDrop';
+import { useStartRecordDrag } from '@/object-record/record-drag/hooks/useStartRecordDrag';
+import { useRecordIndexContextOrThrow } from '@/object-record/record-index/contexts/RecordIndexContext';
+import { useRecordTableContextOrThrow } from '@/object-record/record-table/contexts/RecordTableContext';
+import { selectedRowIdsComponentSelector } from '@/object-record/record-table/states/selectors/selectedRowIdsComponentSelector';
+import { useAtomComponentSelectorCallbackState } from '@/ui/utilities/state/jotai/hooks/useAtomComponentSelectorCallbackState';
+import { useStore } from 'jotai';
 import {
   DragDropContext,
   type DragStart,
   type DropResult,
 } from '@hello-pangea/dnd';
-import { type ReactNode } from 'react';
-import { useRecoilCallback } from 'recoil';
-
-import { useEndRecordDrag } from '@/object-record/record-drag/shared/hooks/useEndRecordDrag';
-import { useStartRecordDrag } from '@/object-record/record-drag/shared/hooks/useStartRecordDrag';
-import { useRecordTableGroupDragOperations } from '@/object-record/record-drag/table/hooks/useRecordTableGroupDragOperations';
-import { useRecordTableContextOrThrow } from '@/object-record/record-table/contexts/RecordTableContext';
-import { selectedRowIdsComponentSelector } from '@/object-record/record-table/states/selectors/selectedRowIdsComponentSelector';
-import { useRecoilComponentCallbackState } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentCallbackState';
-import { getSnapshotValue } from '@/ui/utilities/state/utils/getSnapshotValue';
+import { type ReactNode, useCallback } from 'react';
 
 export const RecordTableBodyRecordGroupDragDropContextProvider = ({
   children,
 }: {
   children: ReactNode;
 }) => {
+  const { recordIndexId } = useRecordIndexContextOrThrow();
   const { recordTableId } = useRecordTableContextOrThrow();
 
-  const selectedRowIdsSelector = useRecoilComponentCallbackState(
+  const selectedRowIds = useAtomComponentSelectorCallbackState(
     selectedRowIdsComponentSelector,
     recordTableId,
   );
 
-  const { startDrag } = useStartRecordDrag('table', recordTableId);
-  const { endDrag } = useEndRecordDrag('table', recordTableId);
-  const { processDragOperation } = useRecordTableGroupDragOperations();
+  const store = useStore();
 
-  const handleDragStart = useRecoilCallback(
-    ({ snapshot }) =>
-      (start: DragStart) => {
-        const currentSelectedRecordIds = getSnapshotValue(
-          snapshot,
-          selectedRowIdsSelector,
-        );
+  const { startRecordDrag } = useStartRecordDrag(recordIndexId);
+  const { endRecordDrag } = useEndRecordDrag(recordIndexId);
 
-        startDrag(start, currentSelectedRecordIds);
-      },
-    [selectedRowIdsSelector, startDrag],
+  const { processTableWithGroupRecordDrop } =
+    useProcessTableWithGroupRecordDrop();
+
+  const handleDragStart = useCallback(
+    (start: DragStart) => {
+      const currentSelectedRecordIds = store.get(selectedRowIds) as string[];
+
+      startRecordDrag(start, currentSelectedRecordIds);
+    },
+    [selectedRowIds, startRecordDrag, store],
   );
 
-  const handleDragEnd = useRecoilCallback(
-    () => (result: DropResult) => {
-      processDragOperation(result);
-      endDrag();
+  const handleDragEnd = useCallback(
+    (result: DropResult) => {
+      processTableWithGroupRecordDrop(result);
+
+      endRecordDrag();
     },
-    [endDrag, processDragOperation],
+    [endRecordDrag, processTableWithGroupRecordDrop],
   );
 
   return (

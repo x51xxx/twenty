@@ -1,4 +1,4 @@
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import { AdvancedSettingsWrapper } from '@/settings/components/AdvancedSettingsWrapper';
 import { SettingsOptionCardContentToggle } from '@/settings/components/SettingsOptions/SettingsOptionCardContentToggle';
 import { OBJECT_NAME_MAXIMUM_LENGTH } from '@/settings/data-model/constants/ObjectNameMaximumLength';
@@ -6,32 +6,38 @@ import { type SettingsDataModelObjectAboutFormValues } from '@/settings/data-mod
 import { IconPicker } from '@/ui/input/components/IconPicker';
 import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
 import { TextArea } from '@/ui/input/components/TextArea';
-import { useTheme } from '@emotion/react';
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
+import { useContext } from 'react';
 import { useLingui } from '@lingui/react/macro';
 import { plural } from 'pluralize';
 import { Controller, useFormContext } from 'react-hook-form';
+import { SettingsPath } from 'twenty-shared/types';
 import { capitalize, isDefined } from 'twenty-shared/utils';
 import {
   AppTooltip,
   IconInfoCircle,
+  IconLink,
   IconRefresh,
   TooltipDelay,
 } from 'twenty-ui/display';
+import { Button } from 'twenty-ui/input';
 import { Card } from 'twenty-ui/layout';
+import { ThemeContext, themeCssVariables } from 'twenty-ui/theme-constants';
 import { type StringKeyOf } from 'type-fest';
-import { computeMetadataNameFromLabel } from '~/pages/settings/data-model/utils/compute-metadata-name-from-label.utils';
+import { useNavigateSettings } from '~/hooks/useNavigateSettings';
+import { computeMetadataNamesFromLabels } from '~/pages/settings/data-model/utils/computeMetadataNamesFromLabels';
 
 type SettingsDataModelObjectAboutFormProps = {
   disableEdition?: boolean;
-  objectMetadataItem?: ObjectMetadataItem;
+  objectMetadataItem?: EnrichedObjectMetadataItem;
   onNewDirtyField?: () => void;
+  conflictingObjectMetadataItem?: EnrichedObjectMetadataItem;
 };
 
 const StyledInputsContainer = styled.div`
   display: flex;
-  gap: ${({ theme }) => theme.spacing(2)};
-  margin-bottom: ${({ theme }) => theme.spacing(2)};
+  gap: ${themeCssVariables.spacing[2]};
+  margin-bottom: ${themeCssVariables.spacing[2]};
   width: 100%;
 `;
 
@@ -42,28 +48,64 @@ const StyledInputContainer = styled.div`
 
 const StyledAdvancedSettingsSectionInputWrapper = styled.div`
   display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.spacing(4)};
-  width: 100%;
   flex: 1;
+  flex-direction: column;
+  gap: ${themeCssVariables.spacing[4]};
+  width: 100%;
 `;
 
 const StyledAdvancedSettingsOuterContainer = styled.div`
-  padding-top: ${({ theme }) => theme.spacing(4)};
+  padding-top: ${themeCssVariables.spacing[4]};
 `;
 
 const StyledAdvancedSettingsContainer = styled.div`
   display: flex;
-  gap: ${({ theme }) => theme.spacing(2)};
+  gap: ${themeCssVariables.spacing[2]};
   position: relative;
   width: 100%;
 `;
 
 const StyledLabel = styled.span`
-  color: ${({ theme }) => theme.font.color.light};
-  font-size: ${({ theme }) => theme.font.size.xs};
-  font-weight: ${({ theme }) => theme.font.weight.semiBold};
-  margin-bottom: ${({ theme }) => theme.spacing(1)};
+  color: ${themeCssVariables.font.color.light};
+  font-size: ${themeCssVariables.font.size.xs};
+  font-weight: ${themeCssVariables.font.weight.semiBold};
+  margin-bottom: ${themeCssVariables.spacing[1]};
+`;
+
+const StyledConflictBanner = styled.div`
+  align-items: center;
+  background-color: ${themeCssVariables.accent.secondary};
+  border-radius: ${themeCssVariables.border.radius.md};
+  box-sizing: border-box;
+  display: flex;
+  gap: ${themeCssVariables.spacing[2]};
+  margin-bottom: ${themeCssVariables.spacing[2]};
+  padding: ${themeCssVariables.spacing[2]};
+`;
+
+const StyledBannerContent = styled.div`
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: ${themeCssVariables.spacing[2]};
+`;
+
+const StyledBannerText = styled.span`
+  color: ${themeCssVariables.color.blue};
+  flex: 1;
+`;
+
+const StyledConflictButtonContainer = styled.div`
+  > button {
+    border-color: ${themeCssVariables.color.blue};
+    color: ${themeCssVariables.color.blue};
+    &:hover {
+      background: ${themeCssVariables.accent.secondary};
+    }
+    &:focus-visible {
+      box-shadow: 0 0 0 3px ${themeCssVariables.accent.tertiary};
+    }
+  }
 `;
 
 const infoCircleElementId = 'info-circle-id';
@@ -72,17 +114,19 @@ export const SettingsDataModelObjectAboutForm = ({
   disableEdition = false,
   onNewDirtyField,
   objectMetadataItem,
+  conflictingObjectMetadataItem,
 }: SettingsDataModelObjectAboutFormProps) => {
+  const { theme } = useContext(ThemeContext);
   const { control, watch, setValue } =
     useFormContext<SettingsDataModelObjectAboutFormValues>();
   const { t } = useLingui();
-  const theme = useTheme();
+  const navigateSettings = useNavigateSettings();
 
   const isLabelSyncedWithName = watch('isLabelSyncedWithName');
   const labelSingular = watch('labelSingular');
   const labelPlural = watch('labelPlural');
-  watch('nameSingular');
-  watch('namePlural');
+  const isStandardObject =
+    isDefined(objectMetadataItem?.isCustom) && !objectMetadataItem.isCustom;
   watch('description');
   watch('icon');
 
@@ -99,27 +143,29 @@ export const SettingsDataModelObjectAboutForm = ({
     const labelPluralFromSingularLabel = plural(labelSingular);
     setValue('labelPlural', labelPluralFromSingularLabel, {
       shouldDirty: true,
+      shouldValidate: true,
     });
     if (isLabelSyncedWithName) {
-      fillNamePluralFromLabelPlural(labelPluralFromSingularLabel);
+      fillNamesFromLabels(labelSingular, labelPluralFromSingularLabel);
     }
   };
 
-  const fillNameSingularFromLabelSingular = (
-    labelSingular: string | undefined,
+  const fillNamesFromLabels = (
+    currentLabelSingular: string,
+    currentLabelPlural: string,
   ) => {
-    if (!isDefined(labelSingular)) return;
+    const { nameSingular, namePlural } = computeMetadataNamesFromLabels(
+      currentLabelSingular,
+      currentLabelPlural,
+    );
 
-    setValue('nameSingular', computeMetadataNameFromLabel(labelSingular), {
+    setValue('nameSingular', nameSingular, {
       shouldDirty: true,
+      shouldValidate: true,
     });
-  };
-
-  const fillNamePluralFromLabelPlural = (labelPlural: string | undefined) => {
-    if (!isDefined(labelPlural)) return;
-
-    setValue('namePlural', computeMetadataNameFromLabel(labelPlural), {
+    setValue('namePlural', namePlural, {
       shouldDirty: true,
+      shouldValidate: true,
     });
   };
 
@@ -139,7 +185,11 @@ export const SettingsDataModelObjectAboutForm = ({
             render={({ field: { onChange, value } }) => (
               <IconPicker
                 selectedIconKey={value}
+                disabled={disableEdition}
                 onChange={({ iconKey }) => {
+                  if (disableEdition) {
+                    return;
+                  }
                   onChange(iconKey);
                   onNewDirtyField?.();
                 }}
@@ -149,7 +199,7 @@ export const SettingsDataModelObjectAboutForm = ({
         </StyledInputContainer>
         <Controller
           key={`object-labelSingular-text-input`}
-          name={'labelSingular'}
+          name="labelSingular"
           control={control}
           defaultValue={objectMetadataItem?.labelSingular ?? ''}
           render={({ field: { onChange, value }, formState: { errors } }) => (
@@ -159,21 +209,14 @@ export const SettingsDataModelObjectAboutForm = ({
               noErrorHelper={true}
               error={errors.labelSingular?.message}
               label={t`Singular`}
-              placeholder={'Listing'}
+              placeholder={t`Listing`}
               value={value}
               onChange={(value) => {
                 onChange(capitalize(value));
                 fillLabelPlural(capitalize(value));
-                if (isLabelSyncedWithName === true) {
-                  fillNameSingularFromLabelSingular(value);
-                }
               }}
               onBlur={() => onNewDirtyField?.()}
-              disabled={
-                objectMetadataItem &&
-                !objectMetadataItem?.isCustom &&
-                isLabelSyncedWithName
-              }
+              disabled={disableEdition}
               fullWidth
               maxLength={OBJECT_NAME_MAXIMUM_LENGTH}
             />
@@ -181,7 +224,7 @@ export const SettingsDataModelObjectAboutForm = ({
         />
         <Controller
           key={`object-labelPlural-text-input`}
-          name={'labelPlural'}
+          name="labelPlural"
           control={control}
           defaultValue={objectMetadataItem?.labelPlural ?? ''}
           render={({ field: { onChange, value }, formState: { errors } }) => (
@@ -196,15 +239,11 @@ export const SettingsDataModelObjectAboutForm = ({
               onChange={(value) => {
                 onChange(capitalize(value));
                 if (isLabelSyncedWithName === true) {
-                  fillNamePluralFromLabelPlural(value);
+                  fillNamesFromLabels(labelSingular, capitalize(value));
                 }
               }}
               onBlur={() => onNewDirtyField?.()}
-              disabled={
-                objectMetadataItem &&
-                !objectMetadataItem?.isCustom &&
-                isLabelSyncedWithName
-              }
+              disabled={disableEdition}
               fullWidth
               maxLength={OBJECT_NAME_MAXIMUM_LENGTH}
             />
@@ -222,29 +261,59 @@ export const SettingsDataModelObjectAboutForm = ({
             value={value ?? undefined}
             onChange={(nextValue) => onChange(nextValue ?? null)}
             onBlur={() => onNewDirtyField?.()}
+            disabled={disableEdition}
           />
         )}
       />
       <StyledAdvancedSettingsOuterContainer>
         <StyledAdvancedSettingsContainer>
           <StyledAdvancedSettingsSectionInputWrapper>
+            {isDefined(conflictingObjectMetadataItem) && (
+              <StyledConflictBanner>
+                <StyledBannerContent>
+                  <IconInfoCircle
+                    color={theme.color.blue}
+                    size={theme.icon.size.md}
+                  />
+                  <StyledBannerText>
+                    {t`An object with this name already exists`}
+                  </StyledBannerText>
+                </StyledBannerContent>
+                <StyledConflictButtonContainer>
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    accent="blue"
+                    title={t`Open`}
+                    onClick={() =>
+                      navigateSettings(SettingsPath.ObjectDetail, {
+                        objectNamePlural:
+                          conflictingObjectMetadataItem.namePlural,
+                      })
+                    }
+                  />
+                </StyledConflictButtonContainer>
+              </StyledConflictBanner>
+            )}
             {[
               {
                 label: t`API Name (Singular)`,
                 fieldName:
-                  'nameSingular' as const satisfies StringKeyOf<ObjectMetadataItem>,
+                  'nameSingular' as const satisfies StringKeyOf<EnrichedObjectMetadataItem>,
                 placeholder: `listing`,
                 defaultValue: objectMetadataItem?.nameSingular ?? '',
-                disableEdition: disableEdition || isLabelSyncedWithName,
+                disableEdition:
+                  isStandardObject || disableEdition || isLabelSyncedWithName,
                 tooltip: apiNameTooltipText,
               },
               {
                 label: t`API Name (Plural)`,
                 fieldName:
-                  'namePlural' as const satisfies StringKeyOf<ObjectMetadataItem>,
+                  'namePlural' as const satisfies StringKeyOf<EnrichedObjectMetadataItem>,
                 placeholder: `listings`,
                 defaultValue: objectMetadataItem?.namePlural ?? '',
-                disableEdition: disableEdition || isLabelSyncedWithName,
+                disableEdition:
+                  isStandardObject || disableEdition || isLabelSyncedWithName,
                 tooltip: apiNameTooltipText,
               },
             ].map(
@@ -312,7 +381,7 @@ export const SettingsDataModelObjectAboutForm = ({
                 </AdvancedSettingsWrapper>
               ),
             )}
-            {(!objectMetadataItem || objectMetadataItem?.isCustom) && (
+            {!isStandardObject && (
               <AdvancedSettingsWrapper>
                 <Controller
                   name="isLabelSyncedWithName"
@@ -326,6 +395,7 @@ export const SettingsDataModelObjectAboutForm = ({
                         description={t`Should changing an object's label also change the API?`}
                         checked={value ?? true}
                         advancedMode
+                        disabled={disableEdition}
                         onChange={(value) => {
                           onChange(value);
                           const isCustomObject =
@@ -337,9 +407,33 @@ export const SettingsDataModelObjectAboutForm = ({
                             value === true &&
                             (isCustomObject || isbeingCreatedObject)
                           ) {
-                            fillNamePluralFromLabelPlural(labelPlural);
-                            fillNameSingularFromLabelSingular(labelSingular);
+                            fillNamesFromLabels(labelSingular, labelPlural);
                           }
+                          onNewDirtyField?.();
+                        }}
+                      />
+                    </Card>
+                  )}
+                />
+              </AdvancedSettingsWrapper>
+            )}
+            {!isDefined(objectMetadataItem) && (
+              <AdvancedSettingsWrapper>
+                <Controller
+                  name="skipNameField"
+                  control={control}
+                  defaultValue={false}
+                  render={({ field: { onChange, value } }) => (
+                    <Card rounded>
+                      <SettingsOptionCardContentToggle
+                        Icon={IconLink}
+                        title={t`Skip creating a Name field `}
+                        description={t`Useful for pivot/junction tables`}
+                        checked={value ?? false}
+                        advancedMode
+                        disabled={disableEdition}
+                        onChange={(value) => {
+                          onChange(value);
                           onNewDirtyField?.();
                         }}
                       />

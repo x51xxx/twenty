@@ -1,4 +1,4 @@
-import { type Meta } from '@storybook/react';
+import { type Meta } from '@storybook/react-vite';
 
 import { mockRsiValues } from '@/spreadsheet-import/__mocks__/mockRsiValues';
 import { ReactSpreadsheetImportContextProvider } from '@/spreadsheet-import/components/ReactSpreadsheetImportContextProvider';
@@ -7,8 +7,8 @@ import { SelectSheetStep } from '@/spreadsheet-import/steps/components/SelectShe
 import { SpreadsheetImportStepType } from '@/spreadsheet-import/steps/types/SpreadsheetImportStepType';
 import { DialogComponentInstanceContext } from '@/ui/feedback/dialog-manager/contexts/DialogComponentInstanceContext';
 import { isModalOpenedComponentState } from '@/ui/layout/modal/states/isModalOpenedComponentState';
-import { RecoilRoot } from 'recoil';
-import { I18nFrontDecorator } from '~/testing/decorators/I18nFrontDecorator';
+import { jotaiStore } from '@/ui/utilities/state/jotai/jotaiStore';
+import { Provider as JotaiProvider } from 'jotai';
 
 const meta: Meta<typeof SelectSheetStep> = {
   title: 'Modules/SpreadsheetImport/SelectSheetStep',
@@ -17,21 +17,19 @@ const meta: Meta<typeof SelectSheetStep> = {
     layout: 'fullscreen',
   },
   decorators: [
-    (Story) => (
-      <RecoilRoot
-        initializeState={({ set }) => {
-          set(
-            isModalOpenedComponentState.atomFamily({
-              instanceId: 'select-sheet-step',
-            }),
-            true,
-          );
-        }}
-      >
-        <Story />
-      </RecoilRoot>
-    ),
-    I18nFrontDecorator,
+    (Story) => {
+      jotaiStore.set(
+        isModalOpenedComponentState.atomFamily({
+          instanceId: 'select-sheet-step',
+        }),
+        true,
+      );
+      return (
+        <JotaiProvider store={jotaiStore}>
+          <Story />
+        </JotaiProvider>
+      );
+    },
   ],
 };
 
@@ -45,7 +43,7 @@ export const Default = () => (
   >
     <ReactSpreadsheetImportContextProvider values={mockRsiValues}>
       <SpreadSheetImportModalWrapper
-        modalId="select-sheet-step"
+        modalInstanceId="select-sheet-step"
         onClose={() => null}
       >
         <SelectSheetStep

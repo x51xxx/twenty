@@ -5,22 +5,24 @@ import {
   Headers,
   Logger,
   Post,
-  RawBodyRequest,
+  type RawBodyRequest,
   Req,
   Res,
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
 
-import { Response } from 'express';
+import { type Response } from 'express';
 import Stripe from 'stripe';
 
 import { BillingWebhookAlertService } from 'src/engine/core-modules/billing-webhook/services/billing-webhook-alert.service';
+import { BillingWebhookCreditGrantService } from 'src/engine/core-modules/billing-webhook/services/billing-webhook-credit-grant.service';
 import { BillingWebhookCustomerService } from 'src/engine/core-modules/billing-webhook/services/billing-webhook-customer.service';
 import { BillingWebhookEntitlementService } from 'src/engine/core-modules/billing-webhook/services/billing-webhook-entitlement.service';
 import { BillingWebhookInvoiceService } from 'src/engine/core-modules/billing-webhook/services/billing-webhook-invoice.service';
 import { BillingWebhookPriceService } from 'src/engine/core-modules/billing-webhook/services/billing-webhook-price.service';
 import { BillingWebhookProductService } from 'src/engine/core-modules/billing-webhook/services/billing-webhook-product.service';
+import { BillingWebhookSubscriptionScheduleService } from 'src/engine/core-modules/billing-webhook/services/billing-webhook-subscription-schedule.service';
 import { BillingWebhookSubscriptionService } from 'src/engine/core-modules/billing-webhook/services/billing-webhook-subscription.service';
 import {
   BillingException,
@@ -30,6 +32,7 @@ import { BillingWebhookEvent } from 'src/engine/core-modules/billing/enums/billi
 import { BillingRestApiExceptionFilter } from 'src/engine/core-modules/billing/filters/billing-api-exception.filter';
 import { BillingSubscriptionService } from 'src/engine/core-modules/billing/services/billing-subscription.service';
 import { StripeWebhookService } from 'src/engine/core-modules/billing/stripe/services/stripe-webhook.service';
+import { NoPermissionGuard } from 'src/engine/guards/no-permission.guard';
 import { PublicEndpointGuard } from 'src/engine/guards/public-endpoint.guard';
 
 @Controller()
@@ -47,10 +50,12 @@ export class BillingWebhookController {
     private readonly billingWebhookAlertService: BillingWebhookAlertService,
     private readonly billingWebhookInvoiceService: BillingWebhookInvoiceService,
     private readonly billingWebhookCustomerService: BillingWebhookCustomerService,
+    private readonly billingWebhookSubscriptionScheduleService: BillingWebhookSubscriptionScheduleService,
+    private readonly billingWebhookCreditGrantService: BillingWebhookCreditGrantService,
   ) {}
 
   @Post(['webhooks/stripe'])
-  @UseGuards(PublicEndpointGuard)
+  @UseGuards(PublicEndpointGuard, NoPermissionGuard)
   async handleWebhooks(
     @Headers('stripe-signature') signature: string,
     @Req() req: RawBodyRequest<Request>,
@@ -100,6 +105,11 @@ export class BillingWebhookController {
           event.data,
         );
 
+      case BillingWebhookEvent.SUBSCRIPTION_SCHEDULE_UPDATED:
+        return await this.billingWebhookSubscriptionScheduleService.processStripeEvent(
+          event.data,
+        );
+
       case BillingWebhookEvent.PRODUCT_UPDATED:
       case BillingWebhookEvent.PRODUCT_CREATED:
         return await this.billingWebhookProductService.processStripeEvent(
@@ -116,8 +126,9 @@ export class BillingWebhookController {
         );
 
       case BillingWebhookEvent.INVOICE_FINALIZED:
+      case BillingWebhookEvent.INVOICE_PAID:
         return await this.billingWebhookInvoiceService.processStripeEvent(
-          event.data,
+          event,
         );
 
       case BillingWebhookEvent.CUSTOMER_CREATED:
@@ -142,6 +153,26 @@ export class BillingWebhookController {
           event,
         );
       }
+
+      case BillingWebhookEvent.CREDIT_GRANT_CREATED:
+      case BillingWebhookEvent.CREDIT_GRANT_UPDATED: {
+        const customer = event.data.object.customer;
+        // customer can be string ID, Customer object, or DeletedCustomer object
+        const stripeCustomerId =
+          typeof customer === 'string' ? customer : customer?.id;
+
+        if (!stripeCustomerId) {
+          throw new BillingException(
+            'Customer ID is required for credit grant events',
+            BillingExceptionCode.BILLING_CUSTOMER_EVENT_WORKSPACE_NOT_FOUND,
+          );
+        }
+
+        return await this.billingWebhookCreditGrantService.processStripeEvent(
+          stripeCustomerId,
+        );
+      }
+
       default:
         return {};
     }

@@ -4,10 +4,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 
-import {
-  type FileTokenJwtPayload,
-  JwtTokenTypeEnum,
-} from 'src/engine/core-modules/auth/types/auth-context.type';
+import { FileTokenJwtPayloadLegacy } from 'src/engine/core-modules/auth/types/auth-context.type';
 import { extractFileInfoFromRequest } from 'src/engine/core-modules/file/utils/extract-file-info-from-request.utils';
 import { JwtWrapperService } from 'src/engine/core-modules/jwt/services/jwt-wrapper.service';
 
@@ -28,7 +25,6 @@ export class FilePathGuard implements CanActivate {
     try {
       const payload = await this.jwtWrapperService.verifyJwtToken(
         fileSignature,
-        JwtTokenTypeEnum.FILE,
         ignoreExpirationToken ? { ignoreExpiration: true } : {},
       );
 
@@ -43,12 +39,10 @@ export class FilePathGuard implements CanActivate {
       return false;
     }
 
-    const decodedPayload = this.jwtWrapperService.decode<FileTokenJwtPayload>(
-      fileSignature,
-      {
+    const decodedPayload =
+      this.jwtWrapperService.decode<FileTokenJwtPayloadLegacy>(fileSignature, {
         json: true,
-      },
-    );
+      });
 
     request.workspaceId = decodedPayload.workspaceId;
 

@@ -1,4 +1,8 @@
-import { OrderByDirection } from 'src/engine/api/graphql/workspace-query-builder/interfaces/object-record.interface';
+import {
+  QUERY_DEFAULT_LIMIT_RECORDS,
+  QUERY_MAX_RECORDS,
+} from 'twenty-shared/constants';
+import { OrderByDirection } from 'twenty-shared/types';
 
 import {
   computeDepthParameters,
@@ -21,8 +25,8 @@ describe('computeParameters', () => {
         schema: {
           type: 'integer',
           minimum: 0,
-          maximum: 60,
-          default: 60,
+          maximum: QUERY_MAX_RECORDS,
+          default: QUERY_DEFAULT_LIMIT_RECORDS,
         },
       });
     });
@@ -56,14 +60,13 @@ describe('computeParameters', () => {
       expect(computeDepthParameters()).toEqual({
         name: 'depth',
         in: 'query',
-        description: `Determines the level of nested related objects to include in the response.  
-    - 0: Primary object only  
-    - 1: Primary object + direct relations  
-    - 2: Primary object + direct relations + nested relations`,
+        description: `Determines the level of nested related objects to include in the response.
+    - 0: Primary object only
+    - 1: Primary object + direct relations`,
         required: false,
         schema: {
           type: 'integer',
-          enum: [0, 1, 2],
+          enum: [0, 1],
           default: 1,
         },
       });
@@ -74,7 +77,8 @@ describe('computeParameters', () => {
       expect(computeFilterParameters()).toEqual({
         name: 'filter',
         in: 'query',
-        description: `Format: field[COMPARATOR]:value,field2[COMPARATOR]:value2  
+        description: `Format: field[COMPARATOR]:value,field2[COMPARATOR]:value2.
+    For like/ilike, use % as a wildcard (e.g. %value% for substring match).
     Refer to the filter section at the top of the page for more details.`,
         required: false,
         schema: {
@@ -93,6 +97,10 @@ describe('computeParameters', () => {
             value:
               'or(createdAt[gte]:"2024-01-01",createdAt[lte]:"2023-01-01",not(id[is]:NULL))',
             description: 'A more complex filter param',
+          },
+          like: {
+            value: 'name[like]:"%value%"',
+            description: 'Pattern matching',
           },
         },
       });

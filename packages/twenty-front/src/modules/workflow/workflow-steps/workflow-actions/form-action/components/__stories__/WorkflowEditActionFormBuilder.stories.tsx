@@ -1,11 +1,12 @@
 import { type WorkflowFormAction } from '@/workflow/types/Workflow';
 import { WorkflowEditActionFormBuilder } from '@/workflow/workflow-steps/workflow-actions/form-action/components/WorkflowEditActionFormBuilder';
-import { type Meta, type StoryObj } from '@storybook/react';
-import { expect, fn, userEvent, waitFor, within } from '@storybook/test';
+import { type Meta, type StoryObj } from '@storybook/react-vite';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { FieldMetadataType } from 'twenty-shared/types';
 import { ComponentDecorator, RouterDecorator } from 'twenty-ui/testing';
-import { I18nFrontDecorator } from '~/testing/decorators/I18nFrontDecorator';
+import { ObjectMetadataItemsDecorator } from '~/testing/decorators/ObjectMetadataItemsDecorator';
 import { WorkflowStepActionDrawerDecorator } from '~/testing/decorators/WorkflowStepActionDrawerDecorator';
+import { WorkflowStepDecorator } from '~/testing/decorators/WorkflowStepDecorator';
 import { graphqlMocks } from '~/testing/graphqlMocks';
 import { getWorkflowNodeIdMock } from '~/testing/mock-data/workflow';
 
@@ -56,9 +57,10 @@ const meta: Meta<typeof WorkflowEditActionFormBuilder> = {
   },
   decorators: [
     WorkflowStepActionDrawerDecorator,
+    WorkflowStepDecorator,
     ComponentDecorator,
     RouterDecorator,
-    I18nFrontDecorator,
+    ObjectMetadataItemsDecorator,
   ],
 };
 
@@ -155,15 +157,6 @@ export const DisabledWithEmptyValues: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    const titleText = await canvas.findByText('Form');
-
-    expect(window.getComputedStyle(titleText).cursor).toBe('default');
-
-    await userEvent.click(titleText);
-
-    const titleInput = canvas.queryByDisplayValue('Form');
-    expect(titleInput).not.toBeInTheDocument();
-
     await canvas.findByText('Company');
 
     const addFieldButton = canvas.queryByText('Add Field');
@@ -186,9 +179,7 @@ export const EmptyForm: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const messageContainer = await canvas.findByTestId(
-      'empty-form-message-title',
-    );
+    const messageContainer = await canvas.findByText('Add inputs to your form');
 
     expect(messageContainer).toBeVisible();
 

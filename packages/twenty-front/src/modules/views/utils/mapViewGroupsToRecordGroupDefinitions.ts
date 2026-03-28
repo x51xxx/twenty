@@ -1,27 +1,29 @@
-import { type ObjectMetadataItem } from '@/object-metadata/types/ObjectMetadataItem';
+import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
 import {
   type RecordGroupDefinition,
   RecordGroupDefinitionType,
 } from '@/object-record/record-group/types/RecordGroupDefinition';
 import { type ViewGroup } from '@/views/types/ViewGroup';
-import { FieldMetadataType } from '~/generated-metadata/graphql';
 import { isDefined } from 'twenty-shared/utils';
+import { FieldMetadataType } from '~/generated-metadata/graphql';
 
 export const mapViewGroupsToRecordGroupDefinitions = ({
+  mainGroupByFieldMetadataId,
   objectMetadataItem,
   viewGroups,
 }: {
-  objectMetadataItem: ObjectMetadataItem;
+  mainGroupByFieldMetadataId: string;
+  objectMetadataItem: EnrichedObjectMetadataItem;
   viewGroups: ViewGroup[];
 }): RecordGroupDefinition[] => {
   if (viewGroups?.length === 0) {
     return [];
   }
 
-  const fieldMetadataId = viewGroups?.[0]?.fieldMetadataId;
   const selectFieldMetadataItem = objectMetadataItem.fields.find(
     (field) =>
-      field.id === fieldMetadataId && field.type === FieldMetadataType.SELECT,
+      field.id === mainGroupByFieldMetadataId &&
+      field.type === FieldMetadataType.SELECT,
   );
 
   if (!selectFieldMetadataItem) {
@@ -40,13 +42,20 @@ export const mapViewGroupsToRecordGroupDefinitions = ({
         (option) => option.value === viewGroup.fieldValue,
       );
 
+      if (
+        !selectedOption &&
+        isDefined(viewGroup.fieldValue) &&
+        viewGroup.fieldValue !== ''
+      ) {
+        return null;
+      }
+
       if (!selectedOption && selectFieldMetadataItem.isNullable === false) {
         return null;
       }
 
       return {
         id: viewGroup.id,
-        fieldMetadataId: viewGroup.fieldMetadataId,
         type: !isDefined(selectedOption)
           ? RecordGroupDefinitionType.NoValue
           : RecordGroupDefinitionType.Value,

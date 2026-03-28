@@ -2,10 +2,13 @@ import { RECORD_INDEX_REMOVE_SORTING_MODAL_ID } from '@/object-record/record-ind
 import { useRemoveRecordSort } from '@/object-record/record-sort/hooks/useRemoveRecordSort';
 import { currentRecordSortsComponentState } from '@/object-record/record-sort/states/currentRecordSortsComponentState';
 import { ConfirmationModal } from '@/ui/layout/modal/components/ConfirmationModal';
-import { useRecoilComponentValue } from '@/ui/utilities/state/component-state/hooks/useRecoilComponentValue';
+import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+import { useLingui } from '@lingui/react/macro';
 
 export const RecordIndexRemoveSortingModal = () => {
-  const currentRecordSorts = useRecoilComponentValue(
+  const { t } = useLingui();
+
+  const currentRecordSorts = useAtomComponentStateValue(
     currentRecordSortsComponentState,
   );
 
@@ -23,11 +26,11 @@ export const RecordIndexRemoveSortingModal = () => {
 
   return (
     <ConfirmationModal
-      modalId={RECORD_INDEX_REMOVE_SORTING_MODAL_ID}
-      title={'Remove sorting?'}
-      subtitle={'This is required to enable manual row reordering.'}
+      modalInstanceId={RECORD_INDEX_REMOVE_SORTING_MODAL_ID}
+      title={t`Remove sorting?`}
+      subtitle={t`This is required to enable manual row reordering.`}
       onConfirmClick={handleRemoveClick}
-      confirmButtonText={'Remove Sorting'}
+      confirmButtonText={t`Remove Sorting`}
     />
   );
 };

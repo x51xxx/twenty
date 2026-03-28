@@ -1,5 +1,11 @@
+import { randomBytes } from 'crypto';
+
+import { type FieldMetadataType } from 'twenty-shared/types';
+import { isDefined } from 'twenty-shared/utils';
 import { type ObjectLiteral } from 'typeorm';
 
+import { findPostgresDefaultNullEquivalentValue } from 'src/engine/api/common/common-args-processors/data-arg-processor/utils/find-postgres-default-null-equivalent-value.util';
+import { STANDARD_ERROR_MESSAGE } from 'src/engine/api/common/common-query-runners/errors/standard-error-message.constant';
 import {
   GraphqlQueryRunnerException,
   GraphqlQueryRunnerExceptionCode,
@@ -15,120 +21,144 @@ export const computeWhereConditionParts = ({
   operator,
   objectNameSingular,
   key,
+  subFieldKey,
   value,
+  fieldMetadataType,
+  useDirectTableReference = false,
 }: {
   operator: string;
   objectNameSingular: string;
   key: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  subFieldKey?: string;
+  // oxlint-disable-next-line @typescripttypescript/no-explicit-any
   value: any;
+  fieldMetadataType: FieldMetadataType;
+  useDirectTableReference?: boolean;
 }): WhereConditionParts => {
-  const uuid = Math.random().toString(36).slice(2, 7);
+  const paramSuffix = randomBytes(5).toString('hex');
+
+  const secondParamSuffix = randomBytes(5).toString('hex');
+
+  const fieldReference = useDirectTableReference
+    ? `"${key}"`
+    : `"${objectNameSingular}"."${key}"`;
+
+  //TODO : Remove filter null equivalence injection once feature flag removed + null equivalence transformation added in ORM
+  const nullEquivalentFieldValue = findPostgresDefaultNullEquivalentValue(
+    value,
+    fieldMetadataType,
+    subFieldKey,
+  );
+
+  const hasNullEquivalentFieldValue = isDefined(nullEquivalentFieldValue);
 
   switch (operator) {
     case 'isEmptyArray':
       return {
-        sql: `"${objectNameSingular}"."${key}" = '{}'`,
+        sql: `${fieldReference} = '{}'${hasNullEquivalentFieldValue ? ` OR ${fieldReference} IS NULL` : ''}`,
         params: {},
       };
     case 'eq':
       return {
-        sql: `"${objectNameSingular}"."${key}" = :${key}${uuid}`,
-        params: { [`${key}${uuid}`]: value },
+        sql: `${fieldReference} = :${key}${paramSuffix}${hasNullEquivalentFieldValue ? ` OR ${fieldReference} IS NULL` : ''}`,
+        params: { [`${key}${paramSuffix}`]: value },
       };
     case 'neq':
       return {
-        sql: `"${objectNameSingular}"."${key}" != :${key}${uuid}`,
-        params: { [`${key}${uuid}`]: value },
+        sql: `${fieldReference} != :${key}${paramSuffix}${hasNullEquivalentFieldValue ? ` OR ${fieldReference} IS NOT NULL` : ''}`,
+        params: { [`${key}${paramSuffix}`]: value },
       };
     case 'gt':
       return {
-        sql: `"${objectNameSingular}"."${key}" > :${key}${uuid}`,
-        params: { [`${key}${uuid}`]: value },
+        sql: `${fieldReference} > :${key}${paramSuffix}`,
+        params: { [`${key}${paramSuffix}`]: value },
       };
     case 'gte':
       return {
-        sql: `"${objectNameSingular}"."${key}" >= :${key}${uuid}`,
-        params: { [`${key}${uuid}`]: value },
+        sql: `${fieldReference} >= :${key}${paramSuffix}`,
+        params: { [`${key}${paramSuffix}`]: value },
       };
     case 'lt':
       return {
-        sql: `"${objectNameSingular}"."${key}" < :${key}${uuid}`,
-        params: { [`${key}${uuid}`]: value },
+        sql: `${fieldReference} < :${key}${paramSuffix}`,
+        params: { [`${key}${paramSuffix}`]: value },
       };
     case 'lte':
       return {
-        sql: `"${objectNameSingular}"."${key}" <= :${key}${uuid}`,
-        params: { [`${key}${uuid}`]: value },
+        sql: `${fieldReference} <= :${key}${paramSuffix}`,
+        params: { [`${key}${paramSuffix}`]: value },
       };
     case 'in':
       return {
-        sql: `"${objectNameSingular}"."${key}" IN (:...${key}${uuid})`,
-        params: { [`${key}${uuid}`]: value },
+        sql: `${fieldReference} IN (:...${key}${paramSuffix})`,
+        params: { [`${key}${paramSuffix}`]: value },
       };
     case 'is':
       return {
-        sql: `"${objectNameSingular}"."${key}" IS ${value === 'NULL' ? 'NULL' : 'NOT NULL'}`,
-        params: {},
+        sql: `${fieldReference} IS ${value === 'NULL' ? 'NULL' : 'NOT NULL'}${hasNullEquivalentFieldValue ? ` OR ${fieldReference} = :${key}${secondParamSuffix}` : ''}`,
+        params: hasNullEquivalentFieldValue
+          ? { [`${key}${secondParamSuffix}`]: nullEquivalentFieldValue }
+          : {},
       };
     case 'like':
       return {
-        sql: `"${objectNameSingular}"."${key}"::text LIKE :${key}${uuid}`,
-        params: { [`${key}${uuid}`]: `${value}` },
+        sql: `${fieldReference}::text LIKE :${key}${paramSuffix}${hasNullEquivalentFieldValue ? ` OR ${fieldReference} IS NULL` : ''}`,
+        params: { [`${key}${paramSuffix}`]: `${value}` },
       };
     case 'ilike':
       return {
-        sql: `"${objectNameSingular}"."${key}"::text ILIKE :${key}${uuid}`,
-        params: { [`${key}${uuid}`]: `${value}` },
+        sql: `${fieldReference}::text ILIKE :${key}${paramSuffix}${hasNullEquivalentFieldValue ? ` OR ${fieldReference} IS NULL` : ''}`,
+        params: { [`${key}${paramSuffix}`]: `${value}` },
       };
     case 'startsWith':
       return {
-        sql: `"${objectNameSingular}"."${key}"::text LIKE :${key}${uuid}`,
-        params: { [`${key}${uuid}`]: `${value}` },
+        sql: `${fieldReference}::text ^@ :${key}${paramSuffix}`,
+        params: { [`${key}${paramSuffix}`]: `${value}` },
       };
     case 'endsWith':
       return {
-        sql: `"${objectNameSingular}"."${key}"::text LIKE :${key}${uuid}`,
-        params: { [`${key}${uuid}`]: `${value}` },
+        sql: `RIGHT(${fieldReference}::text, LENGTH(:${key}${paramSuffix})) = :${key}${paramSuffix}`,
+        params: { [`${key}${paramSuffix}`]: `${value}` },
       };
     case 'contains':
       return {
-        sql: `"${objectNameSingular}"."${key}" @> ARRAY[:...${key}${uuid}]`,
-        params: { [`${key}${uuid}`]: value },
+        sql: `${fieldReference} @> ARRAY[:...${key}${paramSuffix}]`,
+        params: { [`${key}${paramSuffix}`]: value },
       };
     case 'search': {
       const tsQuery = formatSearchTerms(value, 'and');
 
       return {
         sql: `(
-          "${objectNameSingular}"."${key}" @@ to_tsquery('simple', :${key}${uuid}Ts) OR
-          "${objectNameSingular}"."${key}"::text ILIKE :${key}${uuid}Like
+          ${fieldReference} @@ to_tsquery('simple', public.unaccent_immutable(:${key}${paramSuffix}Ts)) OR
+          public.unaccent_immutable(${fieldReference}::text) ILIKE public.unaccent_immutable(:${key}${paramSuffix}Like)
         )`,
         params: {
-          [`${key}${uuid}Ts`]: tsQuery,
-          [`${key}${uuid}Like`]: `%${value}%`,
+          [`${key}${paramSuffix}Ts`]: tsQuery,
+          [`${key}${paramSuffix}Like`]: `%${value}%`,
         },
       };
     }
     case 'notContains':
       return {
-        sql: `NOT ("${objectNameSingular}"."${key}"::text[] && ARRAY[:...${key}${uuid}]::text[])`,
-        params: { [`${key}${uuid}`]: value },
+        sql: `NOT (${fieldReference}::text[] && ARRAY[:...${key}${paramSuffix}]::text[])`,
+        params: { [`${key}${paramSuffix}`]: value },
       };
     case 'containsAny':
       return {
-        sql: `"${objectNameSingular}"."${key}"::text[] && ARRAY[:...${key}${uuid}]::text[]`,
-        params: { [`${key}${uuid}`]: value },
+        sql: `${fieldReference}::text[] && ARRAY[:...${key}${paramSuffix}]::text[]`,
+        params: { [`${key}${paramSuffix}`]: value },
       };
     case 'containsIlike':
       return {
-        sql: `EXISTS (SELECT 1 FROM unnest("${objectNameSingular}"."${key}") AS elem WHERE elem ILIKE :${key}${uuid})`,
-        params: { [`${key}${uuid}`]: value },
+        sql: `EXISTS (SELECT 1 FROM unnest(${fieldReference}) AS elem WHERE elem ILIKE :${key}${paramSuffix})`,
+        params: { [`${key}${paramSuffix}`]: value },
       };
     default:
       throw new GraphqlQueryRunnerException(
         `Operator "${operator}" is not supported`,
         GraphqlQueryRunnerExceptionCode.UNSUPPORTED_OPERATOR,
+        { userFriendlyMessage: STANDARD_ERROR_MESSAGE },
       );
   }
 };

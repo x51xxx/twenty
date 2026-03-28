@@ -2,7 +2,7 @@ import { type WorkspacePreQueryHookInstance } from 'src/engine/api/graphql/works
 import { type UpdateOneResolverArgs } from 'src/engine/api/graphql/workspace-resolver-builder/interfaces/workspace-resolvers-builder.interface';
 
 import { WorkspaceQueryHook } from 'src/engine/api/graphql/workspace-query-runner/workspace-query-hook/decorators/workspace-query-hook.decorator';
-import { type AuthContext } from 'src/engine/core-modules/auth/types/auth-context.type';
+import { type WorkspaceAuthContext } from 'src/engine/core-modules/auth/types/workspace-auth-context.type';
 import {
   WorkflowQueryValidationException,
   WorkflowQueryValidationExceptionCode,
@@ -14,11 +14,14 @@ export class WorkflowRunUpdateOnePreQueryHook
   implements WorkspacePreQueryHookInstance
 {
   async execute(
-    _authContext: AuthContext,
+    _authContext: WorkspaceAuthContext,
     _objectName: string,
     payload: UpdateOneResolverArgs<WorkflowRunWorkspaceEntity>,
   ): Promise<UpdateOneResolverArgs<WorkflowRunWorkspaceEntity>> {
-    if (Object.keys(payload.data).length === 1 && payload.data.name) {
+    const allowedFields = ['name'];
+    const payloadKeys = Object.keys(payload.data);
+
+    if (payloadKeys.every((key) => allowedFields.includes(key))) {
       return payload;
     }
 

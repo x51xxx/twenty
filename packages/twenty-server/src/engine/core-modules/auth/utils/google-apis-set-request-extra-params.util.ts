@@ -2,9 +2,9 @@ import {
   AuthException,
   AuthExceptionCode,
 } from 'src/engine/core-modules/auth/auth.exception';
-import { type GoogleAPIsRequest } from 'src/engine/core-modules/auth/types/google-api-request.type';
+import { type APIsOAuthRequest } from 'src/engine/core-modules/auth/types/apis-oauth-request.type';
 
-type GoogleAPIsRequestExtraParams = {
+type APIsOAuthRequestExtraParams = {
   transientToken?: string;
   redirectLocation?: string;
   calendarVisibility?: string;
@@ -12,11 +12,12 @@ type GoogleAPIsRequestExtraParams = {
   loginHint?: string;
   userId?: string;
   workspaceId?: string;
+  skipMessageChannelConfiguration?: string;
 };
 
 export const setRequestExtraParams = (
-  request: GoogleAPIsRequest,
-  params: GoogleAPIsRequestExtraParams,
+  request: APIsOAuthRequest,
+  params: APIsOAuthRequestExtraParams,
 ): void => {
   const {
     transientToken,
@@ -26,6 +27,7 @@ export const setRequestExtraParams = (
     loginHint,
     userId,
     workspaceId,
+    skipMessageChannelConfiguration,
   } = params;
 
   if (!transientToken) {
@@ -59,5 +61,10 @@ export const setRequestExtraParams = (
 
   if (workspaceId) {
     request.params.workspaceId = workspaceId;
+  }
+
+  if (skipMessageChannelConfiguration) {
+    request.params.skipMessageChannelConfiguration =
+      skipMessageChannelConfiguration;
   }
 };

@@ -1,4 +1,8 @@
-import { type ObjectsPermissionsDeprecated } from 'twenty-shared/types';
+import {
+  FeatureFlagKey,
+  FieldMetadataType,
+  type ObjectsPermissions,
+} from 'twenty-shared/types';
 import {
   type DeepPartial,
   type FindManyOptions,
@@ -11,7 +15,7 @@ import {
 import { type FeatureFlagMap } from 'src/engine/core-modules/feature-flag/interfaces/feature-flag-map.interface';
 import { type WorkspaceInternalContext } from 'src/engine/twenty-orm/interfaces/workspace-internal-context.interface';
 
-import { FeatureFlagKey } from 'src/engine/core-modules/feature-flag/enums/feature-flag-key.enum';
+import { type FlatFieldMetadata } from 'src/engine/metadata-modules/flat-field-metadata/types/flat-field-metadata.type';
 import { type WorkspaceEntityManager } from 'src/engine/twenty-orm/entity-manager/workspace-entity-manager';
 import { WorkspaceRepository } from 'src/engine/twenty-orm/repository/workspace.repository';
 
@@ -20,7 +24,7 @@ describe('WorkspaceRepository', () => {
   let mockEntityManager: jest.Mocked<WorkspaceEntityManager>;
   let mockInternalContext: WorkspaceInternalContext;
   let mockFeatureFlagMap: FeatureFlagMap;
-  let mockObjectRecordsPermissions: ObjectsPermissionsDeprecated;
+  let mockObjectRecordsPermissions: ObjectsPermissions;
   let mockQueryRunner: QueryRunner;
 
   beforeEach(() => {
@@ -55,15 +59,95 @@ describe('WorkspaceRepository', () => {
       decrement: jest.fn(),
       preload: jest.fn(),
       clear: jest.fn(),
+      get internalContext() {
+        return mockInternalContext;
+      },
     } as unknown as jest.Mocked<WorkspaceEntityManager>;
+
+    const mockFieldMetadata: FlatFieldMetadata = {
+      id: 'test-field-id',
+      name: 'id',
+      type: FieldMetadataType.UUID,
+      objectMetadataId: 'test-metadata-id',
+      isActive: true,
+      isNullable: false,
+      isUnique: true,
+      isSystem: true,
+      isCustom: false,
+      isUIReadOnly: false,
+      isLabelSyncedWithName: false,
+      label: 'ID',
+      description: 'Record ID',
+      icon: 'IconKey',
+      workspaceId: 'test-workspace-id',
+      universalIdentifier: 'id-field-universal-id',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      defaultValue: null,
+      options: null,
+      settings: null,
+      morphId: null,
+      standardOverrides: null,
+      applicationId: 'application-id',
+      relationTargetFieldMetadataId: null,
+      relationTargetObjectMetadataId: null,
+      calendarViewIds: [],
+      viewFilterIds: [],
+      fieldPermissionIds: [],
+      kanbanAggregateOperationViewIds: [],
+      viewFieldIds: [],
+      mainGroupByFieldMetadataViewIds: [],
+      applicationUniversalIdentifier: 'application-id',
+      objectMetadataUniversalIdentifier: 'test-metadata-id',
+      relationTargetObjectMetadataUniversalIdentifier: null,
+      relationTargetFieldMetadataUniversalIdentifier: null,
+      viewFilterUniversalIdentifiers: [],
+      viewFieldUniversalIdentifiers: [],
+      kanbanAggregateOperationViewUniversalIdentifiers: [],
+      calendarViewUniversalIdentifiers: [],
+      mainGroupByFieldMetadataViewUniversalIdentifiers: [],
+      fieldPermissionUniversalIdentifiers: [],
+      viewSortIds: [],
+      viewSortUniversalIdentifiers: [],
+      universalSettings: null,
+    };
 
     mockInternalContext = {
       workspaceId: 'test-workspace-id',
-      objectMetadataMaps: {
-        idByNameSingular: {},
+      flatObjectMetadataMaps: {
+        byUniversalIdentifier: {},
+        universalIdentifierById: {},
+        universalIdentifiersByApplicationId: {},
       },
-      featureFlagsMap: {},
-    } as WorkspaceInternalContext;
+      flatFieldMetadataMaps: {
+        byUniversalIdentifier: {
+          'id-field-universal-id': mockFieldMetadata,
+        },
+        universalIdentifierById: {
+          'test-field-id': 'id-field-universal-id',
+        },
+        universalIdentifiersByApplicationId: {},
+      },
+      flatIndexMaps: {
+        byUniversalIdentifier: {},
+        universalIdentifierById: {},
+        universalIdentifiersByApplicationId: {},
+      },
+      flatRowLevelPermissionPredicateMaps: {
+        byUniversalIdentifier: {},
+        universalIdentifierById: {},
+        universalIdentifiersByApplicationId: {},
+      },
+      flatRowLevelPermissionPredicateGroupMaps: {
+        byUniversalIdentifier: {},
+        universalIdentifierById: {},
+        universalIdentifiersByApplicationId: {},
+      },
+      objectIdByNameSingular: {},
+      featureFlagsMap: {} as FeatureFlagMap,
+      userWorkspaceRoleMap: {},
+      eventEmitterService: {} as unknown,
+    } as unknown as WorkspaceInternalContext;
 
     mockFeatureFlagMap = Object.values(FeatureFlagKey).reduce(
       (acc, key) => ({ ...acc, [key]: false }),
@@ -71,17 +155,18 @@ describe('WorkspaceRepository', () => {
     );
     mockObjectRecordsPermissions = {
       'test-entity': {
-        canRead: true,
-        canUpdate: false,
-        canSoftDelete: false,
-        canDestroy: false,
+        canReadObjectRecords: true,
+        canUpdateObjectRecords: false,
+        canSoftDeleteObjectRecords: false,
+        canDestroyObjectRecords: false,
         restrictedFields: {},
+        rowLevelPermissionPredicates: [],
+        rowLevelPermissionPredicateGroups: [],
       },
     };
     mockQueryRunner = {} as QueryRunner;
 
     repository = new WorkspaceRepository(
-      mockInternalContext,
       'test-entity',
       mockEntityManager,
       mockFeatureFlagMap,
@@ -97,6 +182,7 @@ describe('WorkspaceRepository', () => {
         id: 'test-metadata-id',
         nameSingular: 'test-entity',
         namePlural: 'test-entities',
+        fieldIds: ['test-field-id'],
         fieldIdByName: {
           id: 'test-field-id',
         },

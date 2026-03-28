@@ -1,30 +1,29 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { V0_54_UpgradeVersionCommandModule } from 'src/database/commands/upgrade-version-command/0-54/0-54-upgrade-version-command.module';
-import { V0_55_UpgradeVersionCommandModule } from 'src/database/commands/upgrade-version-command/0-55/0-55-upgrade-version-command.module';
-import { V1_1_UpgradeVersionCommandModule } from 'src/database/commands/upgrade-version-command/1-1/1-1-upgrade-version-command.module';
-import { V1_2_UpgradeVersionCommandModule } from 'src/database/commands/upgrade-version-command/1-2/1-2-upgrade-version-command.module';
-import { V1_3_UpgradeVersionCommandModule } from 'src/database/commands/upgrade-version-command/1-3/1-3-upgrade-version-command.module';
-import { V1_5_UpgradeVersionCommandModule } from 'src/database/commands/upgrade-version-command/1-5/1-5-upgrade-version-command.module';
-import {
-  DatabaseMigrationService,
-  UpgradeCommand,
-} from 'src/database/commands/upgrade-version-command/upgrade.command';
-import { Workspace } from 'src/engine/core-modules/workspace/workspace.entity';
-import { WorkspaceSyncMetadataModule } from 'src/engine/workspace-manager/workspace-sync-metadata/workspace-sync-metadata.module';
+import { V1_17_UpgradeVersionCommandModule } from 'src/database/commands/upgrade-version-command/1-17/1-17-upgrade-version-command.module';
+import { V1_18_UpgradeVersionCommandModule } from 'src/database/commands/upgrade-version-command/1-18/1-18-upgrade-version-command.module';
+import { V1_19_UpgradeVersionCommandModule } from 'src/database/commands/upgrade-version-command/1-19/1-19-upgrade-version-command.module';
+import { V1_20_UpgradeVersionCommandModule } from 'src/database/commands/upgrade-version-command/1-20/1-20-upgrade-version-command.module';
+import { UpgradeCommand } from 'src/database/commands/upgrade-version-command/upgrade.command';
+import { CoreEngineVersionModule } from 'src/engine/core-engine-version/core-engine-version.module';
+import { CoreMigrationRunnerModule } from 'src/database/commands/core-migration-runner/core-migration-runner.module';
+import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
+import { DataSourceModule } from 'src/engine/metadata-modules/data-source/data-source.module';
+import { WorkspaceVersionModule } from 'src/engine/workspace-manager/workspace-version/workspace-version.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Workspace]),
-    V0_54_UpgradeVersionCommandModule,
-    V0_55_UpgradeVersionCommandModule,
-    V1_1_UpgradeVersionCommandModule,
-    V1_2_UpgradeVersionCommandModule,
-    V1_3_UpgradeVersionCommandModule,
-    V1_5_UpgradeVersionCommandModule,
-    WorkspaceSyncMetadataModule,
+    TypeOrmModule.forFeature([WorkspaceEntity]),
+    V1_17_UpgradeVersionCommandModule,
+    V1_18_UpgradeVersionCommandModule,
+    V1_19_UpgradeVersionCommandModule,
+    V1_20_UpgradeVersionCommandModule,
+    DataSourceModule,
+    CoreEngineVersionModule,
+    CoreMigrationRunnerModule,
+    WorkspaceVersionModule,
   ],
-  providers: [DatabaseMigrationService, UpgradeCommand],
+  providers: [UpgradeCommand],
 })
 export class UpgradeVersionCommandModule {}

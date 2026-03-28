@@ -49,7 +49,7 @@ export const SettingsDataModelFieldAddressForm = ({
   const { control } = useFormContext<SettingsDataModelFieldTextFormValues>();
   const countries = [
     {
-      label: 'No country',
+      label: t`No country`,
       value: '',
       Icon: IconCircleOff,
     },
@@ -128,7 +128,7 @@ export const SettingsDataModelFieldAddressForm = ({
                   }),
                 )}
                 values={values}
-                dropdownId={'addressSubFieldsId'}
+                dropdownId="addressSubFieldsId"
                 onChange={onChange}
                 callToActionButton={{
                   text: t`Reset to default`,

@@ -1,40 +1,39 @@
-import styled from '@emotion/styled';
+import { styled } from '@linaria/react';
 import { useLingui } from '@lingui/react/macro';
 import { useEffect, useState } from 'react';
-import { useRecoilState, useRecoilValue } from 'recoil';
 import { useDebouncedCallback } from 'use-debounce';
 
 import { currentUserState } from '@/auth/states/currentUserState';
 import { currentWorkspaceMemberState } from '@/auth/states/currentWorkspaceMemberState';
-import { CoreObjectNameSingular } from '@/object-metadata/types/CoreObjectNameSingular';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
+import { useAtomState } from '@/ui/utilities/state/jotai/hooks/useAtomState';
+import { CoreObjectNameSingular } from 'twenty-shared/types';
 import { useUpdateOneRecord } from '@/object-record/hooks/useUpdateOneRecord';
+import { useCanEditProfileField } from '@/settings/profile/hooks/useCanEditProfileField';
 import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { logError } from '~/utils/logError';
 
 const StyledComboInputContainer = styled.div`
   display: flex;
   flex-direction: row;
   > * + * {
-    margin-left: ${({ theme }) => theme.spacing(4)};
+    margin-left: ${themeCssVariables.spacing[4]};
   }
 `;
 
 type NameFieldsProps = {
   autoSave?: boolean;
-  onFirstNameUpdate?: (firstName: string) => void;
-  onLastNameUpdate?: (lastName: string) => void;
 };
 
-export const NameFields = ({
-  autoSave = true,
-  onFirstNameUpdate,
-  onLastNameUpdate,
-}: NameFieldsProps) => {
+export const NameFields = ({ autoSave = true }: NameFieldsProps) => {
   const { t } = useLingui();
-  const currentUser = useRecoilValue(currentUserState);
-  const [currentWorkspaceMember, setCurrentWorkspaceMember] = useRecoilState(
+  const currentUser = useAtomStateValue(currentUserState);
+  const [currentWorkspaceMember, setCurrentWorkspaceMember] = useAtomState(
     currentWorkspaceMemberState,
   );
+  const { canEdit: canEditFirstName } = useCanEditProfileField('firstName');
+  const { canEdit: canEditLastName } = useCanEditProfileField('lastName');
 
   const [firstName, setFirstName] = useState(
     currentWorkspaceMember?.name?.firstName ?? '',
@@ -43,15 +42,10 @@ export const NameFields = ({
     currentWorkspaceMember?.name?.lastName ?? '',
   );
 
-  const { updateOneRecord } = useUpdateOneRecord({
-    objectNameSingular: CoreObjectNameSingular.WorkspaceMember,
-  });
+  const { updateOneRecord } = useUpdateOneRecord();
 
   // TODO: Enhance this with react-web-hook-form (https://www.react-hook-form.com)
   const debouncedUpdate = useDebouncedCallback(async () => {
-    onFirstNameUpdate?.(firstName);
-    onLastNameUpdate?.(lastName);
-
     try {
       if (!currentWorkspaceMember?.id) {
         throw new Error('User is not logged in');
@@ -59,6 +53,7 @@ export const NameFields = ({
 
       if (autoSave) {
         await updateOneRecord({
+          objectNameSingular: CoreObjectNameSingular.WorkspaceMember,
           idToUpdate: currentWorkspaceMember?.id,
           updateOneRecordInput: {
             name: {
@@ -107,6 +102,8 @@ export const NameFields = ({
     debouncedUpdate,
     autoSave,
     currentWorkspaceMember,
+    canEditFirstName,
+    canEditLastName,
   ]);
 
   const firstNameTextInputId = `${currentWorkspaceMember?.id}-first-name`;
@@ -119,16 +116,18 @@ export const NameFields = ({
         label={t`First Name`}
         value={firstName}
         onChange={setFirstName}
-        placeholder="Tim"
+        placeholder={t`Tim`}
         fullWidth
+        disabled={!canEditFirstName}
       />
       <SettingsTextInput
         instanceId={lastNameTextInputId}
         label={t`Last Name`}
         value={lastName}
         onChange={setLastName}
-        placeholder="Cook"
+        placeholder={t`Cook`}
         fullWidth
+        disabled={!canEditLastName}
       />
     </StyledComboInputContainer>
   );

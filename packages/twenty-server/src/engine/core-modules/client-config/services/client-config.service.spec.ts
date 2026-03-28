@@ -3,17 +3,17 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { NodeEnvironment } from 'src/engine/core-modules/twenty-config/interfaces/node-environment.interface';
 import { SupportDriver } from 'src/engine/core-modules/twenty-config/interfaces/support.interface';
 
-import { AiModelRegistryService } from 'src/engine/core-modules/ai/services/ai-model-registry.service';
 import { CaptchaDriverType } from 'src/engine/core-modules/captcha/interfaces';
 import { ClientConfigService } from 'src/engine/core-modules/client-config/services/client-config.service';
-import { DomainManagerService } from 'src/engine/core-modules/domain-manager/services/domain-manager.service';
+import { DomainServerConfigService } from 'src/engine/core-modules/domain/domain-server-config/services/domain-server-config.service';
 import { PUBLIC_FEATURE_FLAGS } from 'src/engine/core-modules/feature-flag/constants/public-feature-flag.const';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
+import { AiModelRegistryService } from 'src/engine/metadata-modules/ai/ai-models/services/ai-model-registry.service';
 
 describe('ClientConfigService', () => {
   let service: ClientConfigService;
   let twentyConfigService: TwentyConfigService;
-  let domainManagerService: DomainManagerService;
+  let domainServerConfigService: DomainServerConfigService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -26,7 +26,7 @@ describe('ClientConfigService', () => {
           },
         },
         {
-          provide: DomainManagerService,
+          provide: DomainServerConfigService,
           useValue: {
             getFrontUrl: jest.fn(),
           },
@@ -34,7 +34,9 @@ describe('ClientConfigService', () => {
         {
           provide: AiModelRegistryService,
           useValue: {
-            getAvailableModels: jest.fn().mockReturnValue([]),
+            getAdminFilteredModels: jest.fn().mockReturnValue([]),
+            getRecommendedModelIds: jest.fn().mockReturnValue(new Set()),
+            getModelConfig: jest.fn().mockReturnValue(undefined),
           },
         },
       ],
@@ -42,8 +44,9 @@ describe('ClientConfigService', () => {
 
     service = module.get<ClientConfigService>(ClientConfigService);
     twentyConfigService = module.get<TwentyConfigService>(TwentyConfigService);
-    domainManagerService =
-      module.get<DomainManagerService>(DomainManagerService);
+    domainServerConfigService = module.get<DomainServerConfigService>(
+      DomainServerConfigService,
+    );
   });
 
   it('should be defined', () => {
@@ -64,6 +67,7 @@ describe('ClientConfigService', () => {
             AUTH_GOOGLE_ENABLED: true,
             AUTH_PASSWORD_ENABLED: true,
             AUTH_MICROSOFT_ENABLED: false,
+            AUTH_CASDOOR_ENABLED: false,
             SIGN_IN_PREFILLED: false,
             IS_MULTIWORKSPACE_ENABLED: true,
             IS_EMAIL_VERIFICATION_REQUIRED: true,
@@ -76,7 +80,6 @@ describe('ClientConfigService', () => {
             SENTRY_FRONT_DSN: 'https://sentry.example.com',
             CAPTCHA_DRIVER: CaptchaDriverType.GOOGLE_RECAPTCHA,
             CAPTCHA_SITE_KEY: 'site-key-123',
-            CHROME_EXTENSION_ID: 'extension-123',
             MUTATION_MAXIMUM_AFFECTED_RECORDS: 1000,
             IS_ATTACHMENT_PREVIEW_ENABLED: true,
             ANALYTICS_ENABLED: true,
@@ -85,13 +88,16 @@ describe('ClientConfigService', () => {
             MESSAGING_PROVIDER_GMAIL_ENABLED: true,
             CALENDAR_PROVIDER_GOOGLE_ENABLED: true,
             IS_CONFIG_VARIABLES_IN_DB_ENABLED: false,
+            IS_IMAP_SMTP_CALDAV_ENABLED: false,
             CALENDAR_BOOKING_PAGE_ID: 'team/twenty/talk-to-us',
+            CLOUDFLARE_API_KEY: undefined,
+            CLOUDFLARE_ZONE_ID: undefined,
           };
 
           return mockValues[key];
         });
 
-      jest.spyOn(domainManagerService, 'getFrontUrl').mockReturnValue({
+      jest.spyOn(domainServerConfigService, 'getFrontUrl').mockReturnValue({
         hostname: 'app.twenty.com',
       } as URL);
     });
@@ -121,6 +127,7 @@ describe('ClientConfigService', () => {
           magicLink: false,
           password: true,
           microsoft: false,
+          casdoor: false,
           sso: [],
         },
         signInPrefilled: false,
@@ -128,7 +135,6 @@ describe('ClientConfigService', () => {
         isEmailVerificationRequired: true,
         defaultSubdomain: 'app',
         frontDomain: 'app.twenty.com',
-        debugMode: true,
         support: {
           supportDriver: 'FRONT',
           supportFrontChatId: 'chat-123',
@@ -142,7 +148,6 @@ describe('ClientConfigService', () => {
           provider: 'GOOGLE_RECAPTCHA',
           siteKey: 'site-key-123',
         },
-        chromeExtensionId: 'extension-123',
         api: {
           mutationMaximumAffectedRecords: 1000,
         },
@@ -155,7 +160,10 @@ describe('ClientConfigService', () => {
         isGoogleMessagingEnabled: true,
         isGoogleCalendarEnabled: true,
         isConfigVariablesInDbEnabled: false,
+        isImapSmtpCaldavEnabled: false,
         calendarBookingPageId: 'team/twenty/talk-to-us',
+        isCloudflareIntegrationEnabled: false,
+        isClickHouseConfigured: false,
       });
     });
 
@@ -171,7 +179,6 @@ describe('ClientConfigService', () => {
 
       const result = await service.getClientConfig();
 
-      expect(result.debugMode).toBe(false);
       expect(result.canManageFeatureFlags).toBe(false);
       expect(result.aiModels).toEqual([]);
     });

@@ -1,72 +1,15 @@
 import { gql } from '@apollo/client';
-import { FieldMetadataType, PermissionsOnAllObjectRecords } from '~/generated/graphql';
+import {
+  DeleteOneFieldMetadataItemDocument,
+  FieldMetadataType,
+} from '~/generated-metadata/graphql';
 
 export const FIELD_METADATA_ID = '2c43466a-fe9e-4005-8d08-c5836067aa6c';
 export const FIELD_RELATION_METADATA_ID =
   '4da0302d-358a-45cd-9973-9f92723ed3c1';
 
 export const queries = {
-  deleteMetadataField: gql`
-    mutation DeleteOneFieldMetadataItem($idToDelete: UUID!) {
-      deleteOneField(input: { id: $idToDelete }) {
-        id
-        type
-        name
-        label
-        description
-        icon
-        isCustom
-        isActive
-        isUnique
-        isNullable
-        createdAt
-        updatedAt
-        settings
-      }
-    }
-  `,
-  findManyViewsQuery: gql`
-    query FindManyViews(
-      $filter: ViewFilterInput
-      $orderBy: [ViewOrderByInput]
-      $lastCursor: String
-      $limit: Int
-    ) {
-      views(
-        filter: $filter
-        orderBy: $orderBy
-        first: $limit
-        after: $lastCursor
-      ) {
-        edges {
-          node {
-            __typename
-            id
-            viewGroups {
-              edges {
-                node {
-                  __typename
-                  fieldMetadataId
-                  fieldValue
-                  id
-                  isVisible
-                  position
-                }
-              }
-            }
-          }
-          cursor
-        }
-        pageInfo {
-          hasNextPage
-          hasPreviousPage
-          startCursor
-          endCursor
-        }
-        totalCount
-      }
-    }
-  `,
+  deleteMetadataField: DeleteOneFieldMetadataItemDocument,
   activateMetadataField: gql`
     mutation UpdateOneFieldMetadataItem(
       $idToUpdate: UUID!
@@ -86,6 +29,10 @@ export const queries = {
         updatedAt
         settings
         isLabelSyncedWithName
+        applicationId
+        object {
+          id
+        }
       }
     }
   `,
@@ -108,6 +55,10 @@ export const queries = {
         defaultValue
         options
         isLabelSyncedWithName
+        applicationId
+        object {
+          id
+        }
       }
     }
   `,
@@ -158,6 +109,7 @@ const defaultResponseData = {
   createdAt: '1977-09-28T13:56:55.157Z',
   updatedAt: '1996-10-10T08:27:57.117Z',
   settings: undefined,
+  applicationId: null,
 };
 
 const fieldRelationResponseData = {
@@ -200,12 +152,6 @@ export const responseData = {
       workspaceMembers: [],
       currentUserWorkspace: {
         permissionFlags: ['DATA_MODEL'],
-        objectRecordsPermissions: [
-          PermissionsOnAllObjectRecords.READ_ALL_OBJECT_RECORDS,
-          PermissionsOnAllObjectRecords.UPDATE_ALL_OBJECT_RECORDS,
-          PermissionsOnAllObjectRecords.SOFT_DELETE_ALL_OBJECT_RECORDS,
-          PermissionsOnAllObjectRecords.DESTROY_ALL_OBJECT_RECORDS,
-        ],
       },
       currentWorkspace: {
         id: 'test-workspace-id',
@@ -216,6 +162,8 @@ export const responseData = {
         activationStatus: 'active',
         isPublicInviteLinkEnabled: false,
         hasValidEnterpriseKey: false,
+        hasValidSignedEnterpriseKey: false,
+        hasValidEnterpriseValidityToken: false,
         isGoogleAuthEnabled: true,
         isMicrosoftAuthEnabled: false,
         isPasswordAuthEnabled: true,
@@ -229,7 +177,7 @@ export const responseData = {
         metadataVersion: 1,
         currentBillingSubscription: null,
         workspaceMembersCount: 1,
-        defaultRole:  {
+        defaultRole: {
           id: 'default-role-id',
           label: 'Default Role',
           description: 'Default Role Description',
@@ -239,7 +187,7 @@ export const responseData = {
           canUpdateAllObjectRecords: true,
           canSoftDeleteAllObjectRecords: true,
           canDestroyAllObjectRecords: true,
-        }
+        },
       },
       currentBillingSubscription: null,
       billingSubscriptions: [],

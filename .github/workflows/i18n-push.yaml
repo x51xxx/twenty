@@ -1,5 +1,9 @@
 name: 'Push translations to Crowdin'
 
+permissions:
+  contents: write
+  pull-requests: write
+
 on:
   workflow_dispatch:
   workflow_call:
@@ -8,15 +12,12 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   extract_translations:
     name: Extract and upload translations
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,7 +31,7 @@ jobs:
           git checkout -B i18n origin/i18n || git checkout -b i18n
 
       - name: Install dependencies
-        uses: ./.github/workflows/actions/yarn-install
+        uses: ./.github/actions/yarn-install
 
       - name: Build dependencies
         run: npx nx build twenty-shared
@@ -86,11 +87,10 @@ jobs:
           download_translations: false
           localization_branch_name: i18n
           base_url: 'https://twenty.api.crowdin.com'
+          config: '.github/crowdin-app.yml'
         env:
-          # A numeric ID, found at https://crowdin.com/project/<projectName>/tools/api
-          CROWDIN_PROJECT_ID: 1
-
-          # Visit https://crowdin.com/settings#api-key to create this token
+          # App translations project
+          CROWDIN_PROJECT_ID: '1'
           CROWDIN_PERSONAL_TOKEN: ${{ secrets.CROWDIN_PERSONAL_TOKEN }}
       - name: Create a pull request
         if: steps.check_extract_changes.outputs.changes_detected == 'true' || steps.check_compile_changes.outputs.changes_detected == 'true'
@@ -102,3 +102,11 @@ jobs:
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Trigger i18n automerge
+        if: steps.check_extract_changes.outputs.changes_detected == 'true' || steps.check_compile_changes.outputs.changes_detected == 'true'
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.TWENTY_INFRA_TOKEN }}
+          repository: twentyhq/twenty-infra
+          event-type: i18n-pr-ready

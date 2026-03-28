@@ -4,14 +4,14 @@ import {
 } from '@ptc-org/nestjs-query-graphql';
 import { v4 as uuidv4 } from 'uuid';
 
-import { type AppToken } from 'src/engine/core-modules/app-token/app-token.entity';
+import { type AppTokenEntity } from 'src/engine/core-modules/app-token/app-token.entity';
 
-export class BeforeCreateOneAppToken<T extends AppToken>
+export class BeforeCreateOneAppToken<T extends AppTokenEntity>
   implements BeforeCreateOneHook<T>
 {
   async run(
     instance: CreateOneInputType<T>,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line @typescripttypescript/no-explicit-any
     context: any,
   ): Promise<CreateOneInputType<T>> {
     const userId = context?.req?.user?.id;

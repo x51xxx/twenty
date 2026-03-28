@@ -4,12 +4,14 @@ import {
   FieldActorMetadata,
   FieldFullNameMetadata,
   FieldLinksMetadata,
+  FieldMorphRelationMetadata,
   FieldRatingMetadata,
+  FieldRichTextMetadata,
   FieldSelectMetadata,
   FieldTextMetadata,
 } from '@/object-record/record-field/ui/types/FieldMetadata';
-import { FieldMetadataType } from '~/generated-metadata/graphql';
-import { generatedMockObjectMetadataItems } from '~/testing/utils/generatedMockObjectMetadataItems';
+import { FieldMetadataType, RelationType } from '~/generated-metadata/graphql';
+import { getTestEnrichedObjectMetadataItemsMock } from '~/testing/utils/getTestEnrichedObjectMetadataItemsMock';
 
 export const fieldMetadataId = 'fieldMetadataId';
 
@@ -22,9 +24,10 @@ export const textfieldDefinition: FieldDefinition<FieldTextMetadata> = {
   metadata: { placeHolder: 'John Doe', fieldName: 'userName' },
 };
 
-const mockedPersonObjectMetadataItem = generatedMockObjectMetadataItems.find(
-  ({ nameSingular }) => nameSingular === 'person',
-);
+const mockedPersonObjectMetadataItem =
+  getTestEnrichedObjectMetadataItemsMock().find(
+    ({ nameSingular }) => nameSingular === 'person',
+  );
 
 if (!mockedPersonObjectMetadataItem) {
   throw new Error('Person object metadata item not found');
@@ -85,9 +88,10 @@ export const ratingFieldDefinition: FieldDefinition<FieldRatingMetadata> = {
   },
 };
 
-const mockedCompanyObjectMetadataItem = generatedMockObjectMetadataItems.find(
-  (item) => item.nameSingular === 'company',
-);
+const mockedCompanyObjectMetadataItem =
+  getTestEnrichedObjectMetadataItemsMock().find(
+    (item) => item.nameSingular === 'company',
+  );
 
 if (!mockedCompanyObjectMetadataItem) {
   throw new Error('Company object metadata item not found');
@@ -126,5 +130,33 @@ export const linksFieldDefinition: FieldDefinition<FieldLinksMetadata> = {
   metadata: {
     fieldName: 'links',
     objectMetadataNameSingular: 'company',
+    settings: null,
   },
 };
+
+export const richTextFieldDefinition: FieldDefinition<FieldRichTextMetadata> = {
+  fieldMetadataId,
+  label: 'Description',
+  iconName: 'IconAlignLeft',
+  type: FieldMetadataType.RICH_TEXT,
+  defaultValue: { blocknote: null, markdown: null },
+  metadata: {
+    fieldName: 'description',
+  },
+};
+
+export const morphRelationFieldDefinition: FieldDefinition<FieldMorphRelationMetadata> =
+  {
+    fieldMetadataId,
+    label: 'Attachments',
+    iconName: 'IconLink',
+    type: FieldMetadataType.MORPH_RELATION,
+    defaultValue: [],
+    metadata: {
+      fieldName: 'attachments',
+      objectMetadataNameSingular: 'company',
+      morphRelations: [],
+      relationType: RelationType.ONE_TO_MANY,
+      settings: null,
+    },
+  };

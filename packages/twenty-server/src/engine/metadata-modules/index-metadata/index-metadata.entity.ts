@@ -7,7 +7,7 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
-  Relation,
+  type Relation,
   Unique,
   UpdateDateColumn,
 } from 'typeorm';
@@ -15,6 +15,7 @@ import {
 import { IndexFieldMetadataEntity } from 'src/engine/metadata-modules/index-metadata/index-field-metadata.entity';
 import { IndexType } from 'src/engine/metadata-modules/index-metadata/types/indexType.types';
 import { ObjectMetadataEntity } from 'src/engine/metadata-modules/object-metadata/object-metadata.entity';
+import { SyncableEntity } from 'src/engine/workspace-manager/types/syncable-entity.interface';
 
 @Unique('IDX_INDEX_METADATA_NAME_WORKSPACE_ID_OBJECT_METADATA_ID_UNIQUE', [
   'name',
@@ -26,7 +27,10 @@ import { ObjectMetadataEntity } from 'src/engine/metadata-modules/object-metadat
   'objectMetadataId',
 ])
 @Entity('indexMetadata')
-export class IndexMetadataEntity {
+export class IndexMetadataEntity
+  extends SyncableEntity
+  implements Required<IndexMetadataEntity>
+{
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -38,9 +42,6 @@ export class IndexMetadataEntity {
 
   @Column({ nullable: false })
   name: string;
-
-  @Column({ nullable: true })
-  workspaceId: string;
 
   @Column({ nullable: false, type: 'uuid' })
   objectMetadataId: string;

@@ -1,11 +1,12 @@
-import { expect } from '@storybook/test';
 import { renderHook } from '@testing-library/react';
-import { act } from 'react';
-import { RecoilRoot, useRecoilValue } from 'recoil';
+import { Provider as JotaiProvider } from 'jotai';
+import { type ReactNode, act } from 'react';
 
 import { isKeyboardShortcutMenuOpenedState } from '@/keyboard-shortcut-menu/states/isKeyboardShortcutMenuOpenedState';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
+import { jotaiStore } from '@/ui/utilities/state/jotai/jotaiStore';
 
-import { useKeyboardShortcutMenu } from '../useKeyboardShortcutMenu';
+import { useKeyboardShortcutMenu } from '@/keyboard-shortcut-menu/hooks/useKeyboardShortcutMenu';
 
 const mockPushFocusItemToFocusStack = jest.fn();
 const mockRemoveFocusItemFromFocusStackById = jest.fn();
@@ -25,10 +26,14 @@ jest.mock(
   }),
 );
 
+const Wrapper = ({ children }: { children: ReactNode }) => (
+  <JotaiProvider store={jotaiStore}>{children}</JotaiProvider>
+);
+
 const renderHookConfig = () => {
   const { result } = renderHook(
     () => {
-      const isKeyboardShortcutMenuOpened = useRecoilValue(
+      const isKeyboardShortcutMenuOpened = useAtomStateValue(
         isKeyboardShortcutMenuOpenedState,
       );
       return {
@@ -37,7 +42,7 @@ const renderHookConfig = () => {
       };
     },
     {
-      wrapper: RecoilRoot,
+      wrapper: Wrapper,
     },
   );
   return { result };
